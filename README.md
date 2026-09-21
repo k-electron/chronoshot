@@ -2,6 +2,8 @@
 
 > A top-down tactical arcade puzzle-shooter where **time moves only when you move**.
 
+[![CI](https://github.com/k-electron/chronoshot/actions/workflows/ci.yml/badge.svg)](https://github.com/k-electron/chronoshot/actions/workflows/ci.yml)
+[![Cloudflare Pages](https://img.shields.io/badge/Deployed%20with-Cloudflare%20Pages-F38020.svg?logo=cloudflare)](https://pages.cloudflare.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg)](https://vitejs.dev/)
@@ -164,18 +166,39 @@ npm run build
 npm run preview
 ```
 
+### Continuous Integration & Cloudflare Pages Hosting
+
+- **GitHub Actions**: Automated CI (`.github/workflows/ci.yml`) runs on all pull requests and pushes to `main`. It validates dependencies, TypeScript compilation, Vite production build, and all 94 Vitest unit tests under Node 26.
+- **Cloudflare Pages Hosting**:
+  1. In the [Cloudflare Dashboard](https://dash.cloudflare.com/), go to **Workers & Pages** > **Create application** > **Pages** > **Connect to Git**.
+  2. Select the `k-electron/chronoshot` repository.
+  3. Set the build configuration:
+     - **Framework preset**: `Vite` (or None)
+     - **Build command**: `npm run build`
+     - **Build output directory**: `dist`
+     - **Environment variables**: Add `NODE_VERSION` = `26` (also auto-detected from `.nvmrc`)
+  4. Click **Save and Deploy**. Cloudflare Pages automatically delivers edge-cached static assets with security headers (`public/_headers`) and generates instant preview URLs for each pull request.
+
 ---
 
 ## 📁 Project Structure
 
 ```text
 chronoshot/
+├── .github/
+│   └── workflows/                # GitHub Actions CI automation (Node 26)
+│       └── ci.yml
+├── .nvmrc                        # Pinned Node runtime (Node 26)
 ├── openspec/                     # OpenSpec durable specifications & archives
 │   ├── specs/                    # Durable project capability specs
 │   │   ├── combat-arena/spec.md
 │   │   ├── time-engine/spec.md
 │   │   └── weapon-system/spec.md
-│   └── changes/archive/          # Completed change proposals
+│   └── changes/                  # Active and completed changes
+├── public/                       # Static public assets copied to dist/ root
+│   ├── _headers                  # Cloudflare Pages edge cache & security headers
+│   ├── _redirects                # SPA fallback rule
+│   └── favicon.svg               # Vector reticle favicon
 ├── src/
 │   ├── audio/                    # Procedural Web Audio API sound synthesizer
 │   │   └── SoundSynthesizer.ts
