@@ -41,43 +41,17 @@
       }
       canvas {
         display: block;
-        background: #0e1117;
-        box-shadow: 0 0 32px rgba(0, 0, 0, 0.75), 0 0 1px rgba(0, 240, 255, 0.2);
-        border: 1px solid #263242;
-        border-radius: 4px;
-        cursor: crosshair;
-      }
-      .controls-bar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        width: 960px;
-        padding: 10px 4px 0 4px;
-        font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
-        font-size: 11px;
-        letter-spacing: 0.5px;
-        color: #6e7681;
-      }
-      .controls-bar span strong {
-        color: #00f0ff;
-        font-weight: 700;
-      }
-      .controls-bar span.accent strong {
-        color: #ff7961;
+        background: #0b0d11;
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.85), 0 0 1px rgba(0, 240, 255, 0.3);
+        border: 1px solid #1c2330;
+        border-radius: 6px;
+        cursor: none;
       }
     </style>
   </head>
   <body>
     <div id="game-container">
       <canvas id="game-canvas" width="960" height="640"></canvas>
-      <div class="controls-bar">
-        <span><strong>[WASD]</strong> MOVE (TIME SCALE)</span>
-        <span><strong>[MOUSE]</strong> AIM</span>
-        <span><strong>[L-CLICK]</strong> FIRE (+6 TICKS)</span>
-        <span class="accent"><strong>[R]</strong> RELOAD (+30 TICKS)</span>
-        <span><strong>[R]</strong> RESTART ON DEFEAT</span>
-        <span><strong>[M]</strong> MUTE</span>
-      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

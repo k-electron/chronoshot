@@ -45,6 +45,7 @@ export class Player implements CombatUnit {
   public acceleration: number;
   public friction: number;
   public aimAngle: number;
+  public aimTarget: Vector2D;
   public isAlive: boolean;
   public weapon: Revolver;
 
@@ -57,6 +58,7 @@ export class Player implements CombatUnit {
     this.position = vec2(x, y);
     this.previousPosition = vec2(x, y);
     this.velocity = vec2(0, 0);
+    this.aimTarget = vec2(x + 50, y);
     this.radius = config.radius ?? 14;
     this.maxSpeed = config.maxSpeed ?? 240;
     this.acceleration = config.acceleration ?? 2000;
@@ -71,6 +73,7 @@ export class Player implements CombatUnit {
    * Free aiming does not advance physical time scale.
    */
   public setAimTarget(target: Vector2D): void {
+    this.aimTarget = { ...target };
     const diff = vecSub(target, this.position);
     if (vecLengthSq(diff) > 1e-4) {
       this.aimAngle = vecAngle(diff);

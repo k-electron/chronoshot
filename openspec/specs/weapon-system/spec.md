@@ -33,4 +33,4 @@ The system SHALL support reloading back to full capacity and render a real-time 
 
 #### Scenario: Visualizing chamber states
 - **WHEN** the HUD renders the current weapon state
-- **THEN** the revolver cylinder visually reflects all available and expended bullet chambers
+- **THEN** the revolver cylinder visually reflects all available and expended bullet chambers using hairline circular geometry, loaded cyan pips, hollow spent sockets, and an active chamber alignment notch

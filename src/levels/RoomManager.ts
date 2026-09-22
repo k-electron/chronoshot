@@ -11,6 +11,7 @@
  */
 
 import { vecDistance, Vector2D } from "../math/vector";
+import { getUIFont, UITheme } from "../ui/theme";
 import { createStandardRoomSequence, RoomConfig } from "./Room";
 
 export class RoomManager {
@@ -226,27 +227,30 @@ export class RoomManager {
   }
 
   /**
-   * Renders the Room Title, Subtitle, and Tactical Tip at the top of the arena.
+   * Renders the Room Title, Subtitle, and Tactical Tip anchored cleanly in the top-left corner.
    */
-  public renderRoomHeader(ctx: CanvasRenderingContext2D, width: number): void {
+  public renderRoomHeader(ctx: CanvasRenderingContext2D, _width: number): void {
     const room = this.getCurrentRoom();
     ctx.save();
-    ctx.textAlign = "center";
+    ctx.textAlign = "left";
     ctx.textBaseline = "top";
 
+    const x = 24;
+    const y = 20;
+
     // Room title badge
-    ctx.font = "900 14px monospace";
+    ctx.font = "bold 11px monospace";
     ctx.fillStyle = "#00f0ff";
     ctx.fillText(
-      `${room.title}  [${room.roomNumber}/${this.rooms.length}]`,
-      width / 2,
-      12
+      `${room.title.toUpperCase()}  [${room.roomNumber}/${this.rooms.length}]`,
+      x,
+      y
     );
 
     // Subtitle & tactical guidance
-    ctx.font = "bold 11px monospace";
-    ctx.fillStyle = "#8b949e";
-    ctx.fillText(room.tacticalTip, width / 2, 30);
+    ctx.font = "10px monospace";
+    ctx.fillStyle = "#64748b";
+    ctx.fillText(room.tacticalTip, x, y + 18);
 
     ctx.restore();
   }
@@ -260,42 +264,53 @@ export class RoomManager {
     height: number
   ): void {
     ctx.save();
-    ctx.fillStyle = "rgba(6, 14, 22, 0.9)";
+    ctx.fillStyle = "rgba(7, 10, 15, 0.92)";
     ctx.fillRect(0, 0, width, height);
 
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
-    // Cyberpunk geometric border
-    ctx.strokeStyle = "#00f0ff";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(40, 40, width - 80, height - 80);
+    // Minimalist hairline frame
+    ctx.strokeStyle = UITheme.colors.panelBorder;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(60, 60, width - 120, height - 120);
 
     // Accent corner tabs
-    const cornerSize = 16;
-    ctx.fillStyle = "#00f0ff";
-    ctx.fillRect(40, 40, cornerSize, 4);
-    ctx.fillRect(40, 40, 4, cornerSize);
-    ctx.fillRect(width - 40 - cornerSize, 40, cornerSize, 4);
-    ctx.fillRect(width - 44, 40, 4, cornerSize);
-    ctx.fillRect(40, height - 44, cornerSize, 4);
-    ctx.fillRect(40, height - 40 - cornerSize, 4, cornerSize);
-    ctx.fillRect(width - 40 - cornerSize, height - 44, cornerSize, 4);
-    ctx.fillRect(width - 44, height - 40 - cornerSize, 4, cornerSize);
+    const cornerSize = 14;
+    ctx.strokeStyle = UITheme.colors.cyan;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    // Top-left
+    ctx.moveTo(60, 60 + cornerSize);
+    ctx.lineTo(60, 60);
+    ctx.lineTo(60 + cornerSize, 60);
+    // Top-right
+    ctx.moveTo(width - 60 - cornerSize, 60);
+    ctx.lineTo(width - 60, 60);
+    ctx.lineTo(width - 60, 60 + cornerSize);
+    // Bottom-left
+    ctx.moveTo(60, height - 60 - cornerSize);
+    ctx.lineTo(60, height - 60);
+    ctx.lineTo(60 + cornerSize, height - 60);
+    // Bottom-right
+    ctx.moveTo(width - 60 - cornerSize, height - 60);
+    ctx.lineTo(width - 60, height - 60);
+    ctx.lineTo(width - 60, height - 60 - cornerSize);
+    ctx.stroke();
 
     // Title
-    ctx.font = "900 42px monospace";
-    ctx.fillStyle = "#00f0ff";
+    ctx.font = getUIFont(34, "800");
+    ctx.fillStyle = UITheme.colors.cyan;
     ctx.fillText("MISSION ACCOMPLISHED", width / 2, height / 2 - 75);
 
     // Subtitle
-    ctx.font = "bold 18px monospace";
-    ctx.fillStyle = "#ffffff";
+    ctx.font = getUIFont(13, "600");
+    ctx.fillStyle = UITheme.colors.textPrimary;
     ctx.fillText("ALL 3 PUZZLE PROTOCOLS CONQUERED", width / 2, height / 2 - 20);
 
     // Protocol checkmarks
-    ctx.font = "13px monospace";
-    ctx.fillStyle = "#7ee787";
+    ctx.font = getUIFont(11, "600");
+    ctx.fillStyle = UITheme.colors.green;
     ctx.fillText(
       "✓ 1v1 Cover Mastery  |  ✓ 2v1 Flank Defense  |  ✓ Buckshot Neutralized",
       width / 2,
@@ -303,8 +318,8 @@ export class RoomManager {
     );
 
     // Reset prompt
-    ctx.font = "bold 16px monospace";
-    ctx.fillStyle = "#e0e6ed";
+    ctx.font = getUIFont(12, "bold");
+    ctx.fillStyle = UITheme.colors.textPrimary;
     ctx.fillText("PRESS [R] TO PLAY AGAIN", width / 2, height / 2 + 90);
 
     ctx.restore();

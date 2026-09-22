@@ -1,14 +1,15 @@
 /**
  * TimeHUD module for ChronoShot.
  *
- * Renders an interactive Canvas 2D time scale gauge showing:
- * - Dynamic time scale gauge [5% micro-creep .. 100% full speed]
- * - Current percentage reading
- * - Tactical action tick burst indicator (+6 Fire, +30 Reload)
- * - "TIME MOVES ONLY WHEN YOU MOVE" status guidance
+ * Renders a top-right minimalist hairline time telemetry gauge:
+ * - Dynamic speed multiplier reading (e.g. "CHRONO // 0.05x" to "1.00x")
+ * - Razor-thin 2px hairline latency bar
+ * - Transient micro-pill action burst badges (+6 Fire, +30 Reload)
+ * - Muted status guidance (Micro-creep vs. Active realtime)
  */
 
 import { TimeGovernor } from "../engine/TimeGovernor";
+import { getUIFont, UITheme } from "./theme";
 
 export interface TimeHUDConfig {
   x: number;
@@ -21,23 +22,29 @@ export class TimeHUD {
   private config: TimeHUDConfig;
   private lastBurstMessage: string = "";
   private burstMessageTimer: number = 0;
+  private maxBurstTimer: number = 0.5;
 
   constructor(config?: Partial<TimeHUDConfig>) {
     this.config = {
-      x: config?.x ?? 20,
+      x: config?.x ?? 776,
       y: config?.y ?? 20,
-      width: config?.width ?? 200,
-      height: config?.height ?? 12,
+      width: config?.width ?? 160,
+      height: config?.height ?? 3,
     };
+  }
+
+  public setPosition(x: number, y: number): void {
+    this.config.x = x;
+    this.config.y = y;
   }
 
   public notifyBurst(ticks: number, label: string): void {
     this.lastBurstMessage = `+${ticks} TICKS [${label.toUpperCase()}]`;
-    this.burstMessageTimer = 0.6; // show for 600ms
+    this.burstMessageTimer = this.maxBurstTimer;
   }
 
   /**
-   * Renders the dynamic time scale meter onto the canvas.
+   * Renders the streamlined hairline time telemetry gauge onto the canvas.
    */
   public render(
     ctx: CanvasRenderingContext2D,
@@ -46,7 +53,7 @@ export class TimeHUD {
   ): void {
     const { x, y, width, height } = this.config;
     const timeScale = governor.getTimeScale();
-    const percent = Math.round(timeScale * 100);
+    const speedMultiplier = timeScale.toFixed(2);
 
     if (this.burstMessageTimer > 0) {
       this.burstMessageTimer = Math.max(0, this.burstMessageTimer - wallDeltaTime);
@@ -54,44 +61,41 @@ export class TimeHUD {
 
     ctx.save();
 
-    // 1. Text header: TIME SCALE: XX%
+    // 1. Telemetry Header: "CHRONO // 0.05x"
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
-    ctx.font = "bold 12px monospace";
-    ctx.fillStyle = timeScale > 0.5 ? "#ffffff" : "#00e5ff";
-    ctx.fillText(`TIME DILATION: ${percent}%`, x, y);
+    ctx.font = getUIFont(11, "bold");
+    ctx.fillStyle = timeScale > 0.5 ? UITheme.colors.white : UITheme.colors.cyan;
+    ctx.fillText(`CHRONO // ${speedMultiplier}x`, x, y);
 
-    // 2. Gauge Background
+    // 2. Hairline Gauge Track (2px thin track with translucent backing)
     const gaugeY = y + 18;
-    ctx.fillStyle = "#151a21";
+    ctx.fillStyle = UITheme.colors.panelBorder;
     ctx.fillRect(x, gaugeY, width, height);
 
-    ctx.strokeStyle = "#27313f";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(x, gaugeY, width, height);
-
-    // 3. Gauge Fill Bar
+    // 3. Active Luminous Fill
     const fillWidth = Math.max(2, Math.min(width, width * timeScale));
     const gradient = ctx.createLinearGradient(x, gaugeY, x + width, gaugeY);
-    gradient.addColorStop(0, "#00bcd4");
-    gradient.addColorStop(0.5, "#00e5ff");
-    gradient.addColorStop(1, "#ffffff");
+    gradient.addColorStop(0, UITheme.colors.cyanMuted);
+    gradient.addColorStop(0.7, UITheme.colors.cyan);
+    gradient.addColorStop(1, UITheme.colors.white);
 
     ctx.fillStyle = gradient;
     ctx.fillRect(x, gaugeY, fillWidth, height);
 
-    // 4. Subtle status or Action Burst flash
+    // 4. Status Guidance / Action Burst Badge
     const statusY = gaugeY + height + 6;
-    ctx.font = "10px monospace";
+    ctx.font = getUIFont(10, "600");
 
     if (this.burstMessageTimer > 0 && this.lastBurstMessage) {
-      ctx.fillStyle = "#ffb700";
+      const alpha = Math.min(1, this.burstMessageTimer / 0.15);
+      ctx.fillStyle = `rgba(255, 183, 0, ${alpha})`;
       ctx.fillText(this.lastBurstMessage, x, statusY);
     } else if (timeScale <= 0.08) {
-      ctx.fillStyle = "#6a7b8f";
-      ctx.fillText("TIME MOVES ONLY WHEN YOU MOVE", x, statusY);
+      ctx.fillStyle = UITheme.colors.textMuted;
+      ctx.fillText("5% MICRO-CREEP", x, statusY);
     } else {
-      ctx.fillStyle = "#4caf50";
+      ctx.fillStyle = UITheme.colors.green;
       ctx.fillText("ACTIVE REALTIME", x, statusY);
     }
 

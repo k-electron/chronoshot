@@ -39,6 +39,7 @@ window.addEventListener("DOMContentLoaded", () => {
   let shootRequested = false;
   let reloadRequested = false;
   let restartRequested = false;
+  let pauseRequested = false;
   let isMuted = false;
 
   // Window coordinate mapping for canvas scaling
@@ -55,6 +56,11 @@ window.addEventListener("DOMContentLoaded", () => {
   // Keyboard Event Handlers
   window.addEventListener("keydown", (e: KeyboardEvent) => {
     keysDown.add(e.code);
+
+    if (e.code === "Escape" || e.code === "KeyP") {
+      e.preventDefault();
+      pauseRequested = true;
+    }
 
     if (e.code === "KeyR") {
       if (arena.status === "defeat" || arena.status === "victory") {
@@ -87,6 +93,8 @@ window.addEventListener("DOMContentLoaded", () => {
     if (e.button === 0) {
       if (arena.status === "defeat" || arena.status === "victory") {
         restartRequested = true;
+      } else if (arena.isPaused) {
+        pauseRequested = true;
       } else {
         shootRequested = true;
       }
@@ -117,12 +125,14 @@ window.addEventListener("DOMContentLoaded", () => {
       shoot: shootRequested,
       reload: reloadRequested,
       restart: restartRequested,
+      togglePause: pauseRequested,
     };
 
     // Reset single-frame triggers
     shootRequested = false;
     reloadRequested = false;
     restartRequested = false;
+    pauseRequested = false;
 
     // Step physics & fixed simulation
     arena.step(wallDeltaTime, input);
