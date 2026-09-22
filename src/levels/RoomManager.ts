@@ -306,13 +306,13 @@ export class RoomManager {
     // Subtitle
     ctx.font = getUIFont(13, "600");
     ctx.fillStyle = UITheme.colors.textPrimary;
-    ctx.fillText("ALL 3 PUZZLE PROTOCOLS CONQUERED", width / 2, height / 2 - 20);
+    ctx.fillText("ALL 5 PUZZLE PROTOCOLS CONQUERED", width / 2, height / 2 - 20);
 
     // Protocol checkmarks
     ctx.font = getUIFont(11, "600");
     ctx.fillStyle = UITheme.colors.green;
     ctx.fillText(
-      "✓ 1v1 Cover Mastery  |  ✓ 2v1 Flank Defense  |  ✓ Buckshot Neutralized",
+      "✓ 1v1 Cover  |  ✓ Armored Breach  |  ✓ Infiltration  |  ✓ Line of Fire  |  ✓ Tactical Gauntlet",
       width / 2,
       height / 2 + 30
     );

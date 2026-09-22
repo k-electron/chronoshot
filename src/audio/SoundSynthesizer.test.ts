@@ -155,6 +155,9 @@ describe("SoundSynthesizer Pitch & Time Modulation", () => {
     expect(() => synth.playImpact(0.1)).not.toThrow();
     expect(() => synth.playShatter(0.05)).not.toThrow();
     expect(() => synth.playVictory(1.0)).not.toThrow();
+    expect(() => synth.playShieldDeflect(0.5)).not.toThrow();
+    expect(() => synth.playShieldBreak(0.5)).not.toThrow();
+    expect(() => synth.playSniperCharge(0.5)).not.toThrow();
     expect(() => synth.setMuted(true)).not.toThrow();
   });
 });
@@ -273,5 +276,97 @@ describe("SoundSynthesizer Procedural Web Audio Generation", () => {
 
     await synth.resume();
     expect(mock.context.resume).toHaveBeenCalled();
+  });
+
+  it("synthesizes shield deflection metallic ping with pitch modulation", () => {
+    const mock = createMockAudioContext();
+    const synth = new SoundSynthesizer(mock.context);
+
+    mock.createdOscillators.length = 0;
+    synth.playShieldDeflect(1.0);
+
+    // Dual metallic sine tones: 1800Hz & 2800Hz
+    expect(mock.createdOscillators.length).toBe(2);
+    expect(mock.createdOscillators[0].frequency.setValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(1800, 1),
+      0
+    );
+    expect(mock.createdOscillators[1].frequency.setValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(2800, 1),
+      0
+    );
+    expect(mock.createdOscillators[0].start).toHaveBeenCalled();
+    expect(mock.createdOscillators[1].start).toHaveBeenCalled();
+
+    // With micro-creep pitch scaling
+    mock.createdOscillators.length = 0;
+    synth.playShieldDeflect(0.05);
+    const pitch = synth.calculatePitch(0.05);
+    expect(mock.createdOscillators[0].frequency.setValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(1800 * pitch, 1),
+      0
+    );
+  });
+
+  it("synthesizes shield break dispersion pop and pitch sweep", () => {
+    const mock = createMockAudioContext();
+    const synth = new SoundSynthesizer(mock.context);
+
+    mock.createdOscillators.length = 0;
+    mock.createdBufferSources.length = 0;
+
+    synth.playShieldBreak(1.0);
+
+    // Noise buffer source burst + descending oscillator sweep
+    expect(mock.createdBufferSources.length).toBe(1);
+    expect(mock.createdOscillators.length).toBe(1);
+
+    const osc = mock.createdOscillators[0];
+    expect(osc.frequency.setValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(800, 1),
+      0
+    );
+    expect(osc.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(80, 1),
+      expect.any(Number)
+    );
+    expect(osc.start).toHaveBeenCalled();
+  });
+
+  it("synthesizes sniper charging tone sweep", () => {
+    const mock = createMockAudioContext();
+    const synth = new SoundSynthesizer(mock.context);
+
+    mock.createdOscillators.length = 0;
+    synth.playSniperCharge(1.0);
+
+    // Ascending pitch sweep: 300Hz to 1200Hz
+    expect(mock.createdOscillators.length).toBe(1);
+    const osc = mock.createdOscillators[0];
+    expect(osc.frequency.setValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(300, 1),
+      0
+    );
+    expect(osc.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(1200, 1),
+      expect.any(Number)
+    );
+    expect(osc.start).toHaveBeenCalled();
+  });
+
+  it("suppresses audio synthesis when muted", () => {
+    const mock = createMockAudioContext();
+    const synth = new SoundSynthesizer(mock.context);
+    synth.setMuted(true);
+
+    mock.createdOscillators.length = 0;
+    mock.createdBufferSources.length = 0;
+
+    synth.playShieldDeflect(1.0);
+    synth.playShieldBreak(1.0);
+    synth.playSniperCharge(1.0);
+
+    expect(mock.createdOscillators.length).toBe(0);
+    expect(mock.createdBufferSources.length).toBe(0);
   });
 });

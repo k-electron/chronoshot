@@ -16,11 +16,20 @@ import { Obstacle } from "./Obstacle";
 
 export type ProjectileOwner = "player" | "enemy";
 
+export interface DamageResult {
+  readonly absorbed: boolean;
+  readonly eliminated: boolean;
+  readonly remainingShields: number;
+}
+
 export interface CombatUnit {
   readonly id: string;
   readonly position: Vector2D;
   readonly radius: number;
   readonly isAlive: boolean;
+  shields?: number;
+  maxShields?: number;
+  takeDamage?(damage?: number): DamageResult;
   kill(): void;
 }
 
@@ -30,6 +39,7 @@ export interface ProjectileHitResult {
   readonly normal: Vector2D;
   readonly obstacle?: Obstacle;
   readonly unit?: CombatUnit;
+  readonly damageResult?: DamageResult;
 }
 
 export interface Projectile {
@@ -150,7 +160,22 @@ export function createProjectile(
         this.isAlive = false;
 
         if (hitResult.type === "unit" && hitResult.unit) {
-          hitResult.unit.kill();
+          let damageResult: DamageResult;
+          if (typeof hitResult.unit.takeDamage === "function") {
+            damageResult = hitResult.unit.takeDamage(1);
+          } else {
+            hitResult.unit.kill();
+            damageResult = {
+              absorbed: false,
+              eliminated: true,
+              remainingShields: 0,
+            };
+          }
+
+          return {
+            ...hitResult,
+            damageResult,
+          };
         }
 
         return hitResult;

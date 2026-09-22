@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg)](https://vitejs.dev/)
-[![Tests](https://img.shields.io/badge/Tests-97%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-140%20passing-brightgreen.svg)]()
 
 ---
 
@@ -62,20 +62,35 @@ Every step you take accelerates global time. When you stop, time slows to a **5%
 ### 4. Continuous Collision Detection (CCD) Ballistics
 - High-speed projectiles utilize per-tick segment raycasting against obstacle polygons and circular unit hitboxes, preventing tunneling even across massive tick jumps.
 
-### 5. Enemy Archetypes
-- **Pistol Grunt (Crimson Triangle)**: Discharges single accurate lethal rounds at steady intervals.
-- **Shotgun Guard (Crimson Square)**: Discharges lethal 5-pellet buckshot spreads, forcing lateral dodges or hard cover.
-- Both archetypes feature continuous line-of-sight raycasting against intervening cover obstacles.
+### 5. Differentiated Enemy Catalog & Archetypes
+Hostiles are differentiated across mobility, shields, weapon cadence, ballistic spreads, and firing styles:
+- **Pistol Grunt (Crimson Diamond)**: 120 px/s skirmisher firing single accurate rounds at a 50-tick cadence with a 6-tick discharge stutter.
+- **Shotgun Guard (Crimson Pentagon)**: 90 px/s heavy breacher with a 1-hit energy shield and a 5-pellet lethal buckshot fan at an 80-tick cadence.
+- **Stalker Rusher (Crimson Chevron)**: 210 px/s high-velocity glass cannon with aggressive pursuit and run-and-gun rapid fire (32-tick cadence) that never halts.
+- **Aegis Warden (Heavy Crimson Hexagon)**: 60 px/s frontline tank with 2-hit shield durability (requiring 3 total rounds to eliminate) and heavy suppressive slugs at a 65-tick cadence.
+- **Marksman Sniper (Crimson 4-Point Star)**: 80 px/s long-range sniper that kites players, halts movement to project a charging red targeting laser for 30 ticks, and discharges hyper-velocity rounds (850 px/s) at a 110-tick cadence.
 
-### 6. Procedural Web Audio Synthesis with Pitch Modulation
-- Zero external audio assets required; all sound effects are synthesized live using the Web Audio API.
+### 6. 40px Grid A* Pathfinding & Intelligent Navigation
+- Discrete $24 \times 16$ tile-grid A* pathfinder with obstacle clearance inflation ($16\text{px}$) navigates complex wall and pillar layouts with zero corner snagging.
+- **Line-of-Sight String Pulling**: When line-of-sight to the player is obstructed, units follow A* waypoints; once line-of-sight is re-established, units transition to smooth direct-vector steering (rushers close distance, kiters retreat).
+- Smooth wall-sliding collision physics prevents units from sticking or clipping into barrier edges.
+
+### 7. Hit-Count Shield Durability System
+- Shield barriers absorb discrete projectile impacts, directly interfacing with the player's 6-round cylinder economy.
+- Concentric radiant electric cyan barrier rings visually communicate active shield charges.
+- Procedural audio pings on deflection (`playShieldDeflect`) and resonant energy pops on shield depletion (`playShieldBreak`) before units become vulnerable to lethal elimination.
+
+### 8. Procedural Web Audio Synthesis with Pitch Modulation
+- Zero external audio assets required; all sound effects (gunfire, dry-fire clicks, cylinder reload clicks, obstacle impacts, shield deflections, shield breaks, sniper laser charging, and victory fanfare) are synthesized live using the Web Audio API.
 - **Dynamic Time-Scale Modulation**: Audio playback rates and oscillator frequencies scale dynamically with `timeScale`. Sounds drop to deep sub-bass drones (~0.43x pitch, ~2.4x duration) during 5% micro-creep and pitch up to normal tempo when sprinting.
 
-### 7. Bite-Sized Tactical Puzzle Progression
-- Handcrafted room sequences with distinct spatial challenges:
-  - **Room 01 (`BASIC COVER`)**: 1v1 duel teaching micro-creep peeking and precision firing.
-  - **Room 02 (`CROSSFIRE`)**: 2v1 flanking engagement teaching line-of-sight breaking and reload timing.
-  - **Room 03 (`HEAVY SPREAD`)**: Shotgun Guard + Pistol Grunt pressure teaching spread avoidance.
+### 9. 5-Room Tactical Puzzle Progression
+- Handcrafted room sequences teaching each archetype and mechanics progressively:
+  - **Room 01 (`BASIC COVER`)**: 1v1 duel against a mobile Pistol Grunt teaching micro-creep peeking and leading shots.
+  - **Room 02 (`ARMORED BREACH`)**: Shotgun Guard (1 shield) + Grunt teaching shield breaking and buckshot evasion.
+  - **Room 03 (`INFILTRATION`)**: High-speed Stalker rusher + Grunt in a zigzag corridor teaching rapid target acquisition under continuous fire.
+  - **Room 04 (`THE LINE OF FIRE`)**: Marksman sniper nest with 30-tick laser telegraph + Shotgun Guard advance teaching sightline evasion.
+  - **Room 05 (`TACTICAL GAUNTLET`)**: Aegis Warden (2 shields) + Stalker + Grunt testing strict 6-round cylinder ammunition budgeting and reload timing.
 - Destroying all enemies in a room unlocks the radiant exit portal to advance to the next floor.
 
 ---
@@ -208,6 +223,7 @@ chronoshot/
 │   │   └── SoundSynthesizer.ts
 │   ├── engine/                   # Time dilation governor & fixed-step simulator
 │   │   ├── FixedStepSimulator.ts
+│   │   ├── GridPathfinder.ts
 │   │   └── TimeGovernor.ts
 │   ├── entities/                 # Game entities & particle systems
 │   │   ├── Arena.ts

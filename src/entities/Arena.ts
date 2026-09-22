@@ -256,7 +256,11 @@ export class Arena {
     // 2. Update Enemies AI
     for (const enemy of this.enemies) {
       if (enemy.isAlive) {
-        const enemyBullets = enemy.update(this.player, this.obstacles, 1);
+        const wasCharging = enemy.isChargingLaser;
+        const enemyBullets = enemy.update(this.player, this.obstacles, 1, fixedDt);
+        if (!wasCharging && enemy.isChargingLaser) {
+          this.soundSynth?.playSniperCharge(this.timeGovernor.getTimeScale());
+        }
         if (enemyBullets.length > 0) {
           this.projectiles.push(...enemyBullets);
           this.soundSynth?.playFire(this.timeGovernor.getTimeScale());
@@ -285,14 +289,27 @@ export class Arena {
           this.particles.emitImpactSparks(hit.point, hit.normal, 6);
           this.soundSynth?.playImpact(this.timeGovernor.getTimeScale());
         } else if (hit.type === "unit" && hit.unit) {
-          // 1-Hit Lethality crystalline shatter
-          this.soundSynth?.playShatter(this.timeGovernor.getTimeScale());
-          if (hit.unit.id === "player") {
-            this.particles.emitShatter(this.player.position, 22, "#00f0ff", 240);
-            this.status = "defeat";
+          if (hit.damageResult?.absorbed) {
+            // Shield absorbed hit!
+            if (hit.damageResult.remainingShields === 0) {
+              // Shield break burst & audio
+              this.particles.emitShieldBreak(hit.point, 16);
+              this.soundSynth?.playShieldBreak(this.timeGovernor.getTimeScale());
+            } else {
+              // Shield deflection sparks & audio ping
+              this.particles.emitShieldSparks(hit.point, hit.normal, 8);
+              this.soundSynth?.playShieldDeflect(this.timeGovernor.getTimeScale());
+            }
           } else {
-            this.particles.emitShatter(hit.point, 18, "#ff2a44", 220);
-            this.checkVictoryCondition();
+            // Lethal hit crystalline shatter
+            this.soundSynth?.playShatter(this.timeGovernor.getTimeScale());
+            if (hit.unit.id === "player") {
+              this.particles.emitShatter(this.player.position, 22, "#00f0ff", 240);
+              this.status = "defeat";
+            } else {
+              this.particles.emitShatter(hit.point, 18, "#ff2a44", 220);
+              this.checkVictoryCondition();
+            }
           }
         }
       }
@@ -431,12 +448,26 @@ export class Arena {
         continue;
       }
 
+      // Render concentric radiant shield rings if unit has active shields
+      if (enemy.shields > 0) {
+        ctx.save();
+        for (let s = 0; s < enemy.shields; s++) {
+          const ringRadius = enemy.radius + 5 + s * 4;
+          ctx.beginPath();
+          ctx.arc(enemy.position.x, enemy.position.y, ringRadius, 0, Math.PI * 2);
+          ctx.strokeStyle = "rgba(0, 240, 255, 0.8)";
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
       ctx.save();
       ctx.translate(enemy.position.x, enemy.position.y);
       ctx.rotate(enemy.aimAngle);
 
       if (enemy.type === "shotgun") {
-        // Shotgun Guard: faceted heavy octagon/pentagon
+        // Shotgun Guard: faceted heavy pentagon
         ctx.beginPath();
         const sides = 5;
         for (let s = 0; s < sides; s++) {
@@ -457,6 +488,69 @@ export class Arena {
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(enemy.radius - 2, -4, 8, 3);
         ctx.fillRect(enemy.radius - 2, 1, 8, 3);
+      } else if (enemy.type === "stalker") {
+        // Stalker: sleek swept-back chevron/arrowhead
+        ctx.beginPath();
+        ctx.moveTo(enemy.radius * 1.4, 0);
+        ctx.lineTo(-enemy.radius * 0.9, -enemy.radius * 0.9);
+        ctx.lineTo(-enemy.radius * 0.3, 0);
+        ctx.lineTo(-enemy.radius * 0.9, enemy.radius * 0.9);
+        ctx.closePath();
+
+        ctx.fillStyle = "#ff1744";
+        ctx.fill();
+        ctx.strokeStyle = "#ff5252";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // High-velocity needle barrel
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(enemy.radius * 1.1, -1.5, 7, 3);
+      } else if (enemy.type === "warden") {
+        // Aegis Warden: reinforced heavy hexagon
+        ctx.beginPath();
+        const sides = 6;
+        for (let s = 0; s < sides; s++) {
+          const a = (s / sides) * Math.PI * 2;
+          const px = Math.cos(a) * enemy.radius;
+          const py = Math.sin(a) * enemy.radius;
+          if (s === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+
+        ctx.fillStyle = "#b71c1c";
+        ctx.fill();
+        ctx.strokeStyle = "#ff8a80";
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // Heavy reinforced slug muzzle
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(enemy.radius - 2, -3, 9, 6);
+      } else if (enemy.type === "marksman") {
+        // Marksman: 4-pointed precision crosshair star
+        ctx.beginPath();
+        const points = 4;
+        for (let p = 0; p < points * 2; p++) {
+          const a = (p / (points * 2)) * Math.PI * 2;
+          const r = p % 2 === 0 ? enemy.radius * 1.3 : enemy.radius * 0.55;
+          const px = Math.cos(a) * r;
+          const py = Math.sin(a) * r;
+          if (p === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+
+        ctx.fillStyle = "#880e4f";
+        ctx.fill();
+        ctx.strokeStyle = "#f06292";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Long precision sniper barrel
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(enemy.radius * 0.6, -1.5, 14, 3);
       } else {
         // Pistol Grunt: sharp directional diamond
         ctx.beginPath();
@@ -477,8 +571,25 @@ export class Arena {
         ctx.fillRect(enemy.radius * 1.1, -2, 6, 4);
       }
 
-      // Sightline beam if tracking player
-      if (enemy.hasLineOfSight) {
+      // Sightline / Charging Laser beam
+      if (enemy.isChargingLaser) {
+        // Vivid crimson charging laser telegraph
+        ctx.restore();
+        ctx.save();
+        ctx.strokeStyle = "rgba(255, 23, 68, 0.9)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(enemy.position.x, enemy.position.y);
+        ctx.lineTo(this.player.position.x, this.player.position.y);
+        ctx.stroke();
+
+        // Aim target dot on player
+        ctx.fillStyle = "#ff1744";
+        ctx.beginPath();
+        ctx.arc(this.player.position.x, this.player.position.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      } else if (enemy.hasLineOfSight) {
         ctx.restore();
         ctx.save();
         ctx.strokeStyle = "rgba(255, 50, 50, 0.25)";
