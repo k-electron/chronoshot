@@ -430,4 +430,137 @@ export class SoundSynthesizer {
       // Ignore
     }
   }
+
+  /**
+   * Shield deflection metallic ping: high-frequency dual sine tones on shield impact.
+   */
+  public playShieldDeflect(timeScale: number = 1.0): void {
+    if (!this.context || !this.masterGain || this.isMuted) return;
+    this.resume();
+
+    const pitch = this.calculatePitch(timeScale);
+    const dur = this.calculateDuration(timeScale);
+    const t0 = this.context.currentTime;
+
+    try {
+      const osc1 = this.context.createOscillator();
+      const osc2 = this.context.createOscillator();
+      const gain = this.context.createGain();
+
+      osc1.type = "sine";
+      osc1.frequency.setValueAtTime(1800 * pitch, t0);
+
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(2800 * pitch, t0);
+
+      gain.gain.setValueAtTime(0.35, t0);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.04 * dur);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(this.masterGain);
+
+      osc1.start(t0);
+      osc2.start(t0);
+      osc1.stop(t0 + 0.04 * dur);
+      osc2.stop(t0 + 0.04 * dur);
+    } catch {
+      // Ignore
+    }
+  }
+
+  /**
+   * Shield break dispersion pop: resonant electric low-pass noise burst combined with descending pitch sweep.
+   */
+  public playShieldBreak(timeScale: number = 1.0): void {
+    if (!this.context || !this.masterGain || this.isMuted) return;
+    this.resume();
+
+    const pitch = this.calculatePitch(timeScale);
+    const dur = this.calculateDuration(timeScale);
+    const t0 = this.context.currentTime;
+
+    try {
+      // Noise burst transient
+      if (this.noiseBuffer) {
+        const noiseSource = this.context.createBufferSource();
+        noiseSource.buffer = this.noiseBuffer;
+
+        const filter = this.context.createBiquadFilter();
+        filter.type = "bandpass";
+        filter.frequency.setValueAtTime(1400 * pitch, t0);
+        filter.Q.setValueAtTime(3.0, t0);
+
+        const noiseGain = this.context.createGain();
+        noiseGain.gain.setValueAtTime(0.5, t0);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.12 * dur);
+
+        noiseSource.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(this.masterGain);
+
+        noiseSource.start(t0);
+        noiseSource.stop(t0 + 0.12 * dur);
+      }
+
+      // Descending pitch sweep
+      const osc = this.context.createOscillator();
+      const oscGain = this.context.createGain();
+
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(800 * pitch, t0);
+      osc.frequency.exponentialRampToValueAtTime(
+        Math.max(10, 80 * pitch),
+        t0 + 0.18 * dur
+      );
+
+      oscGain.gain.setValueAtTime(0.4, t0);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.18 * dur);
+
+      osc.connect(oscGain);
+      oscGain.connect(this.masterGain);
+
+      osc.start(t0);
+      osc.stop(t0 + 0.18 * dur);
+    } catch {
+      // Ignore
+    }
+  }
+
+  /**
+   * Sniper charging whine: ascending pitch sweep indicating active laser sightline lock.
+   */
+  public playSniperCharge(timeScale: number = 1.0): void {
+    if (!this.context || !this.masterGain || this.isMuted) return;
+    this.resume();
+
+    const pitch = this.calculatePitch(timeScale);
+    const dur = this.calculateDuration(timeScale);
+    const t0 = this.context.currentTime;
+
+    try {
+      const osc = this.context.createOscillator();
+      const gain = this.context.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(300 * pitch, t0);
+      osc.frequency.exponentialRampToValueAtTime(
+        1200 * pitch,
+        t0 + 0.45 * dur
+      );
+
+      gain.gain.setValueAtTime(0.05, t0);
+      gain.gain.linearRampToValueAtTime(0.3, t0 + 0.4 * dur);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.45 * dur);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+
+      osc.start(t0);
+      osc.stop(t0 + 0.45 * dur);
+    } catch {
+      // Ignore
+    }
+  }
 }
+

@@ -357,4 +357,115 @@ describe("Combat Arena & Room Loop", () => {
       expect.any(Number)
     );
   });
+
+  it("handles player bullet hitting shielded enemy with deflection and break effects", () => {
+    const arena = new Arena();
+    // Replace enemies with 1 shielded Shotgun Guard (1 shield)
+    const guard = new (arena.enemies[0].constructor as any)({
+      id: "test-guard",
+      type: "shotgun",
+      x: 300,
+      y: 320,
+    });
+    arena.enemies = [guard];
+
+    // Spawn player bullet targeting guard (guard boundary is at x = 300 - 16 = 284)
+    const bullet1 = createProjectile(
+      "p-shot-1",
+      vec2(275, 320),
+      0,
+      600,
+      "player"
+    );
+    arena.projectiles = [bullet1];
+
+    // Step physics with sufficient delta time to ensure discrete physics ticks execute
+    arena.step(0.05, {
+      moveDir: vec2(1, 0),
+      mousePos: vec2(500, 320),
+      shoot: false,
+      reload: false,
+      restart: false,
+    });
+
+    // Guard should still be alive with 0 shields remaining (absorbed)
+    expect(guard.isAlive).toBe(true);
+    expect(guard.shields).toBe(0);
+    expect(arena.status).toBe("playing");
+
+    // Second bullet: lethal kill
+    const bullet2 = createProjectile(
+      "p-shot-2",
+      vec2(275, 320),
+      0,
+      600,
+      "player"
+    );
+    arena.projectiles = [bullet2];
+
+    arena.step(0.05, {
+      moveDir: vec2(1, 0),
+      mousePos: vec2(500, 320),
+      shoot: false,
+      reload: false,
+      restart: false,
+    });
+
+    expect(guard.isAlive).toBe(false);
+    expect(arena.status).toBe("victory");
+  });
+
+  it("renders Stalker, Aegis Warden, and Marksman archetypes with shield rings and lasers without throwing", () => {
+    const mockCtx = {
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      arc: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+      fillRect: vi.fn(),
+      strokeRect: vi.fn(),
+      fillText: vi.fn(),
+      translate: vi.fn(),
+      rotate: vi.fn(),
+      setLineDash: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      closePath: vi.fn(),
+      createRadialGradient: vi.fn().mockReturnValue({
+        addColorStop: vi.fn(),
+      }),
+      createLinearGradient: vi.fn().mockReturnValue({
+        addColorStop: vi.fn(),
+      }),
+    } as unknown as CanvasRenderingContext2D;
+
+    const arena = new Arena();
+    arena.enemies = [
+      new (arena.enemies[0].constructor as any)({
+        id: "stalker",
+        type: "stalker",
+        x: 400,
+        y: 200,
+      }),
+      new (arena.enemies[0].constructor as any)({
+        id: "warden",
+        type: "warden",
+        x: 500,
+        y: 200,
+        maxShields: 2,
+      }),
+      new (arena.enemies[0].constructor as any)({
+        id: "marksman",
+        type: "marksman",
+        x: 600,
+        y: 200,
+      }),
+    ];
+
+    // Flag marksman laser charging
+    arena.enemies[2].isChargingLaser = true;
+
+    expect(() => arena.render(mockCtx, 0.016)).not.toThrow();
+  });
 });

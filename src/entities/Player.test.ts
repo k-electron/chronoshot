@@ -88,4 +88,19 @@ describe("Player Entity", () => {
     expect(player.position.x).toBe(200);
     expect(player.position.y).toBe(200);
   });
+
+  it("enforces 1-hit lethality via takeDamage returning damage result", () => {
+    const player = new Player({ x: 100, y: 100 });
+    player.velocity = vec2(100, 50);
+
+    const result = player.takeDamage(1);
+    expect(result).toEqual({
+      absorbed: false,
+      eliminated: true,
+      remainingShields: 0,
+    });
+    expect(player.isAlive).toBe(false);
+    expect(player.velocity.x).toBe(0);
+    expect(player.velocity.y).toBe(0);
+  });
 });

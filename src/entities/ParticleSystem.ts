@@ -108,6 +108,85 @@ export class ParticleSystem {
   }
 
   /**
+   * Spawns directional electric cyan/bright-blue spark particles bouncing along the normal on shield deflection.
+   */
+  public emitShieldSparks(
+    point: Vector2D,
+    normal: Vector2D,
+    count = 8
+  ): void {
+    const normalAngle = Math.atan2(normal.y, normal.x);
+
+    for (let i = 0; i < count; i++) {
+      // Fan out in reflection hemisphere along normal
+      const angle = normalAngle + (Math.random() - 0.5) * 1.6;
+      const speed = 140 + Math.random() * 180;
+      const velocity = vec2(Math.cos(angle) * speed, Math.sin(angle) * speed);
+
+      const shardRadius = 2 + Math.random() * 2.5;
+      const vertices = [
+        vec2(-shardRadius, 0),
+        vec2(shardRadius, 0),
+        vec2(0, shardRadius * 1.6),
+      ];
+
+      const maxLifetime = 0.2 + Math.random() * 0.25;
+      const color = Math.random() > 0.5 ? "#00f0ff" : "#80d8ff";
+
+      this.particles.push({
+        position: { ...point },
+        velocity,
+        rotation: Math.random() * Math.PI * 2,
+        angularVelocity: (Math.random() - 0.5) * 22,
+        lifetime: maxLifetime,
+        maxLifetime,
+        color,
+        borderColor: "#ffffff",
+        vertices,
+      });
+    }
+  }
+
+  /**
+   * Spawns a circular radiant burst of cyan and blue energy shards upon shield depletion.
+   */
+  public emitShieldBreak(
+    point: Vector2D,
+    count = 16
+  ): void {
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+      const speed = 180 + Math.random() * 160;
+      const velocity = vec2(Math.cos(angle) * speed, Math.sin(angle) * speed);
+
+      const numVerts = Math.random() > 0.4 ? 3 : 4;
+      const shardRadius = 3.5 + Math.random() * 4;
+      const vertices: Vector2D[] = [];
+
+      for (let v = 0; v < numVerts; v++) {
+        const vAngle = (v / numVerts) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+        const vDist = shardRadius * (0.6 + Math.random() * 0.7);
+        vertices.push(vec2(Math.cos(vAngle) * vDist, Math.sin(vAngle) * vDist));
+      }
+
+      const maxLifetime = 0.4 + Math.random() * 0.3;
+      const color = Math.random() > 0.5 ? "#00f0ff" : "#80d8ff";
+
+      this.particles.push({
+        position: { ...point },
+        velocity,
+        rotation: Math.random() * Math.PI * 2,
+        angularVelocity: (Math.random() - 0.5) * 16,
+        lifetime: maxLifetime,
+        maxLifetime,
+        color,
+        borderColor: "#ffffff",
+        vertices,
+      });
+    }
+  }
+
+  /**
    * Simulation tick update: moves shards, applies drag, spins polygons, and culls expired particles.
    */
   public update(fixedDeltaTime: number): void {
@@ -167,6 +246,10 @@ export class ParticleSystem {
 
   public getCount(): number {
     return this.particles.length;
+  }
+
+  public getParticles(): readonly ShardParticle[] {
+    return this.particles;
   }
 
   public clear(): void {

@@ -32,16 +32,22 @@ ChronoShot is deliberately engineered without heavy third-party game engines (no
     - Reload weapon: `+30` simulation ticks.
 - **`Arena`**: Coordinates entities (`Player`, `Enemy`, `Obstacle`, `Projectile`, `ParticleSystem`), collision passes, and room progression.
 
-### 2. Continuous Collision Detection (CCD) Ballistics
+### 2. Continuous Collision Detection (CCD) Ballistics & Shield Durability
 - High-velocity projectiles must never tunnel through obstacles or hitboxes during discrete tick jumps.
 - Projectiles cast raycast line segments between `previousPosition` and `position` against obstacle bounds and unit circles on every tick.
+- **Hit-Count Shields**: Units with energy shields absorb discrete bullet impacts via `takeDamage()`, producing procedural deflection sparks and pings before suffering lethal elimination.
 
 ### 3. Procedural Audio (Zero External Asset Files)
-- All sound effects (gunfire, reload clicks, bullet wall impacts, enemy shatters, victory fanfare) are synthesized programmatically using the browser Web Audio API via `SoundSynthesizer`.
+- All sound effects (gunfire, reload clicks, bullet wall impacts, shield deflections, shield breaks, sniper laser charging, enemy shatters, victory fanfare) are synthesized programmatically using the browser Web Audio API via `SoundSynthesizer`.
 - **Never add external audio binaries (`.mp3`, `.wav`, `.ogg`)**.
 - Audio pitch and duration scale dynamically with `TimeGovernor.getTimeScale()` (e.g. deep sub-bass pitch drop during micro-creep).
 
-### 4. Minimalist HUD & Tactical UI
+### 4. 40px Grid A* Pathfinding & Enemy Archetypes
+- **`GridPathfinder`**: Discrete $24 \times 16$ tile-grid A* with entity radius obstacle inflation ($16\text{px}$) navigates around walls and pillars when line-of-sight is blocked.
+- **Line-of-Sight String Pulling**: When sightlines are clear, AI switches to direct-vector steering (rushers close in, kiters retreat).
+- **5 Archetypes**: Pistol Grunt, Shotgun Guard, Stalker Rusher, Aegis Warden, and Marksman Sniper with distinct speeds, shields, and firing behaviors.
+
+### 5. Minimalist HUD & Tactical UI
 - **In-Canvas Reticle (`src/ui/Reticle.ts`)**: Canvas cursor is set to `cursor: none`. An in-canvas precision hardware crosshair tracks mouse coordinates, dynamically expanding with movement velocity and flashing crimson on dry-fire.
 - **Hairline Revolver Dial (`src/ui/CylinderHUD.ts`)**: Minimalist 6-chamber dial with active chamber alignment notch and smooth rotational transition.
 - **Hairline Chrono-Telemetry (`src/ui/TimeHUD.ts`)**: Top-right gauge displaying numeric multiplier (`CHRONO // 0.05x`) and transient action burst pills.
@@ -82,7 +88,7 @@ npm run dev
    - Use mock Canvas 2D contexts (`createMockContext()`) with `vi.fn()` for rendering tests.
    - Use mock audio contexts to verify audio trigger calls without requiring real audio devices.
 3. **Keep Tests Fast & Deterministic**:
-   - The entire suite (97+ tests) runs in under 300ms. Avoid arbitrary `setTimeout` or wall-clock waits in tests.
+   - The entire suite (140+ tests) runs in under 300ms. Avoid arbitrary `setTimeout` or wall-clock waits in tests.
 
 ---
 

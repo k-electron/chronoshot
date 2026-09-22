@@ -24,7 +24,12 @@ import {
 } from "../math/vector";
 import { Revolver } from "../weapons/Revolver";
 import { Obstacle } from "./Obstacle";
-import { CombatUnit, createProjectile, Projectile } from "./Projectile";
+import {
+  CombatUnit,
+  createProjectile,
+  DamageResult,
+  Projectile,
+} from "./Projectile";
 
 export interface PlayerConfig {
   x?: number;
@@ -248,6 +253,18 @@ export class Player implements CombatUnit {
       return false;
     }
     return this.weapon.reload(governor);
+  }
+
+  /**
+   * Enforces 1-hit lethality upon damage impact.
+   */
+  public takeDamage(_damage = 1): DamageResult {
+    this.kill();
+    return {
+      absorbed: false,
+      eliminated: true,
+      remainingShields: 0,
+    };
   }
 
   /**
