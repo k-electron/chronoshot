@@ -16,6 +16,8 @@ import { RoomConfig } from "../levels/Room";
 import { RoomManager } from "../levels/RoomManager";
 import { vecLength, Vector2D } from "../math/vector";
 import { CylinderHUD } from "../ui/CylinderHUD";
+import { Reticle } from "../ui/Reticle";
+import { getUIFont, UITheme } from "../ui/theme";
 import { TimeHUD } from "../ui/TimeHUD";
 import { Enemy } from "./Enemy";
 import { createObstacle, createPillar, Obstacle } from "./Obstacle";
@@ -31,6 +33,7 @@ export interface ArenaInput {
   shoot: boolean;
   reload: boolean;
   restart: boolean;
+  togglePause?: boolean;
 }
 
 export class Arena {
@@ -48,11 +51,13 @@ export class Arena {
 
   public cylinderHUD: CylinderHUD;
   public timeHUD: TimeHUD;
+  public reticle: Reticle;
 
   public roomManager?: RoomManager;
   public soundSynth?: SoundSynthesizer;
 
   public status: ArenaStatus = "playing";
+  public isPaused: boolean = false;
 
   constructor(
     width = 960,
@@ -66,12 +71,13 @@ export class Arena {
     this.timeGovernor = new TimeGovernor();
     this.simulator = new FixedStepSimulator();
     this.particles = new ParticleSystem();
+    this.reticle = new Reticle();
     this.roomManager = roomManager;
     this.soundSynth = soundSynth ?? new SoundSynthesizer();
 
     this.player = new Player({ x: 140, y: height / 2 });
-    this.cylinderHUD = new CylinderHUD({ x: 70, y: height - 60 });
-    this.timeHUD = new TimeHUD({ x: 24, y: 24 });
+    this.cylinderHUD = new CylinderHUD({ x: 60, y: height - 55, radius: 26, chamberRadius: 5 });
+    this.timeHUD = new TimeHUD({ x: width - 160 - 24, y: 20, width: 160, height: 3 });
 
     if (this.roomManager) {
       this.loadRoom(this.roomManager.getCurrentRoom());
@@ -134,6 +140,7 @@ export class Arena {
    */
   public loadRoom(room: RoomConfig): void {
     this.status = "playing";
+    this.isPaused = false;
     this.obstacles = [...room.obstacles];
     this.enemies = room.enemies.map((cfg) => new Enemy(cfg));
     this.player.reset(room.playerSpawn);
@@ -155,8 +162,21 @@ export class Arena {
       return;
     }
 
+    // Toggle simulation pause state
+    if (input.togglePause) {
+      this.isPaused = !this.isPaused;
+      return;
+    }
+
     // Continuous 360-degree aiming (independent of time dilation)
     this.player.setAimTarget(input.mousePos);
+
+    if (this.isPaused) {
+      if (input.shoot) {
+        this.isPaused = false;
+      }
+      return;
+    }
 
     if (this.status === "playing") {
       // Weapon discharge command
@@ -167,6 +187,7 @@ export class Arena {
           this.projectiles.push(...firedBullets);
           this.soundSynth?.playFire(this.timeGovernor.getTimeScale());
         } else if (this.player.weapon.wasDryFired()) {
+          this.reticle.triggerDryFire();
           this.soundSynth?.playDryClick(this.timeGovernor.getTimeScale());
           this.player.weapon.clearDryFire();
         }
@@ -514,43 +535,208 @@ export class Arena {
       this.roomManager.renderRoomHeader(ctx, this.width);
     }
 
-    // 8. Game Over / Victory Overlay
+    // 8. In-Canvas Precision Reticle & Pause States
+    if (this.status === "playing") {
+      if (this.isPaused) {
+        this.renderPauseOverlay(ctx);
+      } else {
+        // Corner pause hint during active combat
+        ctx.save();
+        ctx.textAlign = "right";
+        ctx.textBaseline = "top";
+        ctx.font = getUIFont(10, "600");
+        ctx.fillStyle = UITheme.colors.textMuted;
+        ctx.fillText("[ESC] PAUSE", this.width - 24, 46);
+        ctx.restore();
+      }
+
+      this.reticle.update(wallDeltaTime);
+      this.reticle.render(ctx, this.player.aimTarget, this.timeGovernor.getTimeScale());
+    }
+
+    // 9. Modernized Game Over / Victory Overlays
     if (this.status === "defeat") {
       ctx.save();
-      ctx.fillStyle = "rgba(10, 0, 0, 0.65)";
+      ctx.fillStyle = "rgba(7, 9, 14, 0.85)";
       ctx.fillRect(0, 0, this.width, this.height);
 
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
-      ctx.font = "900 48px monospace";
-      ctx.fillStyle = "#ff3344";
-      ctx.fillText("DEFEATED", this.width / 2, this.height / 2 - 24);
+      // Subtle hairline border
+      ctx.beginPath();
+      ctx.moveTo(this.width / 2 - 160, this.height / 2 - 50);
+      ctx.lineTo(this.width / 2 + 160, this.height / 2 - 50);
+      ctx.strokeStyle = UITheme.colors.crimsonDim;
+      ctx.lineWidth = 1;
+      ctx.stroke();
 
-      ctx.font = "bold 16px monospace";
-      ctx.fillStyle = "#e0e6ed";
-      ctx.fillText("PRESS [R] TO INSTANTLY RESTART", this.width / 2, this.height / 2 + 28);
+      ctx.font = getUIFont(32, "800");
+      ctx.fillStyle = UITheme.colors.crimson;
+      ctx.fillText("PROTOCOL FAILED", this.width / 2, this.height / 2 - 16);
+
+      ctx.font = getUIFont(11, "600");
+      ctx.fillStyle = UITheme.colors.textMuted;
+      ctx.fillText("CRITICAL LETHAL TRAUMA SUSTAINED", this.width / 2, this.height / 2 + 16);
+
+      ctx.font = getUIFont(12, "bold");
+      ctx.fillStyle = UITheme.colors.textPrimary;
+      ctx.fillText("PRESS [R] TO INSTANTLY RESTART", this.width / 2, this.height / 2 + 52);
+
+      ctx.beginPath();
+      ctx.moveTo(this.width / 2 - 160, this.height / 2 + 80);
+      ctx.lineTo(this.width / 2 + 160, this.height / 2 + 80);
+      ctx.strokeStyle = UITheme.colors.crimsonDim;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
       ctx.restore();
     } else if (this.status === "victory") {
       if (this.roomManager && this.roomManager.isGameCompleted()) {
         this.roomManager.renderGameVictory(ctx, this.width, this.height);
       } else {
         ctx.save();
-        ctx.fillStyle = "rgba(0, 20, 10, 0.6)";
+        ctx.fillStyle = "rgba(4, 12, 16, 0.85)";
         ctx.fillRect(0, 0, this.width, this.height);
 
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
 
-        ctx.font = "900 48px monospace";
-        ctx.fillStyle = "#00f0ff";
-        ctx.fillText("AREA CLEARED", this.width / 2, this.height / 2 - 24);
+        ctx.beginPath();
+        ctx.moveTo(this.width / 2 - 160, this.height / 2 - 50);
+        ctx.lineTo(this.width / 2 + 160, this.height / 2 - 50);
+        ctx.strokeStyle = UITheme.colors.cyanDim;
+        ctx.lineWidth = 1;
+        ctx.stroke();
 
-        ctx.font = "bold 16px monospace";
-        ctx.fillStyle = "#e0e6ed";
-        ctx.fillText("PRESS [R] TO RESTART ENCOUNTER", this.width / 2, this.height / 2 + 28);
+        ctx.font = getUIFont(32, "800");
+        ctx.fillStyle = UITheme.colors.cyan;
+        ctx.fillText("AREA NEUTRALIZED", this.width / 2, this.height / 2 - 16);
+
+        ctx.font = getUIFont(11, "600");
+        ctx.fillStyle = UITheme.colors.textMuted;
+        ctx.fillText("ALL HOSTILES ELIMINATED // EXIT GATE UNLOCKED", this.width / 2, this.height / 2 + 16);
+
+        ctx.font = getUIFont(12, "bold");
+        ctx.fillStyle = UITheme.colors.textPrimary;
+        ctx.fillText("STEP INTO EXIT GATE OR PRESS [R] TO RESTART", this.width / 2, this.height / 2 + 52);
+
+        ctx.beginPath();
+        ctx.moveTo(this.width / 2 - 160, this.height / 2 + 80);
+        ctx.lineTo(this.width / 2 + 160, this.height / 2 + 80);
+        ctx.strokeStyle = UITheme.colors.cyanDim;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
         ctx.restore();
       }
     }
+  }
+
+  /**
+   * Renders the Swiss-style minimalist pause card with full tactical control matrix.
+   */
+  public renderPauseOverlay(ctx: CanvasRenderingContext2D): void {
+    ctx.save();
+
+    // 1. Veiled translucent dark backdrop
+    ctx.fillStyle = "rgba(7, 10, 15, 0.88)";
+    ctx.fillRect(0, 0, this.width, this.height);
+
+    // 2. Central minimalist control card
+    const cardW = 500;
+    const cardH = 320;
+    const cardX = (this.width - cardW) / 2;
+    const cardY = (this.height - cardH) / 2;
+
+    // Card glass fill and hairline border
+    ctx.fillStyle = "rgba(13, 17, 24, 0.95)";
+    ctx.fillRect(cardX, cardY, cardW, cardH);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = UITheme.colors.panelBorder;
+    ctx.strokeRect(cardX, cardY, cardW, cardH);
+
+    // Subtle corner accent notches
+    const cornerSize = 10;
+    ctx.strokeStyle = UITheme.colors.cyan;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    // Top-left
+    ctx.moveTo(cardX, cardY + cornerSize);
+    ctx.lineTo(cardX, cardY);
+    ctx.lineTo(cardX + cornerSize, cardY);
+    // Top-right
+    ctx.moveTo(cardX + cardW - cornerSize, cardY);
+    ctx.lineTo(cardX + cardW, cardY);
+    ctx.lineTo(cardX + cardW, cardY + cornerSize);
+    // Bottom-left
+    ctx.moveTo(cardX, cardY + cardH - cornerSize);
+    ctx.lineTo(cardX, cardY + cardH);
+    ctx.lineTo(cardX + cornerSize, cardY + cardH);
+    // Bottom-right
+    ctx.moveTo(cardX + cardW - cornerSize, cardY + cardH);
+    ctx.lineTo(cardX + cardW, cardY + cardH);
+    ctx.lineTo(cardX + cardW, cardY + cardH - cornerSize);
+    ctx.stroke();
+
+    // Card Header
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.font = getUIFont(12, "bold");
+    ctx.fillStyle = UITheme.colors.cyan;
+    ctx.fillText("// TACTICAL SIMULATION PAUSED", this.width / 2, cardY + 22);
+
+    ctx.font = getUIFont(10, "600");
+    ctx.fillStyle = UITheme.colors.textMuted;
+    ctx.fillText("OPERATIONAL CONTROLS MATRIX", this.width / 2, cardY + 40);
+
+    // Divider line
+    ctx.beginPath();
+    ctx.moveTo(cardX + 25, cardY + 60);
+    ctx.lineTo(cardX + cardW - 25, cardY + 60);
+    ctx.strokeStyle = UITheme.colors.hairline;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Control rows
+    const controls = [
+      { key: "[WASD] / [ARROWS]", desc: "TACTICAL MOVEMENT (TIME PROGRESSION)" },
+      { key: "[MOUSE]", desc: "360° HARDWARE AIM RETICLE" },
+      { key: "[L-CLICK]", desc: "DISCHARGE WEAPON (+6 TICKS)" },
+      { key: "[R]", desc: "RELOAD REVOLVER CYLINDER (+30 TICKS)" },
+      { key: "[SHIFT + R]", desc: "INSTANT PROTOCOL RESTART" },
+      { key: "[M]", desc: "TOGGLE AUDIO SYNTHESIZER" },
+      { key: "[ESC] / [P]", desc: "TOGGLE PAUSE / RESUME COMBAT" },
+    ];
+
+    let rowY = cardY + 74;
+    for (const ctrl of controls) {
+      ctx.textAlign = "left";
+      ctx.font = getUIFont(11, "bold");
+      ctx.fillStyle = UITheme.colors.cyan;
+      ctx.fillText(ctrl.key, cardX + 35, rowY);
+
+      ctx.textAlign = "right";
+      ctx.font = getUIFont(10, "600");
+      ctx.fillStyle = UITheme.colors.textSecondary;
+      ctx.fillText(ctrl.desc, cardX + cardW - 35, rowY);
+
+      rowY += 24;
+    }
+
+    // Bottom action prompt
+    ctx.beginPath();
+    ctx.moveTo(cardX + 25, cardY + cardH - 46);
+    ctx.lineTo(cardX + cardW - 25, cardY + cardH - 46);
+    ctx.strokeStyle = UITheme.colors.hairline;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.textAlign = "center";
+    ctx.font = getUIFont(11, "bold");
+    ctx.fillStyle = UITheme.colors.textPrimary;
+    ctx.fillText("PRESS [ESC] OR CLICK ANYWHERE TO RESUME", this.width / 2, cardY + cardH - 30);
+
+    ctx.restore();
   }
 }

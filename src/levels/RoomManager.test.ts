@@ -196,10 +196,10 @@ describe("RoomManager Tactical Puzzle Progression", () => {
     // Room header render
     expect(() => manager.renderRoomHeader(ctx, 960)).not.toThrow();
     expect(ctx.fillText).toHaveBeenCalledWith(
-      expect.stringContaining("ROOM 01: BASIC COVER"),
-      480,
-      12
-    );
+       expect.stringContaining("ROOM 01: BASIC COVER"),
+       24,
+       20
+     );
 
     // Game victory overlay
     expect(() => manager.renderGameVictory(ctx, 960, 640)).not.toThrow();

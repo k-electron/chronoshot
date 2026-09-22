@@ -12,6 +12,8 @@ function createMockContext(): CanvasRenderingContext2D {
     arc: vi.fn(),
     fill: vi.fn(),
     stroke: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
     fillRect: vi.fn(),
     strokeRect: vi.fn(),
     fillText: vi.fn(),
@@ -30,7 +32,7 @@ describe("HUD Rendering", () => {
     expect(() => hud.render(ctx, revolver)).not.toThrow();
     expect(ctx.arc).toHaveBeenCalled();
     expect(ctx.fill).toHaveBeenCalled();
-    expect(ctx.fillText).toHaveBeenCalledWith("6 / 6", 148, 92);
+    expect(ctx.fillText).toHaveBeenCalledWith("6 / 6", 144, 92);
   });
 
   it("updates CylinderHUD prompt when ammunition is depleted", () => {
@@ -43,20 +45,34 @@ describe("HUD Rendering", () => {
     const ctx = createMockContext();
 
     hud.render(ctx, revolver);
-    expect(ctx.fillText).toHaveBeenCalledWith("0 / 6", 148, 92);
-    expect(ctx.fillText).toHaveBeenCalledWith("[R] RELOAD (+30 TICKS)", 148, 112);
+    expect(ctx.fillText).toHaveBeenCalledWith("0 / 6", 144, 92);
+    expect(ctx.fillText).toHaveBeenCalledWith("[R] RELOAD (+30 TICKS)", 144, 112);
   });
 
   it("renders TimeHUD scale gauge and burst notifications", () => {
     const governor = new TimeGovernor();
-    const hud = new TimeHUD({ x: 20, y: 20, width: 200, height: 12 });
+    const hud = new TimeHUD({ x: 20, y: 20, width: 200, height: 3 });
     const ctx = createMockContext();
 
     expect(() => hud.render(ctx, governor)).not.toThrow();
-    expect(ctx.fillText).toHaveBeenCalledWith("TIME DILATION: 5%", 20, 20);
+    expect(ctx.fillText).toHaveBeenCalledWith("CHRONO // 0.05x", 20, 20);
 
     hud.notifyBurst(30, "reload");
     hud.render(ctx, governor);
-    expect(ctx.fillText).toHaveBeenCalledWith("+30 TICKS [RELOAD]", 20, 56);
+    expect(ctx.fillText).toHaveBeenCalledWith("+30 TICKS [RELOAD]", 20, 47);
+  });
+
+  it("renders Reticle and triggers dry-fire flash", async () => {
+    const { Reticle } = await import("./Reticle");
+    const reticle = new Reticle();
+    const ctx = createMockContext();
+
+    reticle.render(ctx, { x: 200, y: 150 }, 0.05);
+    expect(ctx.arc).toHaveBeenCalledWith(200, 150, 1.5, 0, Math.PI * 2);
+
+    // Trigger dry fire and verify warning ring
+    reticle.triggerDryFire();
+    reticle.render(ctx, { x: 200, y: 150 }, 0.05);
+    expect(ctx.arc).toHaveBeenCalledWith(200, 150, 12, 0, Math.PI * 2);
   });
 });

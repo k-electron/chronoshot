@@ -1,15 +1,17 @@
 /**
  * CylinderHUD module for ChronoShot.
  *
- * Renders an interactive Canvas 2D revolver cylinder HUD displaying:
- * - 6 physical chamber states (loaded, spent, reloading)
- * - Revolver cylinder rotation aligned with the active firing chamber
- * - Ammunition status and [R] Reload prompt with action tick cost (+30 ticks)
- * - Dry-fire tactile warning
+ * Renders a minimalist hairline Canvas 2D revolver cylinder HUD:
+ * - Ultra-clean circular dial with 1px hairline borders and dark glass backing
+ * - 6 micro-chamber pips: radiant cyan for loaded, hollow slate rings for spent
+ * - Animated cylinder rotation tracking the active firing chamber
+ * - Sleek chamber index alignment notch at the firing hammer
+ * - Clean status typography ([R] RELOAD warning vs. READY)
  */
 
 import { Revolver } from "../weapons/Revolver";
 import { ChamberState } from "../weapons/Weapon";
+import { getUIFont, UITheme } from "./theme";
 
 export interface CylinderHUDConfig {
   x: number;
@@ -20,13 +22,14 @@ export interface CylinderHUDConfig {
 
 export class CylinderHUD {
   private config: CylinderHUDConfig;
+  private currentRotation: number = 0;
 
   constructor(config?: Partial<CylinderHUDConfig>) {
     this.config = {
-      x: config?.x ?? 80,
-      y: config?.y ?? 560,
-      radius: config?.radius ?? 32,
-      chamberRadius: config?.chamberRadius ?? 7,
+      x: config?.x ?? 70,
+      y: config?.y ?? 570,
+      radius: config?.radius ?? 28,
+      chamberRadius: config?.chamberRadius ?? 5.5,
     };
   }
 
@@ -36,12 +39,12 @@ export class CylinderHUD {
   }
 
   /**
-   * Renders the cylinder graphic and weapon state onto the 2D canvas context.
+   * Renders the minimalist cylinder graphic and weapon status.
    */
   public render(
     ctx: CanvasRenderingContext2D,
     revolver: Revolver,
-    _wallDeltaTime = 0.016
+    wallDeltaTime = 0.016
   ): void {
     const { x, y, radius, chamberRadius } = this.config;
     const chambers = revolver.getChambers();
@@ -50,100 +53,114 @@ export class CylinderHUD {
     const magSize = revolver.getMagSize();
     const isDryFired = revolver.wasDryFired();
 
+    // Smooth rotation interpolation towards active chamber angle
+    const targetRotation = (activeIndex / Math.max(1, chambers.length)) * Math.PI * 2;
+    const rotDiff = targetRotation - this.currentRotation;
+    this.currentRotation += rotDiff * Math.min(1, wallDeltaTime * 18);
+
     ctx.save();
 
-    // 1. Draw outer cylinder body (metallic wheel)
+    // 1. Outer dial translucent glass backing
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = "#151a21";
+    ctx.fillStyle = UITheme.colors.panelBg;
     ctx.fill();
-    ctx.lineWidth = 2.5;
-    ctx.strokeStyle = isDryFired ? "#ff3344" : "#2e3b4e";
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = isDryFired ? UITheme.colors.crimson : UITheme.colors.hairline;
     ctx.stroke();
 
-    // 2. Draw 6 chambers arranged in a circle
+    // Outer accent tick ring (ultra-faint)
+    ctx.beginPath();
+    ctx.arc(x, y, radius + 3, 0, Math.PI * 2);
+    ctx.strokeStyle = isDryFired ? UITheme.colors.crimsonDim : "rgba(255, 255, 255, 0.05)";
+    ctx.stroke();
+
+    // 2. 6 Chambers arranged radially with rotation offset
     const chamberRingRadius = radius * 0.58;
     const totalChambers = chambers.length;
 
     for (let i = 0; i < totalChambers; i++) {
-      // Rotate chambers around the cylinder
-      const angle = (i / totalChambers) * Math.PI * 2 - Math.PI / 2;
+      const baseAngle = (i / totalChambers) * Math.PI * 2 - Math.PI / 2;
+      const angle = baseAngle - this.currentRotation;
       const cx = x + Math.cos(angle) * chamberRingRadius;
       const cy = y + Math.sin(angle) * chamberRingRadius;
       const state: ChamberState = chambers[i];
       const isActive = i === activeIndex;
 
-      // Chamber socket
       ctx.beginPath();
       ctx.arc(cx, cy, chamberRadius, 0, Math.PI * 2);
 
       if (state === "loaded") {
-        // High-energy cyan bullet primer
-        ctx.fillStyle = isActive ? "#00f0ff" : "#00bcd4";
+        // High-energy radiant cyan pip
+        ctx.fillStyle = isActive ? UITheme.colors.cyan : UITheme.colors.cyanMuted;
         ctx.fill();
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = UITheme.colors.white;
         ctx.stroke();
 
-        // Inner brass bullet center
+        // White micro-core center
         ctx.beginPath();
-        ctx.arc(cx, cy, chamberRadius * 0.45, 0, Math.PI * 2);
-        ctx.fillStyle = "#e0f7fa";
+        ctx.arc(cx, cy, chamberRadius * 0.4, 0, Math.PI * 2);
+        ctx.fillStyle = UITheme.colors.white;
         ctx.fill();
       } else {
-        // Spent empty shell socket
-        ctx.fillStyle = "#0c0f14";
+        // Expended hollow socket
+        ctx.fillStyle = "#0a0d12";
         ctx.fill();
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = "#27313f";
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = UITheme.colors.hairline;
         ctx.stroke();
-
-        // Small spent primer indentation
-        ctx.beginPath();
-        ctx.arc(cx, cy, chamberRadius * 0.3, 0, Math.PI * 2);
-        ctx.fillStyle = "#1f2630";
-        ctx.fill();
       }
 
-      // If active chamber under the hammer, draw an alignment pip
+      // Active chamber alignment ring
       if (isActive) {
         ctx.beginPath();
-        ctx.arc(cx, cy, chamberRadius + 3, 0, Math.PI * 2);
+        ctx.arc(cx, cy, chamberRadius + 2.5, 0, Math.PI * 2);
         ctx.lineWidth = 1;
-        ctx.strokeStyle = isDryFired ? "#ff4455" : "rgba(0, 240, 255, 0.6)";
+        ctx.strokeStyle = isDryFired ? UITheme.colors.crimson : UITheme.colors.cyanDim;
         ctx.stroke();
       }
     }
 
     // 3. Central spindle axle
     ctx.beginPath();
-    ctx.arc(x, y, chamberRadius * 0.7, 0, Math.PI * 2);
-    ctx.fillStyle = "#27313f";
+    ctx.arc(x, y, chamberRadius * 0.6, 0, Math.PI * 2);
+    ctx.fillStyle = "#161c26";
     ctx.fill();
-    ctx.strokeStyle = "#405066";
+    ctx.strokeStyle = UITheme.colors.panelBorder;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // 4. Hammer alignment notch at 12 o'clock
+    ctx.beginPath();
+    ctx.moveTo(x, y - radius - 1);
+    ctx.lineTo(x, y - radius + 4);
+    ctx.strokeStyle = isDryFired ? UITheme.colors.crimson : UITheme.colors.cyan;
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // 4. Text status & reload hint
+    // 5. Typography & Status labels
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
 
-    // Ammo count display
-    ctx.font = "bold 16px monospace";
-    ctx.fillStyle = ammo === 0 ? "#ff4455" : "#e0e6ed";
-    ctx.fillText(`${ammo} / ${magSize}`, x + radius + 16, y - 8);
+    const textOffsetX = x + radius + 16;
 
-    // Contextual action prompt
-    ctx.font = "11px monospace";
+    // Ammunition counter (e.g. "6 / 6")
+    ctx.font = getUIFont(15, "bold");
+    ctx.fillStyle = ammo === 0 || isDryFired ? UITheme.colors.crimson : UITheme.colors.textPrimary;
+    ctx.fillText(`${ammo} / ${magSize}`, textOffsetX, y - 8);
+
+    // Tactical action prompt
+    ctx.font = getUIFont(10, "600");
     if (ammo === 0 || isDryFired) {
-      ctx.fillStyle = "#ff4455";
-      ctx.fillText("[R] RELOAD (+30 TICKS)", x + radius + 16, y + 12);
+      ctx.fillStyle = UITheme.colors.crimson;
+      ctx.fillText("[R] RELOAD (+30 TICKS)", textOffsetX, y + 12);
     } else if (ammo < magSize) {
-      ctx.fillStyle = "#8899a6";
-      ctx.fillText("[R] RELOAD (+30 TICKS)", x + radius + 16, y + 12);
+      ctx.fillStyle = UITheme.colors.textSecondary;
+      ctx.fillText("[R] RELOAD (+30 TICKS)", textOffsetX, y + 12);
     } else {
-      ctx.fillStyle = "#5c6b7d";
-      ctx.fillText("READY", x + radius + 16, y + 12);
+      ctx.fillStyle = UITheme.colors.textMuted;
+      ctx.fillText("READY", textOffsetX, y + 12);
     }
 
     ctx.restore();

@@ -7,13 +7,13 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg)](https://vitejs.dev/)
-[![Tests](https://img.shields.io/badge/Tests-94%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-97%20passing-brightgreen.svg)]()
 
 ---
 
 ```
 +-----------------------------------------------------------------------+
-| ROOM 02: CROSSFIRE                    [CYLINDER: (•)(•)(•)(•)( )( )]  |
+| 02 // CROSSFIRE               CHRONO // 0.20x [||        ] [ESC] PAUSE|
 |                                                                       |
 |        # # # # # # # # # # # # # # # # # # # # # # # # # #            |
 |        #                                                 #            |
@@ -24,12 +24,13 @@
 |        #       | PILLAR|                                 #            |
 |        #       +-------+                                 #            |
 |        #                                                 #            |
-|        #                [● You: Cyan] ----> [Crosshair]  #            |
+|        #                [● You: Cyan] ----> [· Reticle]  #            |
 |        #                                                 #            |
 |        #                               [▲ Enemy: Shotgun]#            |
 |        # # # # # # # # # # # # # [EXIT GATE] # # # # # # #            |
 |                                                                       |
-| TIME: [■■□□□□□□□□] 20%                      [R] RELOAD (+30 TICKS)    |
+| (O) 6 / 6 CYLINDER                                                    |
+|     READY                                                             |
 +-----------------------------------------------------------------------+
 ```
 
@@ -84,11 +85,12 @@ Every step you take accelerates global time. When you stop, time slows to a **5%
 | Input | Action |
 |---|---|
 | <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> | Move (Smoothly accelerates time to 100%) |
-| <kbd>Mouse</kbd> | 360° Aim Crosshair (Does not advance time) |
-| <kbd>Left Click</kbd> | Fire Revolver (+6 simulation ticks) |
-| <kbd>R</kbd> | Reload Revolver (+30 simulation ticks) / Instant Restart on Death |
+| <kbd>Mouse</kbd> | 360° Hardware Aim Reticle (Does not advance time) |
+| <kbd>Left Click</kbd> | Fire Revolver (+6 simulation ticks) / Resume from Pause |
+| <kbd>R</kbd> | Reload Revolver (+30 simulation ticks) / Instant Restart on Defeat |
+| <kbd>Shift</kbd> + <kbd>R</kbd> | Quick Restart Current Encounter |
+| <kbd>Esc</kbd> / <kbd>P</kbd> | Toggle Tactical Pause & Controls Matrix |
 | <kbd>M</kbd> | Toggle Audio Mute |
-| <kbd>Shift</kbd> + <kbd>R</kbd> | Restart Game from Room 1 |
 
 ---
 
@@ -168,7 +170,7 @@ npm run preview
 
 ### Continuous Integration & Cloudflare Pages Hosting
 
-- **GitHub Actions**: Automated CI (`.github/workflows/ci.yml`) runs on all pull requests and pushes to `main`. It validates dependencies, TypeScript compilation, Vite production build, and all 94 Vitest unit tests under Node 26.
+- **GitHub Actions**: Automated CI (`.github/workflows/ci.yml`) runs on all pull requests and pushes to `main`. It validates dependencies, TypeScript compilation, Vite production build, and all 97 Vitest unit tests under Node 26.
 - **Cloudflare Pages Hosting**:
   1. In the [Cloudflare Dashboard](https://dash.cloudflare.com/), go to **Workers & Pages** > **Create application** > **Pages** > **Connect to Git**.
   2. Select the `k-electron/chronoshot` repository.
@@ -189,6 +191,8 @@ chronoshot/
 │   └── workflows/                # GitHub Actions CI automation (Node 26)
 │       └── ci.yml
 ├── .nvmrc                        # Pinned Node runtime (Node 26)
+├── AGENTS.md                     # Architecture and instructions for AI coding assistants
+├── CONTRIBUTING.md               # Guidelines for contributors and PR submission
 ├── openspec/                     # OpenSpec durable specifications & archives
 │   ├── specs/                    # Durable project capability specs
 │   │   ├── combat-arena/spec.md
@@ -218,8 +222,10 @@ chronoshot/
 │   ├── math/                     # 2D vector primitives & continuous collision math
 │   │   ├── collision.ts
 │   │   └── vector.ts
-│   ├── ui/                       # Canvas 2D interactive Cylinder HUD & Time Meter
+│   ├── ui/                       # Minimalist HUD, tactical reticle, and theme
 │   │   ├── CylinderHUD.ts
+│   │   ├── Reticle.ts
+│   │   ├── theme.ts
 │   │   └── TimeHUD.ts
 │   ├── weapons/                  # Modular weapon schema & 6-shot revolver state
 │   │   ├── Revolver.ts

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { vec2 } from "../math/vector";
 import { Arena } from "./Arena";
 import { createProjectile } from "./Projectile";
@@ -259,5 +259,102 @@ describe("Combat Arena & Room Loop", () => {
       restart: false,
     });
     expect(mockSynth.playReload).toHaveBeenCalled();
+  });
+
+  it("supports toggleable pause state halting simulation updates", () => {
+    const arena = new Arena();
+    expect(arena.isPaused).toBe(false);
+
+    // Toggle pause on
+    arena.step(0.016, {
+      moveDir: vec2(0, 0),
+      mousePos: vec2(500, 320),
+      shoot: false,
+      reload: false,
+      restart: false,
+      togglePause: true,
+    });
+    expect(arena.isPaused).toBe(true);
+
+    // Movement while paused does not advance player or time
+    const initialPos = { ...arena.player.position };
+    arena.step(0.05, {
+      moveDir: vec2(1, 0),
+      mousePos: vec2(500, 320),
+      shoot: false,
+      reload: false,
+      restart: false,
+    });
+    expect(arena.player.position.x).toBe(initialPos.x);
+
+    // Click / shoot resumes from pause
+    arena.step(0.016, {
+      moveDir: vec2(0, 0),
+      mousePos: vec2(500, 320),
+      shoot: true,
+      reload: false,
+      restart: false,
+    });
+    expect(arena.isPaused).toBe(false);
+  });
+
+  it("renders pause overlay and modern overlays without throwing", () => {
+    const mockCtx = {
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      closePath: vi.fn(),
+      arc: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+      fillRect: vi.fn(),
+      strokeRect: vi.fn(),
+      fillText: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      translate: vi.fn(),
+      rotate: vi.fn(),
+      setLineDash: vi.fn(),
+      createLinearGradient: vi.fn().mockReturnValue({
+        addColorStop: vi.fn(),
+      }),
+      createRadialGradient: vi.fn().mockReturnValue({
+        addColorStop: vi.fn(),
+      }),
+    } as unknown as CanvasRenderingContext2D;
+
+    const arena = new Arena();
+
+    // Active gameplay render with corner hint
+    arena.render(mockCtx, 0.016);
+    expect(mockCtx.fillText).toHaveBeenCalledWith("[ESC] PAUSE", 936, 46);
+
+    // Paused state render
+    arena.isPaused = true;
+    arena.render(mockCtx, 0.016);
+    expect(mockCtx.fillText).toHaveBeenCalledWith(
+      "// TACTICAL SIMULATION PAUSED",
+      480,
+      expect.any(Number)
+    );
+
+    // Defeat state render
+    arena.isPaused = false;
+    arena.status = "defeat";
+    arena.render(mockCtx, 0.016);
+    expect(mockCtx.fillText).toHaveBeenCalledWith(
+      "PROTOCOL FAILED",
+      480,
+      expect.any(Number)
+    );
+
+    // Victory state render
+    arena.status = "victory";
+    arena.render(mockCtx, 0.016);
+    expect(mockCtx.fillText).toHaveBeenCalledWith(
+      "AREA NEUTRALIZED",
+      480,
+      expect.any(Number)
+    );
   });
 });
