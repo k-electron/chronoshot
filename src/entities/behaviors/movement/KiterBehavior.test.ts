@@ -212,5 +212,45 @@ describe("KiterBehavior", () => {
       expect(kiter.currentWaypointIndex).toBe(0);
       expect(kiter.repathCooldownTicks).toBe(0);
     });
+
+    it("generates a valid escape path and non-zero velocity when starting in an impassable clearance cell", () => {
+      const kiter = new KiterBehavior();
+      const pillar = createObstacle("pillar", 200, 200, 80, 80);
+      const pathfinder = new GridPathfinder(960, 640, 40);
+      pathfinder.updateObstacles([pillar], 14);
+
+      const ctx = createMockContext({
+        position: vec2(185, 220),
+        radius: 14,
+        speed: 80,
+        hasLineOfSight: false,
+      });
+      const target = createMockTarget(500, 220);
+
+      const vel = kiter.update(ctx, target, [pillar], 1, 1 / 60, pathfinder);
+
+      expect(kiter.currentPath.length).toBeGreaterThan(0);
+      expect(vecLength(vel)).toBeCloseTo(80);
+    });
+
+    it("holds position instead of driving backwards into an obstacle when retreat path is obstructed", () => {
+      const kiter = new KiterBehavior(300, 500);
+      const wall = createObstacle("wall-behind", 50, 180, 40, 40);
+
+      // Target at (200, 200). Unit at (105, 200). Dist = 95 < minDist (300).
+      // Retreat vector points left (-1, 0) directly towards wall at x=50..90.
+      const ctx = createMockContext({
+        position: vec2(105, 200),
+        radius: 14,
+        speed: 80,
+        hasLineOfSight: true,
+      });
+      const target = createMockTarget(200, 200);
+
+      const vel = kiter.update(ctx, target, [wall], 1);
+
+      expect(vel.x).toBe(0);
+      expect(vel.y).toBe(0);
+    });
   });
 });

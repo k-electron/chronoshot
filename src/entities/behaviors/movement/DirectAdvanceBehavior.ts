@@ -6,6 +6,7 @@
  */
 
 import { GridPathfinder } from "../../../engine/GridPathfinder";
+import { hasNavigationClearance } from "../../../math/collision";
 import { Vector2D } from "../../../math/vector";
 import { Obstacle } from "../../Obstacle";
 import { CombatUnit } from "../../Projectile";
@@ -42,8 +43,12 @@ export class DirectAdvanceBehavior implements MovementBehavior {
       return this.resultVelocity;
     }
 
-    // 1. Clear line-of-sight: direct vector steering ("string pulling")
-    if (ctx.hasLineOfSight) {
+    // 1. Clear line-of-sight AND physical navigation clearance: direct vector steering ("string pulling")
+    const hasClearance =
+      ctx.hasLineOfSight &&
+      hasNavigationClearance(ctx.position, target.position, ctx.radius, obstacles);
+
+    if (hasClearance) {
       this.currentPath = [];
       this.currentWaypointIndex = 0;
 
@@ -62,7 +67,7 @@ export class DirectAdvanceBehavior implements MovementBehavior {
       return this.resultVelocity;
     }
 
-    // 2. Blocked line-of-sight: 40px tile grid A* pathfinding
+    // 2. Blocked line-of-sight or obstructed physical clearance: 40px tile grid A* pathfinding
     this.repathCooldownTicks -= deltaTicks;
 
     if (
@@ -71,13 +76,36 @@ export class DirectAdvanceBehavior implements MovementBehavior {
       this.currentWaypointIndex >= this.currentPath.length
     ) {
       const pf = pathfinder ?? this.getOrCreatePathfinder(obstacles, ctx.radius);
-      let path = pf.findPath(ctx.position, target.position);
 
-      // Fallback: if target cell itself is inside obstacle clearance, pathfind to nearest walkable cell
-      if (path.length === 0) {
-        const nearestTarget = pf.findNearestWalkable(target.position);
+      // Dual-sided walkable endpoint resolution:
+      // If either start or target position is located inside an obstacle clearance cell,
+      // snap it to the nearest walkable cell center to avoid deadlock.
+      let startPos = ctx.position;
+      const startGrid = pf.worldToGrid(startPos);
+      if (!pf.isWalkable(startGrid.gx, startGrid.gy)) {
+        const nearestStart = pf.findNearestWalkable(startPos);
+        if (nearestStart) {
+          startPos = nearestStart;
+        }
+      }
+
+      let targetPos = target.position;
+      const targetGrid = pf.worldToGrid(targetPos);
+      if (!pf.isWalkable(targetGrid.gx, targetGrid.gy)) {
+        const nearestTarget = pf.findNearestWalkable(targetPos);
         if (nearestTarget) {
-          path = pf.findPath(ctx.position, nearestTarget);
+          targetPos = nearestTarget;
+        }
+      }
+
+      let path = pf.findPath(startPos, targetPos);
+
+      // Fallback: if path is still empty, search nearest walkable cells
+      if (path.length === 0) {
+        const fallbackTarget = pf.findNearestWalkable(target.position);
+        const fallbackStart = pf.findNearestWalkable(ctx.position) ?? ctx.position;
+        if (fallbackTarget) {
+          path = pf.findPath(fallbackStart, fallbackTarget);
         }
       }
 

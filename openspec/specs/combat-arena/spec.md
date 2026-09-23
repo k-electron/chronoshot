@@ -152,19 +152,19 @@ The combat arena SHALL support a toggleable pause state triggered by the Escape 
 - **THEN** all control hints are hidden from the primary display with the exception of a subtle corner pause key indicator
 
 ### Requirement: Enemy Pathing and Intelligent Navigation
-The combat arena SHALL navigate mobile enemy units through obstacle geometry using a 40px grid A* pathfinding algorithm when line-of-sight to the player is obstructed, and transition to direct line-of-sight vector steering when an unobstructed sightline is established.
+The combat arena SHALL navigate mobile enemy units through obstacle geometry using a 40px grid A* pathfinding algorithm when line-of-sight or physical navigation clearance to the player is obstructed, and transition to direct vector pursuit only when both unobstructed optical sightline and physical chassis clearance are established.
 
 #### Scenario: Enemy paths around cover when line-of-sight is blocked
 - **WHEN** an enemy detects that obstacles block direct line-of-sight to the player
 - **THEN** the enemy calculates a waypoint path across walkable 40px grid cells and traverses toward the player position around intervening walls and pillars
 
 #### Scenario: Enemy switches to direct vector steering upon acquiring line-of-sight
-- **WHEN** an enemy establishes an unobstructed sightline to the player
-- **THEN** the enemy bypasses grid waypoint steps and steers smoothly along the line-of-sight vector according to its behavioral archetype (closing distance for rushers, maintaining distance for kiters)
+- **WHEN** an enemy establishes both an unobstructed optical sightline and physical chassis navigation clearance to the player
+- **THEN** the enemy bypasses grid waypoint steps and steers smoothly along the direct vector according to its behavioral archetype (closing distance for rushers, maintaining distance for kiters)
 
 #### Scenario: Unit radius obstacle clearance
-- **WHEN** an enemy navigates near obstacle corners
-- **THEN** pathfinding enforces entity radius clearance to prevent units from penetrating or clipping into obstacle boundaries
+- **WHEN** an enemy navigates near obstacle corners or begins pathfinding from an impassable boundary cell
+- **THEN** pathfinding enforces entity radius clearance to prevent units from penetrating or clipping into obstacle boundaries, and snaps impassable start or target endpoints to the nearest walkable grid cell to prevent deadlock
 
 ### Requirement: Zone 2 Step-Function Baseline Escalation
 The combat arena SHALL enforce an escalated baseline challenge floor across Rooms 6 through 9 with multi-archetype enemy squads, reduced initial engagement delays, and coordinated crossfires calibrated for an augmented player.

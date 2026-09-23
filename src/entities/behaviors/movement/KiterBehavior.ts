@@ -9,7 +9,8 @@
  */
 
 import { GridPathfinder } from "../../../engine/GridPathfinder";
-import { Vector2D } from "../../../math/vector";
+import { hasNavigationClearance } from "../../../math/collision";
+import { vec2, Vector2D } from "../../../math/vector";
 import { Obstacle } from "../../Obstacle";
 import { CombatUnit } from "../../Projectile";
 import { MovementBehavior, MovementContext } from "./MovementBehavior";
@@ -70,42 +71,74 @@ export class KiterBehavior implements MovementBehavior {
 
     // 1. Clear line-of-sight: distance-keeping kiting logic
     if (ctx.hasLineOfSight) {
-      this.currentPath = [];
-      this.currentWaypointIndex = 0;
-
       const dx = target.position.x - ctx.position.x;
       const dy = target.position.y - ctx.position.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
       if (dist < this.minDist) {
-        // Target too close: retreat away from target
+        // Target too close: retreat away from target if clear behind
+        this.currentPath = [];
+        this.currentWaypointIndex = 0;
+
+        let retreatDirX = 0;
+        let retreatDirY = 0;
         if (dist > 1e-6) {
-          const retreatDirX = -dx / dist;
-          const retreatDirY = -dy / dist;
+          retreatDirX = -dx / dist;
+          retreatDirY = -dy / dist;
+        } else {
+          const angle = ctx.aimAngle !== undefined ? ctx.aimAngle + Math.PI : Math.PI;
+          retreatDirX = Math.cos(angle);
+          retreatDirY = Math.sin(angle);
+        }
+
+        // Test if retreat path is physically clear of obstacles
+        const retreatProbeDist = Math.min(40, ctx.radius * 2);
+        const retreatProbe = vec2(
+          ctx.position.x + retreatDirX * retreatProbeDist,
+          ctx.position.y + retreatDirY * retreatProbeDist
+        );
+
+        if (hasNavigationClearance(ctx.position, retreatProbe, ctx.radius, obstacles)) {
           this.resultVelocity.x = retreatDirX * ctx.speed;
           this.resultVelocity.y = retreatDirY * ctx.speed;
         } else {
-          // Exactly on target: retreat backward relative to aim angle
-          const angle = ctx.aimAngle !== undefined ? ctx.aimAngle + Math.PI : Math.PI;
-          this.resultVelocity.x = Math.cos(angle) * ctx.speed;
-          this.resultVelocity.y = Math.sin(angle) * ctx.speed;
+          // Obstacle directly behind: hold ground instead of jamming into wall
+          this.resultVelocity.x = 0;
+          this.resultVelocity.y = 0;
         }
+
+        return this.resultVelocity;
       } else if (dist > this.maxDist) {
-        // Target too far: advance toward target
-        const advanceDirX = dx / dist;
-        const advanceDirY = dy / dist;
-        this.resultVelocity.x = advanceDirX * ctx.speed;
-        this.resultVelocity.y = advanceDirY * ctx.speed;
+        // Target too far: advance toward target if physical clearance is clear
+        const hasClearance = hasNavigationClearance(
+          ctx.position,
+          target.position,
+          ctx.radius,
+          obstacles
+        );
+
+        if (hasClearance) {
+          this.currentPath = [];
+          this.currentWaypointIndex = 0;
+
+          const advanceDirX = dx / dist;
+          const advanceDirY = dy / dist;
+          this.resultVelocity.x = advanceDirX * ctx.speed;
+          this.resultVelocity.y = advanceDirY * ctx.speed;
+          return this.resultVelocity;
+        }
+        // Fall through to A* pathfinding if advancing path is obstructed by cover
       } else {
         // Sweet spot: hold position
+        this.currentPath = [];
+        this.currentWaypointIndex = 0;
         this.resultVelocity.x = 0;
         this.resultVelocity.y = 0;
+        return this.resultVelocity;
       }
-
-      return this.resultVelocity;
     }
 
-    // 2. Blocked line-of-sight: 40px tile grid A* pathfinding
+    // 2. Blocked line-of-sight or obstructed advance: 40px tile grid A* pathfinding
     this.repathCooldownTicks -= deltaTicks;
 
     if (
@@ -114,13 +147,36 @@ export class KiterBehavior implements MovementBehavior {
       this.currentWaypointIndex >= this.currentPath.length
     ) {
       const pf = pathfinder ?? this.getOrCreatePathfinder(obstacles, ctx.radius);
-      let path = pf.findPath(ctx.position, target.position);
 
-      // Fallback: if target cell itself is inside obstacle clearance, pathfind to nearest walkable cell
-      if (path.length === 0) {
-        const nearestTarget = pf.findNearestWalkable(target.position);
+      // Dual-sided walkable endpoint resolution:
+      // If either start or target position is located inside an obstacle clearance cell,
+      // snap it to the nearest walkable cell center to avoid deadlock.
+      let startPos = ctx.position;
+      const startGrid = pf.worldToGrid(startPos);
+      if (!pf.isWalkable(startGrid.gx, startGrid.gy)) {
+        const nearestStart = pf.findNearestWalkable(startPos);
+        if (nearestStart) {
+          startPos = nearestStart;
+        }
+      }
+
+      let targetPos = target.position;
+      const targetGrid = pf.worldToGrid(targetPos);
+      if (!pf.isWalkable(targetGrid.gx, targetGrid.gy)) {
+        const nearestTarget = pf.findNearestWalkable(targetPos);
         if (nearestTarget) {
-          path = pf.findPath(ctx.position, nearestTarget);
+          targetPos = nearestTarget;
+        }
+      }
+
+      let path = pf.findPath(startPos, targetPos);
+
+      // Fallback: if path is still empty, search nearest walkable cells
+      if (path.length === 0) {
+        const fallbackTarget = pf.findNearestWalkable(target.position);
+        const fallbackStart = pf.findNearestWalkable(ctx.position) ?? ctx.position;
+        if (fallbackTarget) {
+          path = pf.findPath(fallbackStart, fallbackTarget);
         }
       }
 

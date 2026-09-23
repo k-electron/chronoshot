@@ -11,6 +11,7 @@ import {
   vecCross,
   vecDistance,
   vecDot,
+  vecLength,
   vecLengthSq,
   vecNormalize,
   vecScale,
@@ -363,5 +364,81 @@ export function testCircleAABB(
     depth: radius + minOverlap,
     contactPoint,
   };
+}
+
+/**
+ * Checks whether an entity with a circular hitbox of the given radius can
+ * navigate in a straight line from `from` to `to` without colliding with obstacles.
+ *
+ * Uses continuous swept-circle testing against obstacle AABBs (Minkowski sum expansion):
+ * 1. Checks if the starting position already overlaps an obstacle.
+ * 2. Checks if the straight segment intersects the expanded obstacle bounds.
+ * 3. Checks corner vertex circles of radius `radius`.
+ *
+ * @param from Starting position of entity center
+ * @param to Target position of entity center
+ * @param radius Hitbox radius of the moving entity
+ * @param obstacles Array of obstacles with AABB bounds
+ * @returns true if the corridor is completely unobstructed, false otherwise
+ */
+export function hasNavigationClearance(
+  from: Vector2D,
+  to: Vector2D,
+  radius: number,
+  obstacles: readonly { bounds: AABB }[]
+): boolean {
+  const diff = vecSub(to, from);
+  const dist = vecLength(diff);
+
+  if (dist < 1e-4) {
+    return true;
+  }
+
+  const dir = vecScale(diff, 1 / dist);
+
+  for (const obstacle of obstacles) {
+    const { min, max } = obstacle.bounds;
+
+    // 1. If start position is already intersecting obstacle hitbox
+    if (testCircleAABB(from, radius, min, max) !== null) {
+      return false;
+    }
+
+    // 2. Broad-phase: check if ray hits bounding box of Minkowski sum
+    const broadMin = vec2(min.x - radius, min.y - radius);
+    const broadMax = vec2(max.x + radius, max.y + radius);
+    const broadHit = rayIntersectsAABB(from, dir, broadMin, broadMax, dist);
+
+    if (!broadHit) {
+      continue;
+    }
+
+    // 3. Narrow-phase: Minkowski sum is the union of two central boxes + 4 corner circles.
+    // Check horizontal expansion box [min.x, max.x] x [min.y - radius, max.y + radius]
+    const boxYMin = vec2(min.x, min.y - radius);
+    const boxYMax = vec2(max.x, max.y + radius);
+    if (rayIntersectsAABB(from, dir, boxYMin, boxYMax, dist) !== null) {
+      return false;
+    }
+
+    // Check vertical expansion box [min.x - radius, max.x + radius] x [min.y, max.y]
+    const boxXMin = vec2(min.x - radius, min.y);
+    const boxXMax = vec2(max.x + radius, max.y);
+    if (rayIntersectsAABB(from, dir, boxXMin, boxXMax, dist) !== null) {
+      return false;
+    }
+
+    // Check 4 corner circles
+    if (
+      circleIntersectsSegment(min, radius, from, to) ||
+      circleIntersectsSegment(vec2(max.x, min.y), radius, from, to) ||
+      circleIntersectsSegment(vec2(min.x, max.y), radius, from, to) ||
+      circleIntersectsSegment(max, radius, from, to)
+    ) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
