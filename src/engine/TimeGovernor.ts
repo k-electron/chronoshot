@@ -116,6 +116,13 @@ export class TimeGovernor {
   }
 
   /**
+   * Convenience helper for tactical locomotion dash burst.
+   */
+  public queueDashBurst(ticks = 12): void {
+    this.queueTicks(ticks);
+  }
+
+  /**
    * Advances wall-clock time and returns the total discrete physics ticks
    * to execute for this frame (combining accumulated scaled time and action bursts).
    *

@@ -12,6 +12,7 @@
 import {
   GOLIATH_01_BLUEPRINT,
   CHRONO_WEAVER_BLUEPRINT,
+  VEKTOR_PRIME_BLUEPRINT,
   BossBlueprint,
 } from "../entities/boss/BossBlueprint";
 import { EnemyConfig } from "../entities/Enemy";
@@ -137,7 +138,11 @@ export class LevelDirector {
 
     const blueprint =
       this.customBossBlueprint ??
-      (sectorNumber <= 1 ? GOLIATH_01_BLUEPRINT : CHRONO_WEAVER_BLUEPRINT);
+      (sectorNumber <= 1
+        ? GOLIATH_01_BLUEPRINT
+        : sectorNumber === 2
+        ? CHRONO_WEAVER_BLUEPRINT
+        : VEKTOR_PRIME_BLUEPRINT);
 
     const bossId = `boss-sector-${sectorNumber}-${roomNumber}`;
     const bossConfig: EnemyConfig = {

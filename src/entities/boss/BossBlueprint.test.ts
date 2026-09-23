@@ -4,8 +4,10 @@ import {
   CHRONO_WEAVER_BLUEPRINT,
   createBossPhaseController,
   GOLIATH_01_BLUEPRINT,
+  VEKTOR_PRIME_BLUEPRINT,
 } from "./BossBlueprint";
 import { vec2 } from "../../math/vector";
+import { AlternatingAttackBehavior } from "../behaviors/attack/AlternatingAttackBehavior";
 import { DirectAdvanceBehavior } from "../behaviors/movement/DirectAdvanceBehavior";
 import { KiterBehavior } from "../behaviors/movement/KiterBehavior";
 import { SingleSlugBehavior } from "../behaviors/attack/SingleSlugBehavior";
@@ -125,8 +127,78 @@ describe("BossBlueprint & Multi-Phase Archetypes", () => {
     expect(controller.speed).toBe(55);
   });
 
+  it("Vektor-Prime blueprint configures 3-phase Step Function progression", () => {
+    const bp = VEKTOR_PRIME_BLUEPRINT;
+    expect(bp.id).toBe("vektor-prime");
+    expect(bp.radius).toBe(26);
+    expect(bp.phases).toHaveLength(3);
+
+    // Phase 1: Fortress Aegis (5 shields, 50 px/s, SingleSlug)
+    const p1 = bp.phases[0];
+    expect(p1.phaseTitle).toBe("FORTRESS AEGIS");
+    expect(p1.maxShields).toBe(5);
+    expect(p1.speed).toBe(50);
+    expect(p1.movement()).toBeInstanceOf(DirectAdvanceBehavior);
+    expect(p1.attack()).toBeInstanceOf(SingleSlugBehavior);
+
+    // Phase 2: Phase Warp (3 shields, 85 px/s, Kiter, Alternating)
+    const p2 = bp.phases[1];
+    expect(p2.phaseTitle).toBe("PHASE WARP");
+    expect(p2.maxShields).toBe(3);
+    expect(p2.speed).toBe(85);
+    expect(p2.movement()).toBeInstanceOf(KiterBehavior);
+    expect(p2.attack()).toBeInstanceOf(AlternatingAttackBehavior);
+
+    // Phase 3: Singularity Nova (0 shields, 115 px/s, DirectAdvance, 16-pellet nova)
+    const p3 = bp.phases[2];
+    expect(p3.phaseTitle).toBe("SINGULARITY NOVA");
+    expect(p3.maxShields).toBe(0);
+    expect(p3.speed).toBe(115);
+    expect(p3.movement()).toBeInstanceOf(DirectAdvanceBehavior);
+    expect(p3.attack()).toBeInstanceOf(RadialNovaBehavior);
+  });
+
+  it("Vektor-Prime phase transitions trigger shockwaves and dynamic escort summons", () => {
+    const bp = VEKTOR_PRIME_BLUEPRINT;
+    const p1 = bp.phases[0];
+    const p2 = bp.phases[1];
+
+    const spawnedMinions: any[] = [];
+    const emittedShatters: any[] = [];
+
+    const mockCtx = {
+      bossPosition: vec2(600, 320),
+      particles: {
+        emitShatter: (pos: any, count: number, color: string, speed: number) => {
+          emittedShatters.push({ pos, count, color, speed });
+        },
+      },
+      soundSynth: {
+        playShieldBreak: () => {},
+      },
+      spawnMinion: (minion: any) => {
+        spawnedMinions.push(minion);
+      },
+    };
+
+    // Phase 1 exit
+    p1.onPhaseExit!(mockCtx as any);
+    expect(emittedShatters).toHaveLength(1);
+    expect(emittedShatters[0].color).toBe("#a855f7");
+    expect(spawnedMinions).toHaveLength(2); // Shotgun + Stalker
+    expect(spawnedMinions[0].type).toBe("shotgun");
+    expect(spawnedMinions[1].type).toBe("stalker");
+
+    // Phase 2 exit
+    p2.onPhaseExit!(mockCtx as any);
+    expect(emittedShatters).toHaveLength(2);
+    expect(emittedShatters[1].color).toBe("#ff1744");
+    expect(spawnedMinions).toHaveLength(4); // 2 more stalkers
+  });
+
   it("BOSS_BLUEPRINTS registry contains registered blueprints", () => {
     expect(BOSS_BLUEPRINTS["goliath-01"]).toBeDefined();
     expect(BOSS_BLUEPRINTS["chrono-weaver"]).toBeDefined();
+    expect(BOSS_BLUEPRINTS["vektor-prime"]).toBeDefined();
   });
 });

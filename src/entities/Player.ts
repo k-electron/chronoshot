@@ -67,6 +67,11 @@ export class Player implements CombatUnit {
   public upgradePipeline: UpgradePipeline;
   public shields: number = 0;
   public maxShields: number = 0;
+  public dashCooldownTicks: number = 0;
+  public dashActiveTicks: number = 0;
+  public readonly dashSpeed: number = 480;
+  public readonly dashDurationTicks: number = 12;
+  public readonly dashCooldownMaxTicks: number = 90;
 
   public readonly baseMaxSpeed: number;
   private spawnPosition: Vector2D;
@@ -134,35 +139,44 @@ export class Player implements CombatUnit {
     this.weapon.update(1);
     this.upgradePipeline.onTick(this, 1);
 
+    if (this.dashCooldownTicks > 0) {
+      this.dashCooldownTicks--;
+    }
+    if (this.dashActiveTicks > 0) {
+      this.dashActiveTicks--;
+    }
+
     // 2. Velocity Integration
-    const inputLenSq = vecLengthSq(inputDir);
-    if (inputLenSq > 1e-4) {
-      const normalizedInput = vecNormalize(inputDir);
-      const targetVelocity = vecScale(normalizedInput, this.maxSpeed);
+    if (this.dashActiveTicks <= 0) {
+      const inputLenSq = vecLengthSq(inputDir);
+      if (inputLenSq > 1e-4) {
+        const normalizedInput = vecNormalize(inputDir);
+        const targetVelocity = vecScale(normalizedInput, this.maxSpeed);
 
-      // Accelerate towards target velocity
-      const velDiff = vecSub(targetVelocity, this.velocity);
-      const diffLen = vecLength(velDiff);
-      const maxChange = this.acceleration * fixedDeltaTime;
+        // Accelerate towards target velocity
+        const velDiff = vecSub(targetVelocity, this.velocity);
+        const diffLen = vecLength(velDiff);
+        const maxChange = this.acceleration * fixedDeltaTime;
 
-      if (diffLen <= maxChange) {
-        this.velocity = targetVelocity;
+        if (diffLen <= maxChange) {
+          this.velocity = targetVelocity;
+        } else {
+          const accelDir = vecScale(velDiff, 1 / diffLen);
+          this.velocity = {
+            x: this.velocity.x + accelDir.x * maxChange,
+            y: this.velocity.y + accelDir.y * maxChange,
+          };
+        }
       } else {
-        const accelDir = vecScale(velDiff, 1 / diffLen);
-        this.velocity = {
-          x: this.velocity.x + accelDir.x * maxChange,
-          y: this.velocity.y + accelDir.y * maxChange,
-        };
-      }
-    } else {
-      // Decelerate with friction when no movement keys are depressed
-      const currentSpeed = vecLength(this.velocity);
-      if (currentSpeed > 1e-4) {
-        const drop = this.friction * fixedDeltaTime;
-        const newSpeed = Math.max(0, currentSpeed - drop);
-        this.velocity = vecScale(this.velocity, newSpeed / currentSpeed);
-      } else {
-        this.velocity = vec2(0, 0);
+        // Decelerate with friction when no movement keys are depressed
+        const currentSpeed = vecLength(this.velocity);
+        if (currentSpeed > 1e-4) {
+          const drop = this.friction * fixedDeltaTime;
+          const newSpeed = Math.max(0, currentSpeed - drop);
+          this.velocity = vecScale(this.velocity, newSpeed / currentSpeed);
+        } else {
+          this.velocity = vec2(0, 0);
+        }
       }
     }
 
@@ -235,6 +249,49 @@ export class Player implements CombatUnit {
         break;
       }
     }
+  }
+
+  /**
+   * Returns whether the Overcharge Dash augmentation is installed.
+   */
+  public hasOverchargeDash(): boolean {
+    return this.upgradePipeline.has("overcharge-dash");
+  }
+
+  /**
+   * Returns whether Overcharge Dash is ready to activate (installed and off cooldown).
+   */
+  public isDashReady(): boolean {
+    return this.hasOverchargeDash() && this.dashCooldownTicks <= 0 && this.isAlive;
+  }
+
+  /**
+   * Triggers an Overcharge Dash: queues an action burst of +12 simulation ticks
+   * onto the TimeGovernor, propels the player at 480 px/s, and initiates a 90-tick cooldown.
+   *
+   * @returns true if dash was successfully initiated.
+   */
+  public triggerDash(governor?: TimeGovernor, explicitDir?: Vector2D): boolean {
+    if (!this.isDashReady()) {
+      return false;
+    }
+
+    // Determine dash direction: explicitDir -> current velocity -> aim direction
+    let dir: Vector2D;
+    if (explicitDir && vecLengthSq(explicitDir) > 1e-4) {
+      dir = vecNormalize(explicitDir);
+    } else if (vecLengthSq(this.velocity) > 1e-4) {
+      dir = vecNormalize(this.velocity);
+    } else {
+      dir = vec2(Math.cos(this.aimAngle), Math.sin(this.aimAngle));
+    }
+
+    this.velocity = vecScale(dir, this.dashSpeed);
+    this.dashActiveTicks = this.dashDurationTicks;
+    this.dashCooldownTicks = this.dashCooldownMaxTicks;
+
+    governor?.queueDashBurst(this.dashDurationTicks);
+    return true;
   }
 
   /**
@@ -368,6 +425,8 @@ export class Player implements CombatUnit {
     this.augmentations = {};
     this.shields = 0;
     this.maxShields = 0;
+    this.dashCooldownTicks = 0;
+    this.dashActiveTicks = 0;
     this.maxSpeed = this.baseMaxSpeed;
     this.weapon = new Revolver();
   }
@@ -384,10 +443,17 @@ export class Player implements CombatUnit {
   }
 
   /**
-   * Processes incoming damage, absorbing impact with reactive shields if available,
+   * Processes incoming damage, absorbing impact with reactive shields or phase dash deflection,
    * otherwise enforcing 1-hit lethality.
    */
   public takeDamage(damage = 1): DamageResult {
+    if (this.dashActiveTicks > 0) {
+      return {
+        absorbed: true,
+        eliminated: false,
+        remainingShields: this.shields,
+      };
+    }
     if (this.shields > 0) {
       this.shields = Math.max(0, this.shields - damage);
       return {
@@ -423,6 +489,8 @@ export class Player implements CombatUnit {
     this.previousPosition = { ...this.spawnPosition };
     this.velocity = vec2(0, 0);
     this.isAlive = true;
+    this.dashCooldownTicks = 0;
+    this.dashActiveTicks = 0;
 
     // Dispatch room start to active upgrades
     this.upgradePipeline.onRoomStart(this);

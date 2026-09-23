@@ -316,6 +316,73 @@ describe("Player Entity", () => {
       expect(player.maxShields).toBe(2);
       expect(player.isAlive).toBe(true);
     });
+
+    describe("Overcharge Dash", () => {
+      it("activates overcharge dash, queues action burst, and initiates cooldown", () => {
+        const governor = new TimeGovernor();
+        const player = new Player({ x: 100, y: 100 });
+        expect(player.hasOverchargeDash()).toBe(false);
+        expect(player.isDashReady()).toBe(false);
+
+        // Cannot dash without upgrade
+        expect(player.triggerDash(governor)).toBe(false);
+
+        player.acquireUpgrade("overcharge-dash");
+        expect(player.hasOverchargeDash()).toBe(true);
+        expect(player.isDashReady()).toBe(true);
+
+        // Aiming right (angle 0)
+        player.aimAngle = 0;
+        const dashed = player.triggerDash(governor);
+        expect(dashed).toBe(true);
+        expect(governor.getQueuedTicks()).toBe(12);
+        expect(player.velocity.x).toBeCloseTo(480);
+        expect(player.velocity.y).toBeCloseTo(0);
+        expect(player.dashActiveTicks).toBe(12);
+        expect(player.dashCooldownTicks).toBe(90);
+
+        // Cannot re-dash while on cooldown
+        expect(player.isDashReady()).toBe(false);
+        expect(player.triggerDash(governor)).toBe(false);
+      });
+
+      it("deflects projectiles during active dash frames without consuming shields", () => {
+        const player = new Player({ x: 100, y: 100 });
+        player.acquireUpgrade("overcharge-dash");
+        player.acquireUpgrade("reactive-shield");
+        expect(player.shields).toBe(1);
+
+        player.triggerDash();
+        expect(player.dashActiveTicks).toBe(12);
+
+        // Incoming damage during dash
+        const hit = player.takeDamage(1);
+        expect(hit.absorbed).toBe(true);
+        expect(hit.eliminated).toBe(false);
+        // Shields were not consumed!
+        expect(player.shields).toBe(1);
+        expect(player.isAlive).toBe(true);
+      });
+
+      it("counts down cooldown in update loop and resets on room reset", () => {
+        const player = new Player({ x: 100, y: 100 });
+        player.acquireUpgrade("overcharge-dash");
+        player.triggerDash();
+        expect(player.dashCooldownTicks).toBe(90);
+
+        // 10 ticks elapse
+        for (let i = 0; i < 10; i++) {
+          player.update(vec2(0, 0), 1 / 60);
+        }
+        expect(player.dashCooldownTicks).toBe(80);
+
+        // Reset restores dash ready
+        player.reset();
+        expect(player.dashCooldownTicks).toBe(0);
+        expect(player.dashActiveTicks).toBe(0);
+        expect(player.isDashReady()).toBe(true);
+      });
+    });
   });
 });
 

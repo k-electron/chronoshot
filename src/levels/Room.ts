@@ -20,7 +20,10 @@
  *   - Room 9 (The Iron Gate): Final defensive line with dual Aegis Wardens + Marksman + Stalker.
  */
 
-import { CHRONO_WEAVER_BLUEPRINT } from "../entities/boss/BossBlueprint";
+import {
+  CHRONO_WEAVER_BLUEPRINT,
+  VEKTOR_PRIME_BLUEPRINT,
+} from "../entities/boss/BossBlueprint";
 import { EnemyConfig } from "../entities/Enemy";
 import { createObstacle, createPillar, Obstacle } from "../entities/Obstacle";
 import { vec2, Vector2D } from "../math/vector";
@@ -921,7 +924,435 @@ export function createRoom14(width = 960, height = 640): RoomConfig {
 }
 
 /**
- * Generates the complete 14-room tactical puzzle progression.
+ * Room 15: Milestone Boss 3 (Vektor-Prime: Phase Sovereign [5 shields] + Grunt escorts).
+ * Step-function milestone: 5-shield fortress -> 3-shield standoff kiter with minion spawns -> 16-pellet nova overdrive.
+ */
+export function createRoom15(width = 960, height = 640): RoomConfig {
+  return {
+    id: "room-15",
+    roomNumber: 15,
+    title: "ROOM 15: VEKTOR-PRIME",
+    subtitle: "Milestone Boss 3: Phase Sovereign",
+    tacticalTip:
+      "Vektor-Prime shifts across 3 high-intensity combat phases! Deplete 5 shields, evade standoff kiter beams, and weave through 16-pellet radial novae.",
+    playerSpawn: vec2(140, height / 2),
+    obstacles: [
+      ...createPerimeterWalls(width, height),
+      createPillar("pillar-nw", 360, 180, 50),
+      createPillar("pillar-sw", 360, height - 180, 50),
+      createPillar("pillar-ne", 600, 180, 50),
+      createPillar("pillar-se", 600, height - 180, 50),
+      createObstacle("center-bunker", width / 2 - 20, height / 2 - 50, 40, 100),
+    ],
+    enemies: [
+      {
+        id: "vektor-prime-boss",
+        type: "boss",
+        x: width - 200,
+        y: height / 2,
+        maxShields: 5,
+        blueprint: VEKTOR_PRIME_BLUEPRINT,
+        bossName: VEKTOR_PRIME_BLUEPRINT.name,
+        fireCadenceTicks: 50,
+        initialDelayTicks: 25,
+      },
+      {
+        id: "grunt-escort-top",
+        type: "grunt",
+        x: width - 260,
+        y: 150,
+        fireCadenceTicks: 50,
+        initialDelayTicks: 30,
+      },
+      {
+        id: "grunt-escort-bottom",
+        type: "grunt",
+        x: width - 260,
+        y: height - 150,
+        fireCadenceTicks: 50,
+        initialDelayTicks: 40,
+      },
+    ],
+    exitPortal: {
+      x: width - 80,
+      y: height / 2,
+      radius: 28,
+    },
+  };
+}
+
+/**
+ * Room 16: Zenith Entry (Sector 4 Entry: 1 Warden + 2 Shotguns + 2 Stalkers + 2 Grunts).
+ * Calibrates player against mixed vanguard pressure using newly drafted 3-upgrade synergies.
+ */
+export function createRoom16(width = 960, height = 640): RoomConfig {
+  return {
+    id: "room-16",
+    roomNumber: 16,
+    title: "ROOM 16: ZENITH ENTRY",
+    subtitle: "Sector 4 Vanguard Infiltration",
+    tacticalTip:
+      "Sector 4 hostiles coordinate simultaneous flank advances. Exploit your 3-augmentation build to control engagement distances.",
+    playerSpawn: vec2(140, height / 2),
+    obstacles: [
+      ...createPerimeterWalls(width, height),
+      createObstacle("barrier-top", 420, 0, 30, height / 2 - 70),
+      createObstacle("barrier-bottom", 420, height / 2 + 70, 30, height / 2 - 70),
+      createPillar("pillar-choke", width / 2 + 80, height / 2, 45),
+    ],
+    enemies: [
+      {
+        id: "warden-center",
+        type: "warden",
+        x: width - 240,
+        y: height / 2,
+        maxShields: 2,
+        fireCadenceTicks: 65,
+        initialDelayTicks: 25,
+      },
+      {
+        id: "guard-top",
+        type: "shotgun",
+        x: width - 220,
+        y: 140,
+        maxShields: 1,
+        fireCadenceTicks: 75,
+        initialDelayTicks: 30,
+      },
+      {
+        id: "guard-bottom",
+        type: "shotgun",
+        x: width - 220,
+        y: height - 140,
+        maxShields: 1,
+        fireCadenceTicks: 75,
+        initialDelayTicks: 35,
+      },
+      {
+        id: "stalker-fast-1",
+        type: "stalker",
+        x: width - 320,
+        y: 130,
+        fireCadenceTicks: 32,
+        initialDelayTicks: 15,
+      },
+      {
+        id: "stalker-fast-2",
+        type: "stalker",
+        x: width - 320,
+        y: height - 130,
+        fireCadenceTicks: 32,
+        initialDelayTicks: 20,
+      },
+      {
+        id: "grunt-support-1",
+        type: "grunt",
+        x: width - 160,
+        y: height / 2 - 80,
+        fireCadenceTicks: 50,
+        initialDelayTicks: 35,
+      },
+      {
+        id: "grunt-support-2",
+        type: "grunt",
+        x: width - 160,
+        y: height / 2 + 80,
+        fireCadenceTicks: 50,
+        initialDelayTicks: 40,
+      },
+    ],
+    exitPortal: {
+      x: width - 80,
+      y: height / 2,
+      radius: 28,
+    },
+  };
+}
+
+/**
+ * Room 17: Twin Bastions (2 Wardens + 2 Marksmen + 2 Shotguns).
+ * Fortified bunker crossfire requiring disciplined cover peeking and shield-cracking.
+ */
+export function createRoom17(width = 960, height = 640): RoomConfig {
+  return {
+    id: "room-17",
+    roomNumber: 17,
+    title: "ROOM 17: TWIN BASTIONS",
+    subtitle: "Armored Bunker Siege",
+    tacticalTip:
+      "Dual snipers pin crossfire lanes from fortified bastions while twin wardens and shotgun guards hold the choke. Break sightlines!",
+    playerSpawn: vec2(140, height / 2),
+    obstacles: [
+      ...createPerimeterWalls(width, height),
+      createObstacle("bunker-nw", 340, 110, 40, 130),
+      createObstacle("bunker-sw", 340, height - 240, 40, 130),
+      createObstacle("bunker-ne", 580, 110, 40, 130),
+      createObstacle("bunker-se", 580, height - 240, 40, 130),
+      createPillar("pillar-mid-top", width / 2, height / 2 - 110, 42),
+      createPillar("pillar-mid-bottom", width / 2, height / 2 + 110, 42),
+    ],
+    enemies: [
+      {
+        id: "warden-top",
+        type: "warden",
+        x: width - 260,
+        y: height / 2 - 90,
+        maxShields: 2,
+        fireCadenceTicks: 65,
+        initialDelayTicks: 25,
+      },
+      {
+        id: "warden-bottom",
+        type: "warden",
+        x: width - 260,
+        y: height / 2 + 90,
+        maxShields: 2,
+        fireCadenceTicks: 65,
+        initialDelayTicks: 30,
+      },
+      {
+        id: "sniper-upper",
+        type: "marksman",
+        x: width - 150,
+        y: 110,
+        fireCadenceTicks: 95,
+        initialDelayTicks: 35,
+      },
+      {
+        id: "sniper-lower",
+        type: "marksman",
+        x: width - 150,
+        y: height - 110,
+        fireCadenceTicks: 95,
+        initialDelayTicks: 45,
+      },
+      {
+        id: "guard-upper",
+        type: "shotgun",
+        x: width - 360,
+        y: height / 2 - 100,
+        maxShields: 1,
+        fireCadenceTicks: 75,
+        initialDelayTicks: 20,
+      },
+      {
+        id: "guard-lower",
+        type: "shotgun",
+        x: width - 360,
+        y: height / 2 + 100,
+        maxShields: 1,
+        fireCadenceTicks: 75,
+        initialDelayTicks: 25,
+      },
+    ],
+    exitPortal: {
+      x: width - 80,
+      y: height / 2,
+      radius: 28,
+    },
+  };
+}
+
+/**
+ * Room 18: Chrono Choke (2 Wardens + 3 Stalkers + 2 Shotguns + 1 Grunt).
+ * Relentless close-quarters containment testing rapid target prioritization and sprint evasion.
+ */
+export function createRoom18(width = 960, height = 640): RoomConfig {
+  return {
+    id: "room-18",
+    roomNumber: 18,
+    title: "ROOM 18: CHRONO CHOKE",
+    subtitle: "Triple Stalker Inundation",
+    tacticalTip:
+      "Three high-velocity stalkers surge through narrow lanes backed by armored wardens. Neutralize rushers immediately.",
+    playerSpawn: vec2(140, height / 2),
+    obstacles: [
+      ...createPerimeterWalls(width, height),
+      createObstacle("corridor-top", 280, 190, width - 480, 24),
+      createObstacle("corridor-bottom", 280, height - 214, width - 480, 24),
+      createPillar("pillar-choke-1", 420, height / 2, 45),
+      createPillar("pillar-choke-2", 620, height / 2, 45),
+    ],
+    enemies: [
+      {
+        id: "stalker-1",
+        type: "stalker",
+        x: width - 200,
+        y: 110,
+        fireCadenceTicks: 32,
+        initialDelayTicks: 15,
+      },
+      {
+        id: "stalker-2",
+        type: "stalker",
+        x: width - 200,
+        y: height - 110,
+        fireCadenceTicks: 32,
+        initialDelayTicks: 20,
+      },
+      {
+        id: "stalker-3",
+        type: "stalker",
+        x: width - 340,
+        y: height / 2,
+        fireCadenceTicks: 32,
+        initialDelayTicks: 15,
+      },
+      {
+        id: "warden-north",
+        type: "warden",
+        x: width - 260,
+        y: height / 2 - 80,
+        maxShields: 2,
+        fireCadenceTicks: 65,
+        initialDelayTicks: 25,
+      },
+      {
+        id: "warden-south",
+        type: "warden",
+        x: width - 260,
+        y: height / 2 + 80,
+        maxShields: 2,
+        fireCadenceTicks: 65,
+        initialDelayTicks: 35,
+      },
+      {
+        id: "guard-flank-top",
+        type: "shotgun",
+        x: width - 180,
+        y: 160,
+        maxShields: 1,
+        fireCadenceTicks: 70,
+        initialDelayTicks: 30,
+      },
+      {
+        id: "guard-flank-bottom",
+        type: "shotgun",
+        x: width - 180,
+        y: height - 160,
+        maxShields: 1,
+        fireCadenceTicks: 70,
+        initialDelayTicks: 35,
+      },
+      {
+        id: "grunt-anchor",
+        type: "grunt",
+        x: width - 140,
+        y: height / 2,
+        fireCadenceTicks: 50,
+        initialDelayTicks: 40,
+      },
+    ],
+    exitPortal: {
+      x: width - 80,
+      y: height / 2,
+      radius: 28,
+    },
+  };
+}
+
+/**
+ * Room 19: Protocol Zenith (Campaign Climax: 3 Wardens + 2 Marksmen + 2 Stalkers + 1 Shotgun).
+ * The ultimate tactical gauntlet demanding complete mastery of all 3 installed augmentations.
+ */
+export function createRoom19(width = 960, height = 640): RoomConfig {
+  return {
+    id: "room-19",
+    roomNumber: 19,
+    title: "ROOM 19: PROTOCOL ZENITH",
+    subtitle: "Endgame Campaign Climax",
+    tacticalTip:
+      "All elite archetypes coordinate in a quadrant matrix. 6 enemy shields to crack under sniper fire—master your timing in micro-creep!",
+    playerSpawn: vec2(140, height / 2),
+    obstacles: [
+      ...createPerimeterWalls(width, height),
+      createObstacle("quad-nw", 340, 100, 24, 120),
+      createObstacle("quad-sw", 340, height - 220, 24, 120),
+      createObstacle("quad-ne", 580, 100, 24, 120),
+      createObstacle("quad-se", 580, height - 220, 24, 120),
+      createPillar("pillar-core-top", width / 2, height / 2 - 110, 46),
+      createPillar("pillar-core-bottom", width / 2, height / 2 + 110, 46),
+    ],
+    enemies: [
+      {
+        id: "warden-lead-1",
+        type: "warden",
+        x: width - 240,
+        y: height / 2 - 110,
+        maxShields: 2,
+        fireCadenceTicks: 65,
+        initialDelayTicks: 25,
+      },
+      {
+        id: "warden-lead-2",
+        type: "warden",
+        x: width - 240,
+        y: height / 2 + 110,
+        maxShields: 2,
+        fireCadenceTicks: 65,
+        initialDelayTicks: 30,
+      },
+      {
+        id: "warden-center",
+        type: "warden",
+        x: width - 200,
+        y: height / 2,
+        maxShields: 2,
+        fireCadenceTicks: 65,
+        initialDelayTicks: 35,
+      },
+      {
+        id: "sniper-high-nest",
+        type: "marksman",
+        x: width - 150,
+        y: 110,
+        fireCadenceTicks: 95,
+        initialDelayTicks: 30,
+      },
+      {
+        id: "sniper-low-nest",
+        type: "marksman",
+        x: width - 150,
+        y: height - 110,
+        fireCadenceTicks: 95,
+        initialDelayTicks: 45,
+      },
+      {
+        id: "stalker-infiltrator-1",
+        type: "stalker",
+        x: width - 360,
+        y: height / 2 - 70,
+        fireCadenceTicks: 32,
+        initialDelayTicks: 15,
+      },
+      {
+        id: "stalker-infiltrator-2",
+        type: "stalker",
+        x: width - 360,
+        y: height / 2 + 70,
+        fireCadenceTicks: 32,
+        initialDelayTicks: 20,
+      },
+      {
+        id: "guard-forward",
+        type: "shotgun",
+        x: width - 280,
+        y: height / 2,
+        maxShields: 1,
+        fireCadenceTicks: 70,
+        initialDelayTicks: 25,
+      },
+    ],
+    exitPortal: {
+      x: width - 80,
+      y: height / 2,
+      radius: 28,
+    },
+  };
+}
+
+/**
+ * Generates the complete 19-room tactical puzzle progression.
  */
 export function createStandardRoomSequence(
   width = 960,
@@ -942,5 +1373,10 @@ export function createStandardRoomSequence(
     createRoom12(width, height),
     createRoom13(width, height),
     createRoom14(width, height),
+    createRoom15(width, height),
+    createRoom16(width, height),
+    createRoom17(width, height),
+    createRoom18(width, height),
+    createRoom19(width, height),
   ];
 }

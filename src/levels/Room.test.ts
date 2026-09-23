@@ -14,11 +14,19 @@ import {
   createRoom12,
   createRoom13,
   createRoom14,
+  createRoom15,
+  createRoom16,
+  createRoom17,
+  createRoom18,
+  createRoom19,
   createStandardRoomSequence,
 } from "./Room";
-import { CHRONO_WEAVER_BLUEPRINT } from "../entities/boss/BossBlueprint";
+import {
+  CHRONO_WEAVER_BLUEPRINT,
+  VEKTOR_PRIME_BLUEPRINT,
+} from "../entities/boss/BossBlueprint";
 
-describe("Room Level Configurations (Rooms 1 to 14)", () => {
+describe("Room Level Configurations (Rooms 1 to 19)", () => {
   it("creates valid room configurations for Rooms 1 through 9", () => {
     const r1 = createRoom1();
     expect(r1.roomNumber).toBe(1);
@@ -135,9 +143,63 @@ describe("Room Level Configurations (Rooms 1 to 14)", () => {
     expect(shotguns).toHaveLength(1);
   });
 
-  it("createStandardRoomSequence returns complete 14-room campaign sequence", () => {
+  it("createRoom15 sets up Vektor-Prime milestone boss encounter with Phase Sovereign blueprint and escorts", () => {
+    const r15 = createRoom15();
+    expect(r15.id).toBe("room-15");
+    expect(r15.roomNumber).toBe(15);
+    expect(r15.title).toContain("ROOM 15: VEKTOR-PRIME");
+    expect(r15.subtitle).toContain("Milestone Boss 3: Phase Sovereign");
+    expect(r15.playerSpawn).toEqual({ x: 140, y: 320 });
+    expect(r15.exitPortal).toBeDefined();
+
+    // 4 perimeter walls + 4 corner pillars + 1 center bunker = 9 obstacles
+    expect(r15.obstacles).toHaveLength(9);
+    const pillars = r15.obstacles.filter((o) => o.id.includes("pillar"));
+    expect(pillars).toHaveLength(4);
+
+    // Enemies: Vektor-Prime boss + 2 Grunt escorts
+    expect(r15.enemies).toHaveLength(3);
+    const boss = r15.enemies.find((e) => e.type === "boss");
+    expect(boss).toBeDefined();
+    expect(boss?.id).toBe("vektor-prime-boss");
+    expect(boss?.maxShields).toBe(5);
+    expect(boss?.blueprint).toBe(VEKTOR_PRIME_BLUEPRINT);
+
+    const grunts = r15.enemies.filter((e) => e.type === "grunt");
+    expect(grunts).toHaveLength(2);
+  });
+
+  it("createRoom16 through createRoom19 configure endgame linear progression (Rooms 16-19)", () => {
+    const r16 = createRoom16();
+    expect(r16.id).toBe("room-16");
+    expect(r16.roomNumber).toBe(16);
+    expect(r16.title).toContain("ROOM 16: ZENITH ENTRY");
+    expect(r16.enemies.length).toBeGreaterThanOrEqual(5);
+
+    const r17 = createRoom17();
+    expect(r17.id).toBe("room-17");
+    expect(r17.roomNumber).toBe(17);
+    expect(r17.title).toContain("ROOM 17: TWIN BASTIONS");
+    expect(r17.enemies.filter((e) => e.type === "marksman")).toHaveLength(2);
+
+    const r18 = createRoom18();
+    expect(r18.id).toBe("room-18");
+    expect(r18.roomNumber).toBe(18);
+    expect(r18.title).toContain("ROOM 18: CHRONO CHOKE");
+    expect(r18.enemies.filter((e) => e.type === "warden")).toHaveLength(2);
+
+    const r19 = createRoom19();
+    expect(r19.id).toBe("room-19");
+    expect(r19.roomNumber).toBe(19);
+    expect(r19.title).toContain("ROOM 19: PROTOCOL ZENITH");
+    expect(r19.enemies.filter((e) => e.type === "warden")).toHaveLength(3);
+    expect(r19.enemies.filter((e) => e.type === "marksman")).toHaveLength(2);
+    expect(r19.enemies.filter((e) => e.type === "stalker")).toHaveLength(2);
+  });
+
+  it("createStandardRoomSequence returns complete 19-room campaign sequence", () => {
     const sequence = createStandardRoomSequence();
-    expect(sequence).toHaveLength(14);
+    expect(sequence).toHaveLength(19);
 
     sequence.forEach((room, index) => {
       expect(room.roomNumber).toBe(index + 1);
@@ -147,8 +209,9 @@ describe("Room Level Configurations (Rooms 1 to 14)", () => {
       expect(room.exitPortal).toBeDefined();
     });
 
-    // Milestone bosses in Room 5 and Room 10
+    // Milestone bosses in Room 5, Room 10, and Room 15
     expect(sequence[4].enemies.some((e) => e.type === "boss")).toBe(true);
     expect(sequence[9].enemies.some((e) => e.type === "boss")).toBe(true);
+    expect(sequence[14].enemies.some((e) => e.type === "boss")).toBe(true);
   });
 });

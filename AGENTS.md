@@ -45,7 +45,7 @@ ChronoShot is deliberately engineered without heavy third-party game engines (no
 ### 4. 40px Grid A* Pathfinding & Modular Boss Phase Engine
 - **`GridPathfinder`**: Discrete $24 \times 16$ tile-grid A* with entity radius obstacle inflation ($16\text{px}$) navigates around walls and pillars when line-of-sight is blocked.
 - **Line-of-Sight String Pulling**: When sightlines are clear, AI switches to direct-vector steering (rushers close in, kiters retreat).
-- **Archetypes & Bosses**: Pistol Grunt, Shotgun Guard, Stalker Rusher, Aegis Warden, Marksman Sniper, alongside multi-phase milestone bosses Goliath-01 Aegis Colossus and Chrono-Weaver Temporal Anchor.
+- **Archetypes & Bosses**: Pistol Grunt, Shotgun Guard, Stalker Rusher, Aegis Warden, Marksman Sniper, alongside multi-phase milestone bosses Goliath-01 Aegis Colossus, Chrono-Weaver Temporal Anchor, and Vektor-Prime Phase Sovereign.
 - **`BossPhaseController` & `BossBlueprint`**: Declarative $N$-phase state machines governing boss progression with dynamic movement/attack swaps, transition triggers, and lifecycle actions (`BossTransitionAction`: radial particle shockwaves, dynamic audio cues, escort minion summons). Includes `RadialNovaBehavior` for 360-degree projectile novae.
 
 ### 5. Minimalist HUD & Tactical UI
@@ -53,14 +53,14 @@ ChronoShot is deliberately engineered without heavy third-party game engines (no
 - **Hairline Revolver Dial (`src/ui/CylinderHUD.ts`)**: Minimalist 6-chamber dial (dynamically expandable to 8 chambers with Extended Cylinder) with active chamber alignment notch and smooth rotational transition.
 - **Hairline Chrono-Telemetry (`src/ui/TimeHUD.ts`)**: Top-right gauge displaying numeric multiplier (`CHRONO // 0.05x`) and transient action burst pills.
 - **Phase-Aware Boss Telemetry (`src/ui/BossTelemetryHUD.ts`)**: Decoupled top-center telemetry rendering boss designation, active phase badges (e.g. `PHASE 2/2 // OVERDRIVE`), and shield charge pips.
-- **Tactical Upgrade Draft & Pipeline (`src/upgrades/` & `src/ui/UpgradeDraftHUD.ts`)**: Data-driven roguelike upgrade pipeline (`UpgradePipeline`) with centralized registry (`UpgradeRegistry`), dynamic $N$-card draft UI (`UpgradeDraftHUD`), stack control, and compounded modifiers. Baseline augmentations (Extended Cylinder, Speed Loader, Reactive Shield) and advanced perks (Kinetic Stride, Chrono Burst, Phase Deflector).
+- **Tactical Upgrade Draft & Pipeline (`src/upgrades/` & `src/ui/UpgradeDraftHUD.ts`)**: Data-driven roguelike upgrade pipeline (`UpgradePipeline`) with centralized registry (`UpgradeRegistry`), dynamic $N$-card draft UI (`UpgradeDraftHUD`), stack control, and compounded modifiers. Baseline augmentations (Extended Cylinder, Speed Loader, Reactive Shield) and advanced perks (Kinetic Stride, Chrono Burst, Phase Deflector, Overcharge Dash).
 - **Pause Lifecycle**: Toggleable with <kbd>Esc</kbd> or <kbd>P</kbd>. Halts simulation ticks and displays a frosted Swiss-style control matrix card.
 
 ### 6. Modular Level Director & Procedural Encounter Generation
 - **`RoomLayoutTemplate` & `DEFAULT_LAYOUT_REGISTRY`**: Composable tactical geometry layouts (`CenterPillarsTemplate`, `TwinBunkersTemplate`, `SplitCorridorTemplate`, `KillboxLanesTemplate`, `ArenaQuadrantTemplate`) with verified spawn safety ($\ge 280\text{px}$ from player spawn).
 - **`EncounterDirector`**: Threat-budget encounter synthesizer selecting hostile archetypes dynamically based on difficulty tier while enforcing composition constraints (max 2 snipers, frontliner escort rules) and geometric separation ($\ge 48\text{px}$ between units, outside obstacle collision boxes).
-- **`LevelDirector`**: Deterministic Mulberry32 PRNG engine producing reproducible room configurations from numeric or string seeds, with automated milestone boss injection every 5th room (Sector 1: Goliath-01, Sector 2+: Chrono-Weaver).
-- **`RoomManager` Dynamic Mode**: Seamlessly switches between classic fixed campaign sequences (14 rooms) and endless procedural room streams upon portal entry.
+- **`LevelDirector`**: Deterministic Mulberry32 PRNG engine producing reproducible room configurations from numeric or string seeds, with automated milestone boss injection every 5th room (Sector 1: Goliath-01, Sector 2: Chrono-Weaver, Sector 3+: Vektor-Prime).
+- **`RoomManager` Dynamic Mode**: Seamlessly switches between classic fixed campaign sequences (19 rooms) and endless procedural room streams upon portal entry.
 
 ---
 
@@ -97,7 +97,7 @@ npm run dev
    - Use mock Canvas 2D contexts (`createMockContext()`) with `vi.fn()` for rendering tests.
    - Use mock audio contexts to verify audio trigger calls without requiring real audio devices.
 3. **Keep Tests Fast & Deterministic**:
-   - The entire suite (452+ tests) runs in under 650ms. Avoid arbitrary `setTimeout` or wall-clock waits in tests.
+   - The entire suite (474+ tests) runs in under 700ms. Avoid arbitrary `setTimeout` or wall-clock waits in tests.
 
 ---
 

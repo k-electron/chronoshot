@@ -45,6 +45,7 @@ window.addEventListener("DOMContentLoaded", () => {
   let mousePos = vec2(canvas.width / 2, canvas.height / 2);
   let shootRequested = false;
   let reloadRequested = false;
+  let dashRequested = false;
   let restartRequested = false;
   let pauseRequested = false;
   let upgradeChoiceRequested: 1 | 2 | 3 | undefined = undefined;
@@ -94,6 +95,10 @@ window.addEventListener("DOMContentLoaded", () => {
       } else {
         reloadRequested = true;
       }
+    }
+
+    if (e.code === "Space" || e.code === "ShiftLeft" || e.code === "ShiftRight") {
+      dashRequested = true;
     }
 
     if (e.code === "KeyM") {
@@ -147,6 +152,7 @@ window.addEventListener("DOMContentLoaded", () => {
       mousePos,
       shoot: shootRequested,
       reload: reloadRequested,
+      dash: dashRequested,
       restart: restartRequested,
       togglePause: pauseRequested,
       upgradeChoice: upgradeChoiceRequested,
@@ -155,6 +161,7 @@ window.addEventListener("DOMContentLoaded", () => {
     // Reset single-frame triggers
     shootRequested = false;
     reloadRequested = false;
+    dashRequested = false;
     restartRequested = false;
     pauseRequested = false;
     upgradeChoiceRequested = undefined;

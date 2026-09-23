@@ -99,6 +99,20 @@ describe("LevelDirector & PRNG", () => {
       expect(escorts.some((e) => e.type === "stalker")).toBe(true);
     });
 
+    it("automatically generates a milestone boss encounter on Room 15 (Sector 3 Boss: Vektor-Prime)", () => {
+      const director = new LevelDirector({ seed: 789 });
+      const room15 = director.generateRoom(15);
+
+      expect(room15.roomNumber).toBe(15);
+      expect(room15.title).toContain("VEKTOR-PRIME: PHASE SOVEREIGN");
+      expect(room15.subtitle).toContain("Sector 3 Milestone Boss");
+
+      const boss = room15.enemies.find((e) => e.type === "boss");
+      expect(boss).toBeDefined();
+      expect(boss?.maxShields).toBe(5);
+      expect(boss?.blueprint?.id).toBe("vektor-prime");
+    });
+
     it("respects explicit custom boss blueprint in constructor config", () => {
       const director = new LevelDirector({ bossBlueprint: GOLIATH_01_BLUEPRINT });
       const room10 = director.generateRoom(10);
