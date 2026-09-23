@@ -45,7 +45,7 @@ export interface ArenaInput {
   restart: boolean;
   dash?: boolean;
   togglePause?: boolean;
-  upgradeChoice?: 1 | 2 | 3;
+  upgradeChoice?: 1 | 2 | 3 | number;
 }
 
 export class Arena {
@@ -73,6 +73,7 @@ export class Arena {
   public isPaused: boolean = false;
   public isUpgradeDraftActive: boolean = false;
   public activeUpgradeDraft: UpgradeDefinition[] = [];
+  public hoveredUpgradeCardIndex: number | null = null;
 
   constructor(
     width = 960,
@@ -220,6 +221,7 @@ export class Arena {
    */
   public openUpgradeDraft(options?: UpgradeDefinition[]): void {
     this.isUpgradeDraftActive = true;
+    this.hoveredUpgradeCardIndex = null;
     if (options && options.length > 0) {
       this.activeUpgradeDraft = [...options];
     } else {
@@ -261,6 +263,7 @@ export class Arena {
     this.soundSynth?.playUpgradeChime(this.timeGovernor.getTimeScale());
     this.isUpgradeDraftActive = false;
     this.activeUpgradeDraft = [];
+    this.hoveredUpgradeCardIndex = null;
 
     if (this.roomManager && this.roomManager.hasNextRoom()) {
       this.roomManager.advanceRoom();
@@ -282,25 +285,28 @@ export class Arena {
 
     // Intercept upgrade draft selection inputs
     if (this.isUpgradeDraftActive) {
+      const draftCards = this.getDraftOptions();
+      this.hoveredUpgradeCardIndex = UpgradeDraftHUD.getCardAt(
+        input.mousePos.x,
+        input.mousePos.y,
+        draftCards.length,
+        this.width,
+        this.height
+      );
+
       if (input.upgradeChoice) {
         this.applyUpgrade(input.upgradeChoice);
         return;
       }
       if (input.shoot) {
-        const draftCards = this.getDraftOptions();
-        const cardIndex = UpgradeDraftHUD.getCardAt(
-          input.mousePos.x,
-          input.mousePos.y,
-          draftCards.length,
-          this.width,
-          this.height
-        );
-        if (cardIndex !== null) {
-          this.applyUpgrade((cardIndex + 1) as 1 | 2 | 3);
+        if (this.hoveredUpgradeCardIndex !== null) {
+          this.applyUpgrade((this.hoveredUpgradeCardIndex + 1) as 1 | 2 | 3);
           return;
         }
       }
       return;
+    } else {
+      this.hoveredUpgradeCardIndex = null;
     }
 
     // Toggle simulation pause state
@@ -745,13 +751,15 @@ export class Arena {
         ctx.restore();
       }
 
-      this.reticle.update(wallDeltaTime);
-      this.reticle.render(ctx, this.player.aimTarget, this.timeGovernor.getTimeScale());
+      if (!this.isUpgradeDraftActive && !this.isPaused) {
+        this.reticle.update(wallDeltaTime);
+        this.reticle.render(ctx, this.player.aimTarget, this.timeGovernor.getTimeScale());
+      }
     }
 
     // Upgrade Draft Overlay
     if (this.isUpgradeDraftActive) {
-      this.renderUpgradeDraft(ctx);
+      this.renderUpgradeDraft(ctx, this.hoveredUpgradeCardIndex);
     }
 
     // 9. Modernized Game Over / Victory Overlays
@@ -989,11 +997,45 @@ export class Arena {
   }
 
   /**
+   * Evaluates the appropriate canvas cursor styling based on the current arena state:
+   * - In upgrade draft: 'pointer' if hovering over a selectable upgrade card, 'default' otherwise.
+   * - In pause, victory, or defeat screens: 'default'.
+   * - During active combat play: 'none' (delegating aim tracking to Reticle).
+   */
+  public getDesiredCursor(mousePos?: Vector2D): string {
+    if (this.isUpgradeDraftActive) {
+      if (mousePos) {
+        const draftCards = this.getDraftOptions();
+        const cardIndex = UpgradeDraftHUD.getCardAt(
+          mousePos.x,
+          mousePos.y,
+          draftCards.length,
+          this.width,
+          this.height
+        );
+        if (cardIndex !== null) {
+          return "pointer";
+        }
+      }
+      return "default";
+    }
+
+    if (this.isPaused || this.status === "defeat" || this.status === "victory") {
+      return "default";
+    }
+
+    return "none";
+  }
+
+  /**
    * Renders the immediate freeze-frame upgrade selection overlay offering curated or sampled cards.
    */
-  public renderUpgradeDraft(ctx: CanvasRenderingContext2D): void {
+  public renderUpgradeDraft(
+    ctx: CanvasRenderingContext2D,
+    hoveredIndex: number | null = this.hoveredUpgradeCardIndex
+  ): void {
     const draftCards = this.getDraftOptions();
-    UpgradeDraftHUD.render(ctx, draftCards, this.width, this.height);
+    UpgradeDraftHUD.render(ctx, draftCards, this.width, this.height, hoveredIndex);
   }
 
   /**

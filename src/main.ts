@@ -48,7 +48,7 @@ window.addEventListener("DOMContentLoaded", () => {
   let dashRequested = false;
   let restartRequested = false;
   let pauseRequested = false;
-  let upgradeChoiceRequested: 1 | 2 | 3 | undefined = undefined;
+  let upgradeChoiceRequested: 1 | 2 | 3 | number | undefined = undefined;
   let isMuted = false;
 
   // Window coordinate mapping for canvas scaling
@@ -77,6 +77,10 @@ window.addEventListener("DOMContentLoaded", () => {
       }
       if (e.code === "Digit3" || e.code === "Numpad3" || e.code === "Key3") {
         upgradeChoiceRequested = 3;
+        return;
+      }
+      if (e.code === "Digit4" || e.code === "Numpad4" || e.code === "Key4") {
+        upgradeChoiceRequested = 4;
         return;
       }
     }
@@ -115,10 +119,13 @@ window.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("mousemove", (e: MouseEvent) => {
     const coords = getCanvasCoords(e);
     mousePos = vec2(coords.x, coords.y);
+    canvas!.style.cursor = arena.getDesiredCursor(mousePos);
   });
 
   canvas.addEventListener("mousedown", (e: MouseEvent) => {
     if (e.button === 0) {
+      const coords = getCanvasCoords(e);
+      mousePos = vec2(coords.x, coords.y);
       if (arena.status === "defeat" || arena.status === "victory") {
         restartRequested = true;
       } else if (arena.isPaused) {
@@ -168,6 +175,9 @@ window.addEventListener("DOMContentLoaded", () => {
 
     // Step physics & fixed simulation
     arena.step(wallDeltaTime, input);
+
+    // Sync dynamic canvas cursor based on arena UI state and mouse position
+    canvas!.style.cursor = arena.getDesiredCursor(mousePos);
 
     // Render frame
     arena.render(ctx!, wallDeltaTime);

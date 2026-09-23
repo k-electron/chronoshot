@@ -194,7 +194,8 @@ export function renderUpgradeDraft(
   ctx: CanvasRenderingContext2D,
   draftOptions: UpgradeDefinition[],
   arenaWidth: number,
-  arenaHeight: number
+  arenaHeight: number,
+  hoveredIndex: number | null = null
 ): void {
   ctx.save();
 
@@ -229,17 +230,18 @@ export function renderUpgradeDraft(
     const { x: cx, y: cardY, width: cardW, height: cardH } = rect;
     const accent = card.accentColor ?? UITheme.colors.cyan;
     const pad = Math.min(20, Math.max(12, Math.floor(cardW * 0.08)));
+    const isHovered = hoveredIndex === i;
 
     // Card glass background
-    ctx.fillStyle = "rgba(13, 17, 24, 0.96)";
+    ctx.fillStyle = isHovered ? "rgba(20, 26, 38, 0.98)" : "rgba(13, 17, 24, 0.96)";
     ctx.fillRect(cx, cardY, cardW, cardH);
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = UITheme.colors.panelBorder;
+    ctx.lineWidth = isHovered ? 1.5 : 1;
+    ctx.strokeStyle = isHovered ? accent : UITheme.colors.panelBorder;
     ctx.strokeRect(cx, cardY, cardW, cardH);
 
-    // Accent top bar (3px high)
+    // Accent top bar (4px high if hovered, 3px otherwise)
     ctx.fillStyle = accent;
-    ctx.fillRect(cx, cardY, cardW, 3);
+    ctx.fillRect(cx, cardY, cardW, isHovered ? 4 : 3);
 
     // Key badge prompt
     const badgeW = 44;
@@ -247,7 +249,7 @@ export function renderUpgradeDraft(
     const badgeX = cx + pad;
     const badgeY = cardY + 20;
 
-    ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+    ctx.fillStyle = isHovered ? "rgba(255, 255, 255, 0.12)" : "rgba(255, 255, 255, 0.05)";
     ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
     ctx.strokeStyle = accent;
     ctx.lineWidth = 1;
@@ -279,7 +281,7 @@ export function renderUpgradeDraft(
     const boxW = cardW - 2 * pad;
     const boxH = 36;
 
-    ctx.fillStyle = "rgba(0, 240, 255, 0.06)";
+    ctx.fillStyle = isHovered ? "rgba(0, 240, 255, 0.12)" : "rgba(0, 240, 255, 0.06)";
     ctx.fillRect(boxX, boxY, boxW, boxH);
     ctx.strokeStyle = accent;
     ctx.lineWidth = 1;
@@ -303,17 +305,32 @@ export function renderUpgradeDraft(
     const btnY = cardY + cardH - 45;
     const btnW = cardW - 2 * pad;
 
-    ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
-    ctx.fillRect(cx + pad, btnY, btnW, btnH);
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(cx + pad, btnY, btnW, btnH);
+    if (isHovered) {
+      // Solid high-visibility accent button on hover
+      ctx.fillStyle = accent;
+      ctx.fillRect(cx + pad, btnY, btnW, btnH);
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cx + pad, btnY, btnW, btnH);
 
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = getUIFont(11, "bold");
-    ctx.fillStyle = accent;
-    ctx.fillText(`INSTALL [${i + 1}]`, cx + cardW / 2, btnY + btnH / 2);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = getUIFont(11, "800");
+      ctx.fillStyle = "#070a0f";
+      ctx.fillText(`INSTALL [${i + 1}]`, cx + cardW / 2, btnY + btnH / 2);
+    } else {
+      ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+      ctx.fillRect(cx + pad, btnY, btnW, btnH);
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cx + pad, btnY, btnW, btnH);
+
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = getUIFont(11, "bold");
+      ctx.fillStyle = accent;
+      ctx.fillText(`INSTALL [${i + 1}]`, cx + cardW / 2, btnY + btnH / 2);
+    }
   }
 
   // 4. Footer prompt
@@ -363,9 +380,10 @@ export class UpgradeDraftHUD {
     ctx: CanvasRenderingContext2D,
     draftOptions: UpgradeDefinition[],
     arenaWidth: number,
-    arenaHeight: number
+    arenaHeight: number,
+    hoveredIndex: number | null = null
   ): void {
-    renderUpgradeDraft(ctx, draftOptions, arenaWidth, arenaHeight);
+    renderUpgradeDraft(ctx, draftOptions, arenaWidth, arenaHeight, hoveredIndex);
   }
 
   public computeCardLayout(
@@ -390,8 +408,9 @@ export class UpgradeDraftHUD {
     ctx: CanvasRenderingContext2D,
     draftOptions: UpgradeDefinition[],
     arenaWidth: number,
-    arenaHeight: number
+    arenaHeight: number,
+    hoveredIndex: number | null = null
   ): void {
-    renderUpgradeDraft(ctx, draftOptions, arenaWidth, arenaHeight);
+    renderUpgradeDraft(ctx, draftOptions, arenaWidth, arenaHeight, hoveredIndex);
   }
 }
