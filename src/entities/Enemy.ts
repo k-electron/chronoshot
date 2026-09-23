@@ -1,7 +1,7 @@
 /**
  * Enemy Entities module for ChronoShot.
  *
- * Implements tactical combat AI units across 5 archetypes:
+ * Implements tactical combat AI units across 5 baseline archetypes and milestone boss:
  * - Pistol Grunt: Standard skirmisher with medium cadence, moderate speed, and discharge stutter
  * - Shotgun Guard: Heavy breacher with 1-hit shield, wide 5-pellet buckshot spread, and steady advance
  * - Stalker: Agile glass-cannon rusher with high sprint speed and run-and-gun rapid fire
@@ -9,8 +9,8 @@
  * - Marksman: Long-range sniper with kiting AI, hyper-velocity beam, and charging sightline laser
  * - Boss (Goliath-01: Aegis Colossus): Multi-phase juggernaut with 4-hit shield durability and enraged spread barrage
  *
- * Coordinates continuous line-of-sight raycasting, 40px grid A* navigation around obstacles,
- * smooth obstacle collision sliding, and hit-count shield durability.
+ * Composed from modular MovementBehavior and AttackBehavior strategies with
+ * continuous line-of-sight raycasting, 40px grid A* navigation, and smooth wall sliding.
  */
 
 import { GridPathfinder } from "../engine/GridPathfinder";
@@ -18,22 +18,19 @@ import { rayIntersectsAABB, testCircleAABB } from "../math/collision";
 import {
   vec2,
   vecAngle,
-  vecDistance,
   vecDot,
   vecLength,
   vecLengthSq,
-  vecNormalize,
   vecScale,
   vecSub,
   Vector2D,
 } from "../math/vector";
+import { EnemyChassisType } from "../ui/EnemyRenderer";
+import { AttackBehavior, AttackContext } from "./behaviors/attack/AttackBehavior";
+import { MovementBehavior, MovementContext } from "./behaviors/movement/MovementBehavior";
+import { BLUEPRINTS } from "./EnemyFactory";
 import { Obstacle } from "./Obstacle";
-import {
-  CombatUnit,
-  createProjectile,
-  DamageResult,
-  Projectile,
-} from "./Projectile";
+import { CombatUnit, DamageResult, Projectile } from "./Projectile";
 
 export type EnemyType =
   | "grunt"
@@ -58,6 +55,9 @@ export interface EnemyConfig {
   pellets?: number;
   isBoss?: boolean;
   bossName?: string;
+  movement?: MovementBehavior;
+  attack?: AttackBehavior;
+  chassis?: EnemyChassisType;
 }
 
 export class Enemy implements CombatUnit {
@@ -70,14 +70,27 @@ export class Enemy implements CombatUnit {
   public isAlive: boolean = true;
   public aimAngle: number = 0;
   public hasLineOfSight: boolean = false;
-  public fireCooldownTicks: number;
+
+  public movement: MovementBehavior;
+  public attack: AttackBehavior;
+  public chassis: EnemyChassisType;
 
   public shields: number;
   public readonly maxShields: number;
 
   public readonly isBoss: boolean;
   public readonly bossName?: string;
-  public isEnraged: boolean = false;
+  private _isEnraged: boolean = false;
+
+  public get isEnraged(): boolean {
+    return this._isEnraged;
+  }
+  public set isEnraged(val: boolean) {
+    this._isEnraged = val;
+    if ("isEnraged" in this.attack) {
+      (this.attack as any).isEnraged = val;
+    }
+  }
 
   private _speed: number = 0;
   public get speed(): number {
@@ -97,20 +110,65 @@ export class Enemy implements CombatUnit {
   public readonly stutterTicks: number;
   public readonly runAndGun: boolean;
 
-  // Sniper / Marksman charging laser state
-  public isChargingLaser: boolean = false;
+  public get isChargingLaser(): boolean {
+    return this.attack.isChargingLaser;
+  }
+  public set isChargingLaser(val: boolean) {
+    this.attack.isChargingLaser = val;
+  }
   public readonly laserChargeTicks: number = 30;
 
-  // Stutter state
-  public stutterTimerTicks: number = 0;
+  public get stutterTimerTicks(): number {
+    return this.attack.stutterTimerTicks;
+  }
+  public set stutterTimerTicks(val: number) {
+    this.attack.stutterTimerTicks = val;
+  }
 
-  // Pathfinding state
-  public currentPath: Vector2D[] = [];
-  public currentWaypointIndex: number = 0;
-  public repathCooldownTicks: number = 0;
+  public get fireCooldownTicks(): number {
+    return this.attack.fireCooldownTicks;
+  }
+  public set fireCooldownTicks(val: number) {
+    this.attack.fireCooldownTicks = val;
+  }
+
+  public get currentPath(): Vector2D[] {
+    if ("currentPath" in this.movement) {
+      return (this.movement as any).currentPath;
+    }
+    return [];
+  }
+  public set currentPath(val: Vector2D[]) {
+    if ("currentPath" in this.movement) {
+      (this.movement as any).currentPath = val;
+    }
+  }
+
+  public get currentWaypointIndex(): number {
+    if ("currentWaypointIndex" in this.movement) {
+      return (this.movement as any).currentWaypointIndex;
+    }
+    return 0;
+  }
+  public set currentWaypointIndex(val: number) {
+    if ("currentWaypointIndex" in this.movement) {
+      (this.movement as any).currentWaypointIndex = val;
+    }
+  }
+
+  public get repathCooldownTicks(): number {
+    if ("repathCooldownTicks" in this.movement) {
+      return (this.movement as any).repathCooldownTicks;
+    }
+    return 0;
+  }
+  public set repathCooldownTicks(val: number) {
+    if ("repathCooldownTicks" in this.movement) {
+      (this.movement as any).repathCooldownTicks = val;
+    }
+  }
 
   private spawnPosition: Vector2D;
-  private defaultPathfinder?: GridPathfinder;
 
   constructor(config: EnemyConfig) {
     this.id = config.id;
@@ -120,6 +178,8 @@ export class Enemy implements CombatUnit {
     this.previousPosition = vec2(config.x, config.y);
     this.velocity = vec2(0, 0);
 
+    const blueprint = BLUEPRINTS[config.type] ?? BLUEPRINTS.grunt;
+
     if (config.type === "boss") {
       this.isBoss = true;
       this.bossName = config.bossName ?? "GOLIATH-01: AEGIS COLOSSUS";
@@ -128,85 +188,22 @@ export class Enemy implements CombatUnit {
       this.bossName = config.bossName;
     }
 
-    switch (config.type) {
-      case "boss":
-        this.radius = config.radius ?? 24;
-        this.speed = config.speed ?? 55;
-        this.maxShields = config.maxShields ?? 4;
-        this.fireCadenceTicks = config.fireCadenceTicks ?? 60;
-        this.bulletSpeed = config.bulletSpeed ?? 520;
-        this.spreadAngle = config.spreadAngle ?? 0.05;
-        this.pellets = config.pellets ?? 1;
-        this.stutterTicks = 10;
-        this.runAndGun = false;
-        break;
+    this.radius = config.radius ?? blueprint.radius;
+    this.speed = config.speed ?? blueprint.speed;
+    this.maxShields = config.maxShields ?? blueprint.maxShields;
+    this.fireCadenceTicks = config.fireCadenceTicks ?? blueprint.fireCadenceTicks;
+    this.bulletSpeed = config.bulletSpeed ?? blueprint.bulletSpeed;
+    this.spreadAngle = config.spreadAngle ?? blueprint.spreadAngle;
+    this.pellets = config.pellets ?? blueprint.pellets;
+    this.stutterTicks = blueprint.stutterTicks;
+    this.runAndGun = blueprint.runAndGun;
+    this.chassis = config.chassis ?? blueprint.chassis;
 
-      case "shotgun":
-        this.radius = config.radius ?? 16;
-        this.speed = config.speed ?? 90;
-        this.maxShields = config.maxShields ?? 1;
-        this.fireCadenceTicks = config.fireCadenceTicks ?? 80;
-        this.bulletSpeed = config.bulletSpeed ?? 480;
-        this.spreadAngle = config.spreadAngle ?? 0.35; // ~20 deg fan
-        this.pellets = config.pellets ?? 5;
-        this.stutterTicks = 8;
-        this.runAndGun = false;
-        break;
-
-      case "stalker":
-        this.radius = config.radius ?? 13;
-        this.speed = config.speed ?? 210;
-        this.maxShields = config.maxShields ?? 0;
-        this.fireCadenceTicks = config.fireCadenceTicks ?? 32;
-        this.bulletSpeed = config.bulletSpeed ?? 500;
-        this.spreadAngle = config.spreadAngle ?? 0.08;
-        this.pellets = config.pellets ?? 1;
-        this.stutterTicks = 0;
-        this.runAndGun = true;
-        break;
-
-      case "warden":
-        this.radius = config.radius ?? 18;
-        this.speed = config.speed ?? 60;
-        this.maxShields = config.maxShields ?? 2;
-        this.fireCadenceTicks = config.fireCadenceTicks ?? 65;
-        this.bulletSpeed = config.bulletSpeed ?? 580;
-        this.spreadAngle = config.spreadAngle ?? 0.03;
-        this.pellets = config.pellets ?? 1;
-        this.stutterTicks = 8;
-        this.runAndGun = false;
-        break;
-
-      case "marksman":
-        this.radius = config.radius ?? 14;
-        this.speed = config.speed ?? 80;
-        this.maxShields = config.maxShields ?? 0;
-        this.fireCadenceTicks = config.fireCadenceTicks ?? 110;
-        this.bulletSpeed = config.bulletSpeed ?? 850;
-        this.spreadAngle = config.spreadAngle ?? 0.01;
-        this.pellets = config.pellets ?? 1;
-        this.stutterTicks = 0;
-        this.runAndGun = false;
-        break;
-
-      case "grunt":
-      default:
-        this.radius = config.radius ?? 15;
-        this.speed = config.speed ?? 120;
-        this.maxShields = config.maxShields ?? 0;
-        this.fireCadenceTicks = config.fireCadenceTicks ?? 50;
-        this.bulletSpeed = config.bulletSpeed ?? 550;
-        this.spreadAngle = config.spreadAngle ?? 0.04;
-        this.pellets = config.pellets ?? 1;
-        this.stutterTicks = 6;
-        this.runAndGun = false;
-        break;
-    }
+    this.movement = config.movement ?? blueprint.createMovement(config);
+    this.attack = config.attack ?? blueprint.createAttack(config);
 
     this.shields = this.maxShields;
     this.isEnraged = false;
-    this.fireCooldownTicks =
-      config.initialDelayTicks ?? Math.floor(this.fireCadenceTicks * 0.5);
   }
 
   /**
@@ -301,7 +298,7 @@ export class Enemy implements CombatUnit {
     }
 
     // 1. Evaluate Line of Sight
-    const canSee = this.checkLineOfSight(target.position, obstacles);
+    this.hasLineOfSight = this.checkLineOfSight(target.position, obstacles);
 
     // 2. Aim angle always aligns with target position
     const diff = vecSub(target.position, this.position);
@@ -309,100 +306,42 @@ export class Enemy implements CombatUnit {
       this.aimAngle = vecAngle(diff);
     }
 
-    // 3. Firing cadence and charging telegraph logic
-    let firedProjectiles: Projectile[] = [];
+    // 3. Firing cadence and charging telegraph logic delegated to attack behavior
+    const attackCtx: AttackContext = {
+      id: this.id,
+      position: this.position,
+      aimAngle: this.aimAngle,
+      radius: this.radius,
+    };
+    const firedProjectiles = this.attack.update(
+      attackCtx,
+      this.hasLineOfSight,
+      deltaTicks
+    );
 
-    if (canSee) {
-      if (this.type === "marksman") {
-        if (this.fireCooldownTicks <= this.laserChargeTicks) {
-          this.isChargingLaser = true;
-        } else {
-          this.isChargingLaser = false;
-        }
-      }
-
-      this.fireCooldownTicks -= deltaTicks;
-
-      if (this.fireCooldownTicks <= 0) {
-        this.fireCooldownTicks = this.fireCadenceTicks;
-        this.isChargingLaser = false;
-        if (!this.runAndGun) {
-          this.stutterTimerTicks = this.stutterTicks;
-        }
-        firedProjectiles = this.discharge();
-      }
-    } else {
-      this.isChargingLaser = false;
-    }
-
-    // 4. Movement AI
+    // 4. Movement AI delegated to movement behavior
     if (this.stutterTimerTicks > 0 && !this.runAndGun) {
-      this.stutterTimerTicks = Math.max(0, this.stutterTimerTicks - deltaTicks);
       this.velocity = vec2(0, 0);
     } else if (this.isChargingLaser) {
       this.velocity = vec2(0, 0);
-    } else if (canSee) {
-      // Clear line-of-sight: direct vector steering ("string pulling")
-      this.currentPath = [];
-      this.currentWaypointIndex = 0;
-
-      if (this.type === "marksman") {
-        // Marksman kiting logic
-        const dist = vecDistance(this.position, target.position);
-        if (dist < 340) {
-          // Retreat away from player
-          const retreatDir = vecNormalize(vecSub(this.position, target.position));
-          this.velocity = vecScale(retreatDir, this.speed);
-        } else if (dist > 520) {
-          // Close in toward comfortable sniper range
-          const advanceDir = vecNormalize(vecSub(target.position, this.position));
-          this.velocity = vecScale(advanceDir, this.speed);
-        } else {
-          // Hold position in sweet spot
-          this.velocity = vec2(0, 0);
-        }
-      } else {
-        // Rushers / standard combatants close in along sightline
-        const advanceDir = vecNormalize(vecSub(target.position, this.position));
-        this.velocity = vecScale(advanceDir, this.speed);
-      }
     } else {
-      // Blocked line-of-sight: 40px tile grid A* pathfinding
-      this.repathCooldownTicks -= deltaTicks;
-
-      if (
-        this.repathCooldownTicks <= 0 ||
-        this.currentPath.length === 0 ||
-        this.currentWaypointIndex >= this.currentPath.length
-      ) {
-        const pf = pathfinder ?? this.getOrCreatePathfinder(obstacles);
-        this.currentPath = pf.findPath(this.position, target.position);
-        this.currentWaypointIndex = 0;
-        this.repathCooldownTicks = 20; // Repath every 20 ticks (~0.33s)
-      }
-
-      if (
-        this.currentPath.length > 0 &&
-        this.currentWaypointIndex < this.currentPath.length
-      ) {
-        const nextWaypoint = this.currentPath[this.currentWaypointIndex];
-        const toWaypoint = vecSub(nextWaypoint, this.position);
-        const distToWaypoint = vecLength(toWaypoint);
-
-        if (distToWaypoint < 18) {
-          this.currentWaypointIndex++;
-        }
-
-        if (this.currentWaypointIndex < this.currentPath.length) {
-          const activeWp = this.currentPath[this.currentWaypointIndex];
-          const wpDir = vecNormalize(vecSub(activeWp, this.position));
-          this.velocity = vecScale(wpDir, this.speed);
-        } else {
-          this.velocity = vec2(0, 0);
-        }
-      } else {
-        this.velocity = vec2(0, 0);
-      }
+      const movementCtx: MovementContext = {
+        position: this.position,
+        previousPosition: this.previousPosition,
+        velocity: this.velocity,
+        radius: this.radius,
+        speed: this.speed,
+        aimAngle: this.aimAngle,
+        hasLineOfSight: this.hasLineOfSight,
+      };
+      this.velocity = this.movement.update(
+        movementCtx,
+        target,
+        obstacles,
+        deltaTicks,
+        fixedDeltaTime,
+        pathfinder
+      );
     }
 
     // 5. Position integration
@@ -425,64 +364,17 @@ export class Enemy implements CombatUnit {
     return firedProjectiles;
   }
 
-  private getOrCreatePathfinder(obstacles: Obstacle[]): GridPathfinder {
-    if (!this.defaultPathfinder) {
-      this.defaultPathfinder = new GridPathfinder(960, 640, 40);
-      this.defaultPathfinder.updateObstacles(obstacles, this.radius);
-    }
-    return this.defaultPathfinder;
-  }
-
   /**
    * Discharges weapon projectile(s) toward current aimAngle.
    */
   public discharge(): Projectile[] {
-    const projectiles: Projectile[] = [];
-    const spawnOffset = this.radius + 6;
-    const isEnragedBoss = this.isBoss && this.isEnraged;
-    const pellets = isEnragedBoss ? 3 : this.pellets;
-    const spreadAngle = isEnragedBoss ? 0.35 : this.spreadAngle;
-
-    if (pellets === 1) {
-      // Single pinpoint / sniper / slug shot
-      const angle = this.aimAngle + (Math.random() - 0.5) * spreadAngle;
-      const spawnPos = vec2(
-        this.position.x + Math.cos(angle) * spawnOffset,
-        this.position.y + Math.sin(angle) * spawnOffset
-      );
-      projectiles.push(
-        createProjectile(
-          `bullet-${this.id}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          spawnPos,
-          angle,
-          this.bulletSpeed,
-          "enemy"
-        )
-      );
-    } else {
-      // Fan spread for shotgun pellets or enraged boss 3-way spread
-      const halfSpread = spreadAngle / 2;
-      const angleStep = spreadAngle / (pellets - 1);
-
-      for (let i = 0; i < pellets; i++) {
-        const pelletAngle = this.aimAngle - halfSpread + i * angleStep;
-        const spawnPos = vec2(
-          this.position.x + Math.cos(pelletAngle) * spawnOffset,
-          this.position.y + Math.sin(pelletAngle) * spawnOffset
-        );
-        projectiles.push(
-          createProjectile(
-            `bullet-${this.id}-${Date.now()}-pellet-${i}`,
-            spawnPos,
-            pelletAngle,
-            this.bulletSpeed,
-            "enemy"
-          )
-        );
-      }
-    }
-
-    return projectiles;
+    const attackCtx: AttackContext = {
+      id: this.id,
+      position: this.position,
+      aimAngle: this.aimAngle,
+      radius: this.radius,
+    };
+    return this.attack.discharge(attackCtx);
   }
 
   /**
@@ -532,10 +424,7 @@ export class Enemy implements CombatUnit {
     this.isEnraged = false;
     this.hasLineOfSight = false;
     this.isChargingLaser = false;
-    this.stutterTimerTicks = 0;
-    this.currentPath = [];
-    this.currentWaypointIndex = 0;
-    this.repathCooldownTicks = 0;
-    this.fireCooldownTicks = Math.floor(this.fireCadenceTicks * 0.5);
+    this.movement.reset();
+    this.attack.reset();
   }
 }
