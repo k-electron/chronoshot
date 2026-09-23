@@ -397,4 +397,62 @@ describe("RoomManager Tactical Puzzle Progression", () => {
       300
     );
   });
+
+  describe("LevelDirector & Endless Mode Integration", () => {
+    it("initializes in endless mode when supplied with a LevelDirector", async () => {
+      const { LevelDirector } = await import("./LevelDirector");
+      const director = new LevelDirector({ seed: 42 });
+      const manager = new RoomManager(director);
+
+      expect(manager.isEndlessMode()).toBe(true);
+      expect(manager.levelDirector).toBe(director);
+      expect(manager.getCurrentRoomIndex()).toBe(0);
+      expect(manager.getCurrentRoom().roomNumber).toBe(1);
+      expect(manager.getCurrentRoom().id).toContain("procedural-room-1");
+      expect(manager.hasNextRoom()).toBe(true);
+    });
+
+    it("generates rooms dynamically on demand beyond room 1", async () => {
+      const { LevelDirector } = await import("./LevelDirector");
+      const director = new LevelDirector({ seed: 99 });
+      const manager = new RoomManager(director);
+
+      // Advance through 5 rooms
+      for (let i = 1; i <= 4; i++) {
+        expect(manager.hasNextRoom()).toBe(true);
+        const advanced = manager.advanceRoom();
+        expect(advanced).toBe(true);
+        expect(manager.getCurrentRoom().roomNumber).toBe(i + 1);
+      }
+
+      // Room 5 is reached: milestone boss room!
+      expect(manager.getCurrentRoomIndex()).toBe(4);
+      expect(manager.getCurrentRoom().roomNumber).toBe(5);
+      expect(manager.isBossRoom()).toBe(true);
+      expect(manager.getCurrentRoom().enemies.some((e) => e.type === "boss")).toBe(true);
+
+      // Endless mode never halts: can continue past room 5 to room 6
+      expect(manager.hasNextRoom()).toBe(true);
+      manager.advanceRoom();
+      expect(manager.getCurrentRoomIndex()).toBe(5);
+      expect(manager.getCurrentRoom().roomNumber).toBe(6);
+      expect(manager.isBossRoom()).toBe(false);
+    });
+
+    it("resets dynamic endless progression back to Room 1 on restartGame()", async () => {
+      const { LevelDirector } = await import("./LevelDirector");
+      const director = new LevelDirector({ seed: 101 });
+      const manager = new RoomManager(director);
+
+      manager.advanceRoom();
+      manager.advanceRoom();
+      expect(manager.getCurrentRoomIndex()).toBe(2);
+
+      manager.restartGame();
+      expect(manager.getCurrentRoomIndex()).toBe(0);
+      expect(manager.getCurrentRoom().roomNumber).toBe(1);
+      expect(manager.getRoomCount()).toBe(1);
+    });
+  });
 });
+

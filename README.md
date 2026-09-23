@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg)](https://vitejs.dev/)
-[![Tests](https://img.shields.io/badge/Tests-374%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-452%20passing-brightgreen.svg)]()
 
 ---
 
@@ -113,6 +113,12 @@ Powered by a decoupled data-driven architecture (`UpgradePipeline`, `UpgradeRegi
   - **Room 08 (`KILLBOX ENCLOSURE`)**: High-density 5-enemy squad in a tight pillbox arena forcing tactical reloading.
   - **Room 09 (`THE IRON GATE`)**: Climax with dual Aegis Wardens, Marksman sniper, and Stalker rusher requiring 6 total shield breaks.
 - **Pure Permadeath**: There are no lives or checkpoints. Lethal trauma terminates the run, displays sector and upgrade statistics, and resets progress back to Room 1.
+
+### 11. Modular Level Director & Procedural Generation
+- **Composable Tactical Layouts**: 5 geometry templates (`CenterPillarsTemplate`, `TwinBunkersTemplate`, `SplitCorridorTemplate`, `KillboxLanesTemplate`, `ArenaQuadrantTemplate`) providing varied obstacle geometries, tactical sightlines, and verified spawn separation ($\ge 280\text{px}$ from player).
+- **Threat-Budget Encounter Spawner (`EncounterDirector`)**: Scales difficulty by assigning numerical threat budgets across hostiles while enforcing squad composition constraints (maximum 2 Marksman snipers per room, mandatory frontline escorts) and non-overlapping safe spawn sampling ($\ge 48\text{px}$ unit separation).
+- **Deterministic Seeded PRNG (`LevelDirector`)**: High-performance Mulberry32 pseudo-random number generator enabling 100% reproducible room seeds, daily challenges, and milestone boss synthesis on every 5th room.
+- **Dynamic Endless Mode**: `RoomManager` seamlessly toggles between the classic handcrafted 9-room campaign and infinite on-demand procedural generation.
 
 ---
 
@@ -232,7 +238,10 @@ chronoshot/
 ├── CONTRIBUTING.md               # Guidelines for contributors and PR submission
 ├── openspec/                     # OpenSpec durable specifications & archives
 │   ├── specs/                    # Durable project capability specs
+│   │   ├── boss-encounters/spec.md
 │   │   ├── combat-arena/spec.md
+│   │   ├── procedural-levels/spec.md
+│   │   ├── roguelike-upgrades/spec.md
 │   │   ├── time-engine/spec.md
 │   │   └── weapon-system/spec.md
 │   └── changes/                  # Active and completed changes
@@ -247,24 +256,38 @@ chronoshot/
 │   │   ├── FixedStepSimulator.ts
 │   │   ├── GridPathfinder.ts
 │   │   └── TimeGovernor.ts
-│   ├── entities/                 # Game entities & particle systems
+│   ├── entities/                 # Game entities, behaviors, and boss systems
+│   │   ├── behaviors/            # Modular movement & attack strategy patterns
+│   │   ├── boss/                 # Modular boss phase state machine & blueprints
 │   │   ├── Arena.ts
 │   │   ├── Enemy.ts
+│   │   ├── EnemyFactory.ts
 │   │   ├── Obstacle.ts
 │   │   ├── ParticleSystem.ts
 │   │   ├── Player.ts
 │   │   └── Projectile.ts
-│   ├── levels/                   # Puzzle room configurations & room progression
+│   ├── levels/                   # Procedural level director & tactical templates
+│   │   ├── templates/            # Composable cover & geometry layout templates
+│   │   ├── EncounterDirector.ts
+│   │   ├── LevelDirector.ts
 │   │   ├── Room.ts
 │   │   └── RoomManager.ts
 │   ├── math/                     # 2D vector primitives & continuous collision math
 │   │   ├── collision.ts
 │   │   └── vector.ts
-│   ├── ui/                       # Minimalist HUD, tactical reticle, and theme
+│   ├── ui/                       # Minimalist HUD, tactical reticle, boss & enemy renderers
+│   │   ├── BossTelemetryHUD.ts
 │   │   ├── CylinderHUD.ts
+│   │   ├── EnemyRenderer.ts
 │   │   ├── Reticle.ts
 │   │   ├── theme.ts
-│   │   └── TimeHUD.ts
+│   │   ├── TimeHUD.ts
+│   │   └── UpgradeDraftHUD.ts
+│   ├── upgrades/                 # Roguelike upgrade registry & stat pipeline
+│   │   ├── definitions/
+│   │   ├── UpgradeDefinition.ts
+│   │   ├── UpgradePipeline.ts
+│   │   └── UpgradeRegistry.ts
 │   ├── weapons/                  # Modular weapon schema & 6-shot revolver state
 │   │   ├── Revolver.ts
 │   │   └── Weapon.ts
@@ -283,6 +306,9 @@ ChronoShot is developed following [OpenSpec](https://github.com/openspec/openspe
 - **`time-engine`**: Time dilation curves, micro-creep, and action tick bursts.
 - **`weapon-system`**: Modular firearm configurations and the 6-round revolver.
 - **`combat-arena`**: 2D arena layout, obstacle cover, enemy AI, 1-hit lethality, and puzzle rooms.
+- **`boss-encounters`**: Multi-phase boss architecture, shield absorption, radial novae, and telemetry.
+- **`roguelike-upgrades`**: Data-driven upgrade pipeline, dynamic card draft UI, and stat compounding.
+- **`procedural-levels`**: Modular layout templates, threat-budget spawner, and deterministic PRNG.
 
 ---
 
