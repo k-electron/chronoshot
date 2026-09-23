@@ -40,6 +40,7 @@ window.addEventListener("DOMContentLoaded", () => {
   let reloadRequested = false;
   let restartRequested = false;
   let pauseRequested = false;
+  let upgradeChoiceRequested: 1 | 2 | 3 | undefined = undefined;
   let isMuted = false;
 
   // Window coordinate mapping for canvas scaling
@@ -56,6 +57,21 @@ window.addEventListener("DOMContentLoaded", () => {
   // Keyboard Event Handlers
   window.addEventListener("keydown", (e: KeyboardEvent) => {
     keysDown.add(e.code);
+
+    if (arena.isUpgradeDraftActive) {
+      if (e.code === "Digit1" || e.code === "Numpad1" || e.code === "Key1") {
+        upgradeChoiceRequested = 1;
+        return;
+      }
+      if (e.code === "Digit2" || e.code === "Numpad2" || e.code === "Key2") {
+        upgradeChoiceRequested = 2;
+        return;
+      }
+      if (e.code === "Digit3" || e.code === "Numpad3" || e.code === "Key3") {
+        upgradeChoiceRequested = 3;
+        return;
+      }
+    }
 
     if (e.code === "Escape" || e.code === "KeyP") {
       e.preventDefault();
@@ -126,6 +142,7 @@ window.addEventListener("DOMContentLoaded", () => {
       reload: reloadRequested,
       restart: restartRequested,
       togglePause: pauseRequested,
+      upgradeChoice: upgradeChoiceRequested,
     };
 
     // Reset single-frame triggers
@@ -133,6 +150,7 @@ window.addEventListener("DOMContentLoaded", () => {
     reloadRequested = false;
     restartRequested = false;
     pauseRequested = false;
+    upgradeChoiceRequested = undefined;
 
     // Step physics & fixed simulation
     arena.step(wallDeltaTime, input);

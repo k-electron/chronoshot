@@ -7,6 +7,7 @@
  * - Stalker: Agile glass-cannon rusher with high sprint speed and run-and-gun rapid fire
  * - Aegis Warden: Frontline tank with 2-hit shield, heavy slug cannon, and inexorable march
  * - Marksman: Long-range sniper with kiting AI, hyper-velocity beam, and charging sightline laser
+ * - Boss (Goliath-01: Aegis Colossus): Multi-phase juggernaut with 4-hit shield durability and enraged spread barrage
  *
  * Coordinates continuous line-of-sight raycasting, 40px grid A* navigation around obstacles,
  * smooth obstacle collision sliding, and hit-count shield durability.
@@ -34,7 +35,13 @@ import {
   Projectile,
 } from "./Projectile";
 
-export type EnemyType = "grunt" | "shotgun" | "stalker" | "warden" | "marksman";
+export type EnemyType =
+  | "grunt"
+  | "shotgun"
+  | "stalker"
+  | "warden"
+  | "marksman"
+  | "boss";
 
 export interface EnemyConfig {
   id: string;
@@ -49,6 +56,8 @@ export interface EnemyConfig {
   bulletSpeed?: number;
   spreadAngle?: number;
   pellets?: number;
+  isBoss?: boolean;
+  bossName?: string;
 }
 
 export class Enemy implements CombatUnit {
@@ -66,7 +75,21 @@ export class Enemy implements CombatUnit {
   public shields: number;
   public readonly maxShields: number;
 
-  public readonly speed: number;
+  public readonly isBoss: boolean;
+  public readonly bossName?: string;
+  public isEnraged: boolean = false;
+
+  private _speed: number = 0;
+  public get speed(): number {
+    if (this.isBoss && this.isEnraged) {
+      return 95;
+    }
+    return this._speed;
+  }
+  public set speed(val: number) {
+    this._speed = val;
+  }
+
   public readonly fireCadenceTicks: number;
   public readonly bulletSpeed: number;
   public readonly spreadAngle: number;
@@ -97,7 +120,27 @@ export class Enemy implements CombatUnit {
     this.previousPosition = vec2(config.x, config.y);
     this.velocity = vec2(0, 0);
 
+    if (config.type === "boss") {
+      this.isBoss = true;
+      this.bossName = config.bossName ?? "GOLIATH-01: AEGIS COLOSSUS";
+    } else {
+      this.isBoss = config.isBoss ?? false;
+      this.bossName = config.bossName;
+    }
+
     switch (config.type) {
+      case "boss":
+        this.radius = config.radius ?? 24;
+        this.speed = config.speed ?? 55;
+        this.maxShields = config.maxShields ?? 4;
+        this.fireCadenceTicks = config.fireCadenceTicks ?? 60;
+        this.bulletSpeed = config.bulletSpeed ?? 520;
+        this.spreadAngle = config.spreadAngle ?? 0.05;
+        this.pellets = config.pellets ?? 1;
+        this.stutterTicks = 10;
+        this.runAndGun = false;
+        break;
+
       case "shotgun":
         this.radius = config.radius ?? 16;
         this.speed = config.speed ?? 90;
@@ -161,6 +204,7 @@ export class Enemy implements CombatUnit {
     }
 
     this.shields = this.maxShields;
+    this.isEnraged = false;
     this.fireCooldownTicks =
       config.initialDelayTicks ?? Math.floor(this.fireCadenceTicks * 0.5);
   }
@@ -395,10 +439,13 @@ export class Enemy implements CombatUnit {
   public discharge(): Projectile[] {
     const projectiles: Projectile[] = [];
     const spawnOffset = this.radius + 6;
+    const isEnragedBoss = this.isBoss && this.isEnraged;
+    const pellets = isEnragedBoss ? 3 : this.pellets;
+    const spreadAngle = isEnragedBoss ? 0.35 : this.spreadAngle;
 
-    if (this.pellets === 1) {
+    if (pellets === 1) {
       // Single pinpoint / sniper / slug shot
-      const angle = this.aimAngle + (Math.random() - 0.5) * this.spreadAngle;
+      const angle = this.aimAngle + (Math.random() - 0.5) * spreadAngle;
       const spawnPos = vec2(
         this.position.x + Math.cos(angle) * spawnOffset,
         this.position.y + Math.sin(angle) * spawnOffset
@@ -413,11 +460,11 @@ export class Enemy implements CombatUnit {
         )
       );
     } else {
-      // Fan spread for shotgun pellets
-      const halfSpread = this.spreadAngle / 2;
-      const angleStep = this.spreadAngle / (this.pellets - 1);
+      // Fan spread for shotgun pellets or enraged boss 3-way spread
+      const halfSpread = spreadAngle / 2;
+      const angleStep = spreadAngle / (pellets - 1);
 
-      for (let i = 0; i < this.pellets; i++) {
+      for (let i = 0; i < pellets; i++) {
         const pelletAngle = this.aimAngle - halfSpread + i * angleStep;
         const spawnPos = vec2(
           this.position.x + Math.cos(pelletAngle) * spawnOffset,
@@ -444,6 +491,9 @@ export class Enemy implements CombatUnit {
   public takeDamage(damage: number = 1): DamageResult {
     if (this.shields > 0) {
       this.shields = Math.max(0, this.shields - damage);
+      if (this.isBoss) {
+        this.isEnraged = this.shields === 0;
+      }
       return {
         absorbed: true,
         eliminated: false,
@@ -479,6 +529,7 @@ export class Enemy implements CombatUnit {
     this.velocity = vec2(0, 0);
     this.isAlive = true;
     this.shields = this.maxShields;
+    this.isEnraged = false;
     this.hasLineOfSight = false;
     this.isChargingLaser = false;
     this.stutterTimerTicks = 0;

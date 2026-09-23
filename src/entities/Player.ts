@@ -31,6 +31,12 @@ import {
   Projectile,
 } from "./Projectile";
 
+export interface PlayerAugmentations {
+  extendedCylinder?: boolean;
+  speedLoader?: boolean;
+  reactiveShield?: boolean;
+}
+
 export interface PlayerConfig {
   x?: number;
   y?: number;
@@ -53,6 +59,9 @@ export class Player implements CombatUnit {
   public aimTarget: Vector2D;
   public isAlive: boolean;
   public weapon: Revolver;
+  public augmentations: PlayerAugmentations = {};
+  public shields: number = 0;
+  public maxShields: number = 0;
 
   private spawnPosition: Vector2D;
 
@@ -71,6 +80,9 @@ export class Player implements CombatUnit {
     this.aimAngle = 0;
     this.isAlive = true;
     this.weapon = new Revolver();
+    this.augmentations = {};
+    this.shields = 0;
+    this.maxShields = 0;
   }
 
   /**
@@ -246,19 +258,74 @@ export class Player implements CombatUnit {
   }
 
   /**
-   * Reloads revolver cylinder back to 6 rounds and queues reload burst onto TimeGovernor.
+   * Sets or updates a tactical augmentation modifier on the player.
+   */
+  public setAugmentation(key: keyof PlayerAugmentations, value: boolean): void {
+    this.augmentations[key] = value;
+
+    if (key === "extendedCylinder") {
+      const magSize = value ? 8 : 6;
+      const reloadTickBurst = this.augmentations.speedLoader ? 15 : 30;
+      this.weapon = new Revolver({
+        magSize,
+        reloadTickBurst,
+      });
+      this.weapon.reset();
+    } else if (key === "speedLoader") {
+      const reloadTicks = value ? 15 : 30;
+      this.weapon.setReloadTickBurst(reloadTicks);
+    } else if (key === "reactiveShield") {
+      if (value) {
+        this.maxShields = 1;
+        this.shields = 1;
+      } else {
+        this.maxShields = 0;
+        this.shields = 0;
+      }
+    }
+  }
+
+  /**
+   * Returns current active player augmentations.
+   */
+  public getAugmentations(): Readonly<PlayerAugmentations> {
+    return { ...this.augmentations };
+  }
+
+  /**
+   * Clears all tactical augmentations, restores default 6-chamber weapon, and clears shields.
+   */
+  public clearAugmentations(): void {
+    this.augmentations = {};
+    this.shields = 0;
+    this.maxShields = 0;
+    this.weapon = new Revolver();
+  }
+
+  /**
+   * Reloads revolver cylinder back to full capacity and queues reload burst onto TimeGovernor.
    */
   public reload(governor?: TimeGovernor): boolean {
     if (!this.isAlive) {
       return false;
     }
-    return this.weapon.reload(governor);
+    const reloadTicks = this.augmentations.speedLoader ? 15 : 30;
+    return this.weapon.reload(governor, reloadTicks);
   }
 
   /**
-   * Enforces 1-hit lethality upon damage impact.
+   * Processes incoming damage, absorbing impact with reactive shields if available,
+   * otherwise enforcing 1-hit lethality.
    */
-  public takeDamage(_damage = 1): DamageResult {
+  public takeDamage(damage = 1): DamageResult {
+    if (this.shields > 0) {
+      this.shields = Math.max(0, this.shields - damage);
+      return {
+        absorbed: true,
+        eliminated: false,
+        remainingShields: this.shields,
+      };
+    }
     this.kill();
     return {
       absorbed: false,
@@ -286,6 +353,13 @@ export class Player implements CombatUnit {
     this.previousPosition = { ...this.spawnPosition };
     this.velocity = vec2(0, 0);
     this.isAlive = true;
+    if (this.augmentations.reactiveShield) {
+      this.shields = 1;
+      this.maxShields = 1;
+    } else {
+      this.shields = 0;
+      this.maxShields = 0;
+    }
     this.weapon.reset();
   }
 }

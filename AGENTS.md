@@ -45,12 +45,13 @@ ChronoShot is deliberately engineered without heavy third-party game engines (no
 ### 4. 40px Grid A* Pathfinding & Enemy Archetypes
 - **`GridPathfinder`**: Discrete $24 \times 16$ tile-grid A* with entity radius obstacle inflation ($16\text{px}$) navigates around walls and pillars when line-of-sight is blocked.
 - **Line-of-Sight String Pulling**: When sightlines are clear, AI switches to direct-vector steering (rushers close in, kiters retreat).
-- **5 Archetypes**: Pistol Grunt, Shotgun Guard, Stalker Rusher, Aegis Warden, and Marksman Sniper with distinct speeds, shields, and firing behaviors.
+- **6 Archetypes**: Pistol Grunt, Shotgun Guard, Stalker Rusher, Aegis Warden, Marksman Sniper, and Goliath-01 Aegis Colossus (Sector 1 Boss with 4 shields, dual heavy slugs, enraged phase 2, and dedicated telemetry).
 
 ### 5. Minimalist HUD & Tactical UI
 - **In-Canvas Reticle (`src/ui/Reticle.ts`)**: Canvas cursor is set to `cursor: none`. An in-canvas precision hardware crosshair tracks mouse coordinates, dynamically expanding with movement velocity and flashing crimson on dry-fire.
-- **Hairline Revolver Dial (`src/ui/CylinderHUD.ts`)**: Minimalist 6-chamber dial with active chamber alignment notch and smooth rotational transition.
+- **Hairline Revolver Dial (`src/ui/CylinderHUD.ts`)**: Minimalist 6-chamber dial (dynamically expandable to 8 chambers with Extended Cylinder) with active chamber alignment notch and smooth rotational transition.
 - **Hairline Chrono-Telemetry (`src/ui/TimeHUD.ts`)**: Top-right gauge displaying numeric multiplier (`CHRONO // 0.05x`) and transient action burst pills.
+- **Boss Telemetry & Upgrade Draft**: Top-center boss shield telemetry meter during milestone encounters, followed by immediate freeze-frame 3-card tactical augmentation draft (Extended Cylinder, Speed Loader, Reactive Shield).
 - **Pause Lifecycle**: Toggleable with <kbd>Esc</kbd> or <kbd>P</kbd>. Halts simulation ticks and displays a frosted Swiss-style control matrix card.
 
 ---
@@ -88,7 +89,7 @@ npm run dev
    - Use mock Canvas 2D contexts (`createMockContext()`) with `vi.fn()` for rendering tests.
    - Use mock audio contexts to verify audio trigger calls without requiring real audio devices.
 3. **Keep Tests Fast & Deterministic**:
-   - The entire suite (140+ tests) runs in under 300ms. Avoid arbitrary `setTimeout` or wall-clock waits in tests.
+   - The entire suite (166+ tests) runs in under 350ms. Avoid arbitrary `setTimeout` or wall-clock waits in tests.
 
 ---
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { TimeGovernor } from "../engine/TimeGovernor";
 import { vec2 } from "../math/vector";
 import { createObstacle } from "./Obstacle";
 import { Player } from "./Player";
@@ -102,5 +103,139 @@ describe("Player Entity", () => {
     expect(player.isAlive).toBe(false);
     expect(player.velocity.x).toBe(0);
     expect(player.velocity.y).toBe(0);
+  });
+
+  it("supports extended cylinder augmentation with 8-round capacity and reload", () => {
+    const player = new Player({ x: 100, y: 100 });
+    expect(player.weapon.getMagSize()).toBe(6);
+
+    player.setAugmentation("extendedCylinder", true);
+    expect(player.getAugmentations().extendedCylinder).toBe(true);
+    expect(player.weapon.getMagSize()).toBe(8);
+    expect(player.weapon.getAmmo()).toBe(8);
+
+    // Fire all 8 rounds
+    for (let i = 0; i < 8; i++) {
+      const bullets = player.fire();
+      expect(bullets).toHaveLength(1);
+      player.weapon.update(10);
+    }
+    expect(player.weapon.getAmmo()).toBe(0);
+
+    // 9th pull dry fires
+    const dryBullets = player.fire();
+    expect(dryBullets).toHaveLength(0);
+
+    // Reload back to 8
+    const reloaded = player.reload();
+    expect(reloaded).toBe(true);
+    expect(player.weapon.getAmmo()).toBe(8);
+
+    // Disabling extended cylinder restores 6 rounds
+    player.setAugmentation("extendedCylinder", false);
+    expect(player.weapon.getMagSize()).toBe(6);
+    expect(player.weapon.getAmmo()).toBe(6);
+  });
+
+  it("supports speed loader augmentation queuing 15 reload ticks instead of 30", () => {
+    const governor = new TimeGovernor();
+    const player = new Player({ x: 100, y: 100 });
+
+    // Standard reload queues 30 ticks
+    player.fire();
+    player.reload(governor);
+    expect(governor.getQueuedTicks()).toBe(30);
+
+    governor.advance(0);
+    player.weapon.update(10);
+    player.setAugmentation("speedLoader", true);
+    expect(player.getAugmentations().speedLoader).toBe(true);
+
+    // Reload with speedLoader queues 15 ticks
+    player.fire();
+    player.reload(governor);
+    expect(governor.getQueuedTicks()).toBe(15);
+
+    // Disabling restores 30 ticks
+    governor.advance(0);
+    player.weapon.update(10);
+    player.setAugmentation("speedLoader", false);
+    player.fire();
+    player.reload(governor);
+    expect(governor.getQueuedTicks()).toBe(30);
+  });
+
+  it("supports reactive shield augmentation absorbing 1 hit before lethal elimination", () => {
+    const player = new Player({ x: 100, y: 100 });
+    expect(player.shields).toBe(0);
+    expect(player.maxShields).toBe(0);
+
+    player.setAugmentation("reactiveShield", true);
+    expect(player.shields).toBe(1);
+    expect(player.maxShields).toBe(1);
+
+    // First impact is absorbed by shield
+    const hit1 = player.takeDamage(1);
+    expect(hit1).toEqual({
+      absorbed: true,
+      eliminated: false,
+      remainingShields: 0,
+    });
+    expect(player.isAlive).toBe(true);
+    expect(player.shields).toBe(0);
+
+    // Second impact is fatal
+    const hit2 = player.takeDamage(1);
+    expect(hit2).toEqual({
+      absorbed: false,
+      eliminated: true,
+      remainingShields: 0,
+    });
+    expect(player.isAlive).toBe(false);
+  });
+
+  it("restores reactive shield and weapon on reset() when augmentation is active", () => {
+    const player = new Player({ x: 100, y: 100 });
+    player.setAugmentation("reactiveShield", true);
+    player.setAugmentation("extendedCylinder", true);
+
+    // Fire 3 shots and eliminate player
+    player.fire();
+    player.weapon.update(10);
+    player.fire();
+    player.weapon.update(10);
+    player.fire();
+    expect(player.weapon.getAmmo()).toBe(5);
+
+    player.takeDamage(1); // Shield broken
+    player.takeDamage(1); // Eliminated
+    expect(player.isAlive).toBe(false);
+    expect(player.shields).toBe(0);
+
+    // Reset room
+    player.reset(vec2(250, 250));
+    expect(player.isAlive).toBe(true);
+    expect(player.position.x).toBe(250);
+    expect(player.position.y).toBe(250);
+    expect(player.shields).toBe(1);
+    expect(player.weapon.getAmmo()).toBe(8);
+  });
+
+  it("clears all augmentations, restoring default weapon and zero shields on clearAugmentations()", () => {
+    const player = new Player({ x: 100, y: 100 });
+    player.setAugmentation("extendedCylinder", true);
+    player.setAugmentation("speedLoader", true);
+    player.setAugmentation("reactiveShield", true);
+
+    expect(player.weapon.getMagSize()).toBe(8);
+    expect(player.shields).toBe(1);
+    expect(player.maxShields).toBe(1);
+
+    player.clearAugmentations();
+    expect(player.getAugmentations()).toEqual({});
+    expect(player.shields).toBe(0);
+    expect(player.maxShields).toBe(0);
+    expect(player.weapon.getMagSize()).toBe(6);
+    expect(player.weapon.getReloadTickBurst()).toBe(30);
   });
 });
