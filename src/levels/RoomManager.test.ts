@@ -213,9 +213,9 @@ describe("Room Configuration & Sequence Schema", () => {
     expect(room9.exitPortal).toBeDefined();
   });
 
-  it("constructs standard room sequence containing all 9 rooms", () => {
+  it("constructs standard room sequence containing all 14 rooms", () => {
     const sequence = createStandardRoomSequence();
-    expect(sequence).toHaveLength(9);
+    expect(sequence).toHaveLength(14);
     sequence.forEach((room, index) => {
       expect(room.roomNumber).toBe(index + 1);
       expect(room.id).toBe(`room-${index + 1}`);
@@ -230,7 +230,7 @@ describe("RoomManager Tactical Puzzle Progression", () => {
   it("initializes at Room 1 with locked exit portal and incomplete game status", () => {
     const manager = new RoomManager();
 
-    expect(manager.getRoomCount()).toBe(9);
+    expect(manager.getRoomCount()).toBe(14);
     expect(manager.getCurrentRoomIndex()).toBe(0);
     expect(manager.getCurrentRoom().roomNumber).toBe(1);
     expect(manager.isBossRoom()).toBe(false);
@@ -255,6 +255,19 @@ describe("RoomManager Tactical Puzzle Progression", () => {
 
     // Rooms 6 to 9 are not boss rooms
     for (let i = 5; i < 9; i++) {
+      manager.setExitUnlocked(true);
+      manager.advanceRoom();
+      expect(manager.isBossRoom()).toBe(false);
+    }
+
+    // Room 10 is the Milestone Boss 2 (Chrono-Weaver) room
+    manager.setExitUnlocked(true);
+    manager.advanceRoom();
+    expect(manager.getCurrentRoom().roomNumber).toBe(10);
+    expect(manager.isBossRoom()).toBe(true);
+
+    // Rooms 11 to 14 are not boss rooms
+    for (let i = 10; i < 14; i++) {
       manager.setExitUnlocked(true);
       manager.advanceRoom();
       expect(manager.isBossRoom()).toBe(false);
@@ -321,11 +334,11 @@ describe("RoomManager Tactical Puzzle Progression", () => {
     expect(manager.isPlayerInExitPortal(outsidePos, 14)).toBe(false);
   });
 
-  it("advances sequentially across 9 rooms and triggers game completion", () => {
+  it("advances sequentially across 14 rooms and triggers game completion", () => {
     const manager = new RoomManager();
 
-    // Rooms 1 -> 2 -> ... -> 9
-    for (let i = 1; i <= 8; i++) {
+    // Rooms 1 -> 2 -> ... -> 14
+    for (let i = 1; i <= 13; i++) {
       manager.setExitUnlocked(true);
       expect(manager.advanceRoom()).toBe(true);
       expect(manager.getCurrentRoomIndex()).toBe(i);
@@ -356,8 +369,8 @@ describe("RoomManager Tactical Puzzle Progression", () => {
     expect(manager.getCurrentRoomIndex()).toBe(1);
     expect(manager.isExitUnlocked()).toBe(false);
 
-    // Advance to room 9 then complete
-    for (let i = 2; i <= 9; i++) {
+    // Advance to room 14 then complete
+    for (let i = 2; i <= 14; i++) {
       manager.advanceRoom();
     }
     expect(manager.isGameCompleted()).toBe(true);
@@ -392,7 +405,7 @@ describe("RoomManager Tactical Puzzle Progression", () => {
       245
     );
     expect(ctx.fillText).toHaveBeenCalledWith(
-      "ALL 9 TACTICAL PROTOCOLS CONQUERED",
+      "ALL 14 TACTICAL PROTOCOLS CONQUERED",
       480,
       300
     );

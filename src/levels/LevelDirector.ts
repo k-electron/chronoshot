@@ -9,7 +9,11 @@
  * - Synthesis of complete RoomConfig objects ready for Arena / RoomManager
  */
 
-import { GOLIATH_01_BLUEPRINT, BossBlueprint } from "../entities/boss/BossBlueprint";
+import {
+  GOLIATH_01_BLUEPRINT,
+  CHRONO_WEAVER_BLUEPRINT,
+  BossBlueprint,
+} from "../entities/boss/BossBlueprint";
 import { EnemyConfig } from "../entities/Enemy";
 import { RoomConfig } from "./Room";
 import { EncounterDirector } from "./EncounterDirector";
@@ -56,6 +60,7 @@ export class LevelDirector {
   public readonly templateRegistry: LayoutTemplateRegistry;
   public readonly encounterDirector: EncounterDirector;
   public readonly bossBlueprint: BossBlueprint;
+  private readonly customBossBlueprint?: BossBlueprint;
   public readonly arenaWidth: number;
   public readonly arenaHeight: number;
   public baseSeed?: string | number;
@@ -63,6 +68,7 @@ export class LevelDirector {
   constructor(config: LevelDirectorConfig = {}) {
     this.templateRegistry = config.templateRegistry ?? DEFAULT_LAYOUT_REGISTRY;
     this.encounterDirector = config.encounterDirector ?? new EncounterDirector();
+    this.customBossBlueprint = config.bossBlueprint;
     this.bossBlueprint = config.bossBlueprint ?? GOLIATH_01_BLUEPRINT;
     this.arenaWidth = config.arenaWidth ?? 960;
     this.arenaHeight = config.arenaHeight ?? 640;
@@ -129,16 +135,21 @@ export class LevelDirector {
     const padNumber = String(roomNumber).padStart(2, "0");
     const sectorNumber = Math.floor(roomNumber / 5);
 
+    const blueprint =
+      this.customBossBlueprint ??
+      (sectorNumber <= 1 ? GOLIATH_01_BLUEPRINT : CHRONO_WEAVER_BLUEPRINT);
+
     const bossId = `boss-sector-${sectorNumber}-${roomNumber}`;
     const bossConfig: EnemyConfig = {
       id: bossId,
       type: "boss",
       x: this.arenaWidth - 200,
       y: this.arenaHeight / 2,
-      maxShields: 4,
+      maxShields: blueprint.phases[0]?.maxShields ?? 4,
       fireCadenceTicks: 60,
       initialDelayTicks: 25,
-      blueprint: this.bossBlueprint,
+      blueprint,
+      bossName: blueprint.name,
     };
 
     const escorts: EnemyConfig[] = [];
@@ -164,9 +175,9 @@ export class LevelDirector {
     return {
       id: `procedural-room-${roomNumber}`,
       roomNumber,
-      title: `ROOM ${padNumber}: ${this.bossBlueprint.name}`,
+      title: `ROOM ${padNumber}: ${blueprint.name}`,
       subtitle: `Sector ${sectorNumber} Milestone Boss Encounter`,
-      tacticalTip: `Neutralize ${this.bossBlueprint.name} shields and coordinate fire against escort hostiles.`,
+      tacticalTip: `Neutralize ${blueprint.name} shields and coordinate fire against escort hostiles.`,
       playerSpawn: template.playerSpawn,
       obstacles: template.buildObstacles(this.arenaWidth, this.arenaHeight),
       enemies: [bossConfig, ...escorts],

@@ -101,24 +101,29 @@ Powered by a decoupled data-driven architecture (`UpgradePipeline`, `UpgradeRegi
 - Zero external audio assets required; all sound effects (gunfire, dry-fire clicks, cylinder reload clicks, obstacle impacts, shield deflections, shield breaks, sniper laser charging, upgrade chime arpeggios, boss defeat rumbles, and victory fanfare) are synthesized live using the Web Audio API.
 - **Dynamic Time-Scale Modulation**: Audio playback rates and oscillator frequencies scale dynamically with `timeScale`. Sounds drop to deep sub-bass drones (~0.43x pitch, ~2.4x duration) during 5% micro-creep and pitch up to normal tempo when sprinting.
 
-### 10. 9-Room Tactical Campaign & Pure Permadeath
-- Handcrafted room sequences teaching each archetype and mechanics progressively across two sectors:
+### 10. 14-Room Tactical Campaign & Pure Permadeath
+- Handcrafted room sequences teaching each archetype and mechanics progressively across three sectors:
   - **Room 01 (`BASIC COVER`)**: 1v1 duel against a mobile Pistol Grunt teaching micro-creep peeking and leading shots.
   - **Room 02 (`ARMORED BREACH`)**: Shotgun Guard (1 shield) + Grunt teaching shield breaking and buckshot evasion.
   - **Room 03 (`INFILTRATION`)**: High-speed Stalker rusher + Grunt in a zigzag corridor teaching rapid target acquisition.
   - **Room 04 (`THE LINE OF FIRE`)**: Marksman sniper nest with 30-tick laser telegraph + Shotgun Guard advance teaching sightline evasion.
-  - **Room 05 (`SECTOR 1 BOSS`)**: Goliath-01 Aegis Colossus (4 shields) + Grunt escorts testing complete combat mastery, triggering the upgrade draft.
+  - **Room 05 (`SECTOR 1 BOSS`)**: Goliath-01 Aegis Colossus (4 shields) + Grunt escorts testing complete combat mastery, triggering Upgrade Draft 1.
   - **Room 06 (`BREACH PROTOCOL`)**: Zone 2 baseline launch with dual Stalker pincer sprint + Shotgun Guard suppression.
   - **Room 07 (`CROSSFIRE CORRIDOR`)**: Dual Marksman Snipers holding crisscrossing sightlines while an Aegis Warden advances.
   - **Room 08 (`KILLBOX ENCLOSURE`)**: High-density 5-enemy squad in a tight pillbox arena forcing tactical reloading.
   - **Room 09 (`THE IRON GATE`)**: Climax with dual Aegis Wardens, Marksman sniper, and Stalker rusher requiring 6 total shield breaks.
+  - **Room 10 (`CHRONO-WEAVER`)**: Milestone Boss 2 (Temporal Anchor) pairing precision standoff laser beams in Phase 1 with 360-degree radial novae and Stalker summons in Phase 2, triggering Upgrade Draft 2.
+  - **Room 11 (`VANGUARD BREACH`)**: Sector 3 entry calibration testing 2-upgrade builds against Warden, Shotgun, and Stalker vanguard squads.
+  - **Room 12 (`TWIN BUNKER CROSSFIRE`)**: Multi-shield siege featuring dual advancing Wardens pinned by perimeter snipers.
+  - **Room 13 (`SPLIT FLANK MATRIX`)**: Corridor containment preventing dual high-speed Stalker pincer rushes.
+  - **Room 14 (`THE CRUCIBLE`)**: Peak pre-boss gauntlet testing full mastery across Wardens, Snipers, Shotguns, and Stalkers.
 - **Pure Permadeath**: There are no lives or checkpoints. Lethal trauma terminates the run, displays sector and upgrade statistics, and resets progress back to Room 1.
 
 ### 11. Modular Level Director & Procedural Generation
 - **Composable Tactical Layouts**: 5 geometry templates (`CenterPillarsTemplate`, `TwinBunkersTemplate`, `SplitCorridorTemplate`, `KillboxLanesTemplate`, `ArenaQuadrantTemplate`) providing varied obstacle geometries, tactical sightlines, and verified spawn separation ($\ge 280\text{px}$ from player).
 - **Threat-Budget Encounter Spawner (`EncounterDirector`)**: Scales difficulty by assigning numerical threat budgets across hostiles while enforcing squad composition constraints (maximum 2 Marksman snipers per room, mandatory frontline escorts) and non-overlapping safe spawn sampling ($\ge 48\text{px}$ unit separation).
-- **Deterministic Seeded PRNG (`LevelDirector`)**: High-performance Mulberry32 pseudo-random number generator enabling 100% reproducible room seeds, daily challenges, and milestone boss synthesis on every 5th room.
-- **Dynamic Endless Mode**: `RoomManager` seamlessly toggles between the classic handcrafted 9-room campaign and infinite on-demand procedural generation.
+- **Deterministic Seeded PRNG (`LevelDirector`)**: High-performance Mulberry32 pseudo-random number generator enabling 100% reproducible room seeds, daily challenges, and milestone boss synthesis on every 5th room (Sector 1: Goliath-01, Sector 2+: Chrono-Weaver).
+- **Dynamic Endless Mode**: `RoomManager` seamlessly toggles between the classic handcrafted 14-room campaign and infinite on-demand procedural generation.
 
 ---
 

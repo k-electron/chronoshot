@@ -14,7 +14,12 @@ import { TelegraphedBeamBehavior } from "../behaviors/attack/TelegraphedBeamBeha
 import { DirectAdvanceBehavior } from "../behaviors/movement/DirectAdvanceBehavior";
 import { KiterBehavior } from "../behaviors/movement/KiterBehavior";
 import { BossPhaseConfig, BossPhaseController } from "./BossPhaseController";
-import { createShockwavePulse } from "./BossTransitionAction";
+import {
+  combineTransitionActions,
+  createAudioCue,
+  createMinionEscortSpawn,
+  createShockwavePulse,
+} from "./BossTransitionAction";
 
 export interface BossBlueprint {
   readonly id: string;
@@ -99,8 +104,20 @@ export const CHRONO_WEAVER_BLUEPRINT: BossBlueprint = {
         }),
       transitionTrigger: (ctx) => ctx.shields <= 0,
       onPhaseExit: (ctx) => {
-        const shockwave = createShockwavePulse(32, 300, "#00f0ff");
-        shockwave(ctx);
+        const action = combineTransitionActions(
+          createShockwavePulse(32, 300, "#00f0ff"),
+          createMinionEscortSpawn([
+            {
+              type: "stalker",
+              offsetX: -120,
+              offsetY: 0,
+              fireCadenceTicks: 32,
+              initialDelayTicks: 25,
+            },
+          ]),
+          createAudioCue("shieldBreak")
+        );
+        action(ctx);
       },
     },
     {
