@@ -4,6 +4,7 @@ import { vec2 } from "../math/vector";
 import { Enemy } from "./Enemy";
 import { createObstacle, createPillar } from "./Obstacle";
 import { Player } from "./Player";
+import { CHRONO_WEAVER_BLUEPRINT, createBossPhaseController } from "./boss/BossBlueprint";
 
 describe("Enemy Tactical AI & Archetypes", () => {
   it("detects unobstructed line-of-sight to player", () => {
@@ -370,5 +371,97 @@ describe("Enemy - Boss Archetype (Goliath-01)", () => {
 
     // Calm discharge after reset
     expect(boss.discharge()).toHaveLength(1);
+  });
+
+  describe("BossPhaseController Integration", () => {
+    it("instantiates BossPhaseController by default for type === 'boss'", () => {
+      const boss = new Enemy({
+        id: "boss-phase-check",
+        type: "boss",
+        x: 500,
+        y: 300,
+      });
+
+      expect(boss.phaseController).toBeDefined();
+      expect(boss.phaseController?.currentPhaseIndex).toBe(0);
+      expect(boss.phaseController?.totalPhases).toBe(2);
+      expect(boss.phaseController?.currentPhase.phaseTitle).toBe("AEGIS FORTRESS");
+      expect(boss.movement).toBe(boss.phaseController?.movement);
+      expect(boss.attack).toBe(boss.phaseController?.attack);
+    });
+
+    it("swaps active movement and attack instances upon phase transition", () => {
+      const boss = new Enemy({
+        id: "boss-phase-swap",
+        type: "boss",
+        x: 500,
+        y: 300,
+      });
+
+      const initialAttack = boss.attack;
+
+      // Deplete all 4 shields to trigger transition
+      for (let i = 0; i < 4; i++) {
+        boss.takeDamage(1);
+      }
+
+      expect(boss.phaseController?.currentPhaseIndex).toBe(1);
+      expect(boss.phaseController?.currentPhase.phaseTitle).toBe("OVERDRIVE RAM");
+      expect(boss.attack).not.toBe(initialAttack);
+      expect(boss.speed).toBe(95);
+      expect(boss.isEnraged).toBe(true);
+    });
+
+    it("supports custom BossPhaseController initialization (Chrono-Weaver)", () => {
+      const chronoController = createBossPhaseController(CHRONO_WEAVER_BLUEPRINT, { x: 500, y: 300 });
+      const boss = new Enemy({
+        id: "boss-chrono",
+        type: "boss",
+        x: 500,
+        y: 300,
+        chassis: CHRONO_WEAVER_BLUEPRINT.chassis,
+        bossName: CHRONO_WEAVER_BLUEPRINT.name,
+        phaseController: chronoController,
+      });
+
+      expect(boss.bossName).toBe("CHRONO-WEAVER: TEMPORAL ANCHOR");
+      expect(boss.shields).toBe(3);
+      expect(boss.speed).toBe(70);
+      expect(boss.phaseController?.currentPhase.phaseTitle).toBe("STASIS ORBIT");
+
+      // Deplete 3 shields
+      for (let i = 0; i < 3; i++) {
+        boss.takeDamage(1);
+      }
+
+      expect(boss.phaseController?.currentPhaseIndex).toBe(1);
+      expect(boss.phaseController?.currentPhase.phaseTitle).toBe("TEMPORAL NOVA");
+      expect(boss.speed).toBe(100);
+
+      // Phase 2 discharges 12-pellet radial nova
+      const novaProjectiles = boss.discharge();
+      expect(novaProjectiles).toHaveLength(12);
+    });
+
+    it("reset() resets BossPhaseController to phase 0 with pristine shields", () => {
+      const boss = new Enemy({
+        id: "boss-controller-reset",
+        type: "boss",
+        x: 500,
+        y: 300,
+      });
+
+      for (let i = 0; i < 4; i++) {
+        boss.takeDamage(1);
+      }
+      expect(boss.phaseController?.currentPhaseIndex).toBe(1);
+
+      boss.reset();
+      expect(boss.phaseController?.currentPhaseIndex).toBe(0);
+      expect(boss.phaseController?.shields).toBe(4);
+      expect(boss.shields).toBe(4);
+      expect(boss.isEnraged).toBe(false);
+      expect(boss.speed).toBe(55);
+    });
   });
 });
