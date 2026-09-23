@@ -10,7 +10,7 @@ import { vec2 } from "../math/vector";
 
 describe("EnemyFactory & Blueprints", () => {
   it("registers valid blueprints for all 6 baseline archetypes", () => {
-    const types: EnemyType[] = ["grunt", "shotgun", "stalker", "warden", "marksman", "boss"];
+    const types: EnemyType[] = ["grunt", "shotgun", "stalker", "warden", "marksman", "sniper", "boss"];
     for (const type of types) {
       const bp = EnemyFactory.getBlueprint(type);
       expect(bp).toBeDefined();
@@ -40,6 +40,9 @@ describe("EnemyFactory & Blueprints", () => {
 
     expect(BLUEPRINTS.marksman.createMovement()).toBeInstanceOf(KiterBehavior);
     expect(BLUEPRINTS.marksman.createAttack()).toBeInstanceOf(TelegraphedBeamBehavior);
+
+    expect(BLUEPRINTS.sniper.createMovement()).toBeInstanceOf(KiterBehavior);
+    expect(BLUEPRINTS.sniper.createAttack()).toBeInstanceOf(TelegraphedBeamBehavior);
 
     expect(BLUEPRINTS.boss.createMovement()).toBeInstanceOf(DirectAdvanceBehavior);
     expect(BLUEPRINTS.boss.createAttack()).toBeInstanceOf(BossAttackBehavior);

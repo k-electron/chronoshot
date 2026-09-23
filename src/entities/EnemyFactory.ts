@@ -273,6 +273,29 @@ export const BLUEPRINTS: Record<EnemyType, EnemyBlueprint> = {
       }),
   },
 
+  sniper: {
+    type: "sniper",
+    radius: 14,
+    speed: 80,
+    maxShields: 0,
+    fireCadenceTicks: 110,
+    bulletSpeed: 850,
+    spreadAngle: 0.01,
+    pellets: 1,
+    stutterTicks: 0,
+    runAndGun: false,
+    chassis: "star",
+    createMovement: () => new KiterBehavior({ minDist: 340, maxDist: 520 }),
+    createAttack: (config) =>
+      new TelegraphedBeamBehavior({
+        fireCadenceTicks: config?.fireCadenceTicks ?? 110,
+        bulletSpeed: config?.bulletSpeed ?? 850,
+        spreadAngle: config?.spreadAngle ?? 0.01,
+        laserChargeTicks: 30,
+        initialDelayTicks: config?.initialDelayTicks,
+      }),
+  },
+
   boss: {
     type: "boss",
     radius: 24,

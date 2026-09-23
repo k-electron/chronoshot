@@ -14,23 +14,39 @@
 import { vecDistance, Vector2D } from "../math/vector";
 import { getUIFont, UITheme } from "../ui/theme";
 import { createStandardRoomSequence, RoomConfig } from "./Room";
+import { LevelDirector } from "./LevelDirector";
 
 export class RoomManager {
+  public readonly levelDirector?: LevelDirector;
   private rooms: RoomConfig[];
   private currentRoomIndex: number = 0;
   private exitUnlocked: boolean = false;
   private gameCompleted: boolean = false;
   private portalAnimationTimer: number = 0;
 
-  constructor(rooms?: RoomConfig[]) {
-    this.rooms = rooms && rooms.length > 0 ? rooms : createStandardRoomSequence();
+  constructor(roomsOrDirector?: RoomConfig[] | LevelDirector) {
+    if (roomsOrDirector instanceof LevelDirector) {
+      this.levelDirector = roomsOrDirector;
+      this.rooms = [this.levelDirector.generateRoom(1)];
+    } else if (Array.isArray(roomsOrDirector) && roomsOrDirector.length > 0) {
+      this.rooms = roomsOrDirector;
+    } else {
+      this.rooms = createStandardRoomSequence();
+    }
     this.currentRoomIndex = 0;
     this.exitUnlocked = false;
     this.gameCompleted = false;
   }
 
   /**
-   * Returns total count of rooms in the sequence.
+   * Returns whether the manager is running in dynamic endless mode.
+   */
+  public isEndlessMode(): boolean {
+    return this.levelDirector !== undefined;
+  }
+
+  /**
+   * Returns total count of rooms currently loaded in the sequence.
    */
   public getRoomCount(): number {
     return this.rooms.length;
@@ -42,7 +58,7 @@ export class RoomManager {
   public isBossRoom(): boolean {
     const currentRoom = this.getCurrentRoom();
     return (
-      currentRoom.roomNumber === 5 ||
+      (currentRoom.roomNumber > 0 && currentRoom.roomNumber % 5 === 0) ||
       currentRoom.enemies.some((e) => (e.type as string) === "boss")
     );
   }
@@ -77,8 +93,12 @@ export class RoomManager {
 
   /**
    * Returns whether there is a subsequent room after the current one.
+   * In endless mode (with LevelDirector), always returns true.
    */
   public hasNextRoom(): boolean {
+    if (this.levelDirector) {
+      return true;
+    }
     return this.currentRoomIndex < this.rooms.length - 1;
   }
 
@@ -123,11 +143,21 @@ export class RoomManager {
 
   /**
    * Advances the sequence to the next room.
-   * If called on the final room, sets gameCompleted to true.
+   * In endless mode, synthesizes the subsequent room dynamically.
+   * If called on the final campaign room, sets gameCompleted to true.
    *
    * @returns true if progressed to next room; false if final room completed.
    */
   public advanceRoom(): boolean {
+    if (this.levelDirector) {
+      this.currentRoomIndex++;
+      this.exitUnlocked = false;
+      if (this.currentRoomIndex >= this.rooms.length) {
+        this.rooms.push(this.levelDirector.generateRoom(this.currentRoomIndex + 1));
+      }
+      return true;
+    }
+
     if (this.hasNextRoom()) {
       this.currentRoomIndex++;
       this.exitUnlocked = false;
@@ -149,6 +179,9 @@ export class RoomManager {
    * Restarts the entire mission back to Room 1.
    */
   public restartGame(): void {
+    if (this.levelDirector) {
+      this.rooms = [this.levelDirector.generateRoom(1)];
+    }
     this.currentRoomIndex = 0;
     this.exitUnlocked = false;
     this.gameCompleted = false;

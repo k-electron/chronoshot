@@ -56,6 +56,12 @@ ChronoShot is deliberately engineered without heavy third-party game engines (no
 - **Tactical Upgrade Draft & Pipeline (`src/upgrades/` & `src/ui/UpgradeDraftHUD.ts`)**: Data-driven roguelike upgrade pipeline (`UpgradePipeline`) with centralized registry (`UpgradeRegistry`), dynamic $N$-card draft UI (`UpgradeDraftHUD`), stack control, and compounded modifiers. Baseline augmentations (Extended Cylinder, Speed Loader, Reactive Shield) and advanced perks (Kinetic Stride, Chrono Burst, Phase Deflector).
 - **Pause Lifecycle**: Toggleable with <kbd>Esc</kbd> or <kbd>P</kbd>. Halts simulation ticks and displays a frosted Swiss-style control matrix card.
 
+### 6. Modular Level Director & Procedural Encounter Generation
+- **`RoomLayoutTemplate` & `DEFAULT_LAYOUT_REGISTRY`**: Composable tactical geometry layouts (`CenterPillarsTemplate`, `TwinBunkersTemplate`, `SplitCorridorTemplate`, `KillboxLanesTemplate`, `ArenaQuadrantTemplate`) with verified spawn safety ($\ge 280\text{px}$ from player spawn).
+- **`EncounterDirector`**: Threat-budget encounter synthesizer selecting hostile archetypes dynamically based on difficulty tier while enforcing composition constraints (max 2 snipers, frontliner escort rules) and geometric separation ($\ge 48\text{px}$ between units, outside obstacle collision boxes).
+- **`LevelDirector`**: Deterministic Mulberry32 PRNG engine producing reproducible room configurations from numeric or string seeds, with automated milestone boss injection every 5th room.
+- **`RoomManager` Dynamic Mode**: Seamlessly switches between classic fixed campaign sequences and endless procedural room streams upon portal entry.
+
 ---
 
 ## 🛠️ Essential Commands
@@ -91,7 +97,7 @@ npm run dev
    - Use mock Canvas 2D contexts (`createMockContext()`) with `vi.fn()` for rendering tests.
    - Use mock audio contexts to verify audio trigger calls without requiring real audio devices.
 3. **Keep Tests Fast & Deterministic**:
-   - The entire suite (374+ tests) runs in under 600ms. Avoid arbitrary `setTimeout` or wall-clock waits in tests.
+   - The entire suite (452+ tests) runs in under 650ms. Avoid arbitrary `setTimeout` or wall-clock waits in tests.
 
 ---
 

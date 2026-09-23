@@ -60,6 +60,7 @@ export function resolveEnemyChassis(enemy: RenderableEnemy): EnemyChassisType {
     case "warden":
       return "hexagon";
     case "marksman":
+    case "sniper":
       return "star";
     case "boss":
       return "octagon";

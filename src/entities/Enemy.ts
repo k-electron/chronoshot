@@ -28,7 +28,7 @@ import {
 import { EnemyChassisType } from "../ui/EnemyRenderer";
 import { AttackBehavior, AttackContext } from "./behaviors/attack/AttackBehavior";
 import { MovementBehavior, MovementContext } from "./behaviors/movement/MovementBehavior";
-import { createBossPhaseController, GOLIATH_01_BLUEPRINT } from "./boss/BossBlueprint";
+import { BossBlueprint, createBossPhaseController, GOLIATH_01_BLUEPRINT } from "./boss/BossBlueprint";
 import { BossPhaseController } from "./boss/BossPhaseController";
 import { BLUEPRINTS } from "./EnemyFactory";
 import { Obstacle } from "./Obstacle";
@@ -40,6 +40,7 @@ export type EnemyType =
   | "stalker"
   | "warden"
   | "marksman"
+  | "sniper"
   | "boss";
 
 export interface EnemyConfig {
@@ -61,6 +62,7 @@ export interface EnemyConfig {
   attack?: AttackBehavior;
   chassis?: EnemyChassisType;
   phaseController?: BossPhaseController;
+  blueprint?: BossBlueprint;
 }
 
 export class Enemy implements CombatUnit {
@@ -84,6 +86,7 @@ export class Enemy implements CombatUnit {
   public readonly isBoss: boolean;
   public readonly bossName?: string;
   public phaseController?: BossPhaseController;
+  public blueprint?: BossBlueprint;
   private _isEnraged: boolean = false;
 
   public get isEnraged(): boolean {
@@ -209,10 +212,11 @@ export class Enemy implements CombatUnit {
       this.bossName = config.bossName;
     }
 
+    this.blueprint = config.blueprint;
     if (config.phaseController) {
       this.phaseController = config.phaseController;
     } else if (config.type === "boss") {
-      this.phaseController = createBossPhaseController(GOLIATH_01_BLUEPRINT, this.position);
+      this.phaseController = createBossPhaseController(config.blueprint ?? GOLIATH_01_BLUEPRINT, this.position);
     }
 
     this.radius = config.radius ?? blueprint.radius;
