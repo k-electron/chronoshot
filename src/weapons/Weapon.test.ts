@@ -219,4 +219,114 @@ describe("Revolver Weapon State Machine", () => {
     revolver.reload(governor, 12);
     expect(governor.getQueuedTicks()).toBe(12);
   });
+
+  it("handles stateful multi-tick reload cycle with sequential chamber loading", () => {
+    const revolver = new Revolver();
+
+    // Fire all 6 rounds
+    for (let i = 0; i < 6; i++) {
+      revolver.fire();
+      revolver.update(DEFAULT_REVOLVER_CONFIG.cooldownTicks);
+    }
+    expect(revolver.getAmmo()).toBe(0);
+
+    // Cannot start reload if already full (tested below), but can start when empty
+    expect(revolver.isReloading()).toBe(false);
+    expect(revolver.getReloadProgress()).toBe(0);
+
+    const started = revolver.startReload(30);
+    expect(started).toBe(true);
+    expect(revolver.isReloading()).toBe(true);
+    expect(revolver.isReady()).toBe(false); // Weapon offline during reload
+    expect(revolver.getReloadTicksTotal()).toBe(30);
+    expect(revolver.getReloadTicksRemaining()).toBe(30);
+    expect(revolver.getReloadProgress()).toBe(0);
+
+    // Double startReload should be ignored
+    expect(revolver.startReload(30)).toBe(false);
+
+    // Firing while reloading is blocked
+    const fireAttempt = revolver.fire();
+    expect(fireAttempt.fired).toBe(false);
+    expect(fireAttempt.dryFired).toBe(false);
+
+    // Advance 4 ticks: no chamber loaded yet (elapsed 4/30)
+    let res = revolver.updateReload(4);
+    expect(res.completed).toBe(false);
+    expect(res.justLoadedChamber).toBe(false);
+    expect(revolver.getAmmo()).toBe(0);
+    expect(revolver.getReloadTicksRemaining()).toBe(26);
+
+    // Advance 1 more tick (total elapsed 5): 1st chamber seats!
+    res = revolver.updateReload(1);
+    expect(res.completed).toBe(false);
+    expect(res.justLoadedChamber).toBe(true);
+    expect(res.loadedChambers).toBe(1);
+    expect(revolver.getAmmo()).toBe(1);
+    expect(revolver.getChambers()[0]).toBe("loaded");
+    expect(revolver.getChambers()[1]).toBe("spent");
+
+    // Advance 5 more ticks (elapsed 10): 2nd chamber seats!
+    res = revolver.updateReload(5);
+    expect(res.completed).toBe(false);
+    expect(res.justLoadedChamber).toBe(true);
+    expect(res.loadedChambers).toBe(2);
+    expect(revolver.getAmmo()).toBe(2);
+
+    // Advance 10 ticks (elapsed 20): chambers 3 and 4 seat!
+    res = revolver.updateReload(10);
+    expect(res.completed).toBe(false);
+    expect(res.justLoadedChamber).toBe(true);
+    expect(res.loadedChambers).toBe(4);
+    expect(revolver.getAmmo()).toBe(4);
+
+    // Advance remaining 10 ticks (elapsed 30): reload completes with all 6 rounds!
+    res = revolver.updateReload(10);
+    expect(res.completed).toBe(true);
+    expect(res.loadedChambers).toBe(6);
+    expect(revolver.getAmmo()).toBe(6);
+    expect(revolver.isReloading()).toBe(false);
+    expect(revolver.getReloadProgress()).toBe(0);
+    expect(revolver.getReloadTicksRemaining()).toBe(0);
+    expect(revolver.getChambers().every((c) => c === "loaded")).toBe(true);
+  });
+
+  it("supports partial chamber retention upon cancelReload()", () => {
+    const revolver = new Revolver();
+
+    // Fire all 6 rounds
+    for (let i = 0; i < 6; i++) {
+      revolver.fire();
+      revolver.update(DEFAULT_REVOLVER_CONFIG.cooldownTicks);
+    }
+    expect(revolver.getAmmo()).toBe(0);
+
+    // Start 30-tick reload
+    expect(revolver.startReload(30)).toBe(true);
+
+    // Advance 16 ticks (first 3 chambers load: ticks 5, 10, 15)
+    revolver.updateReload(16);
+    expect(revolver.getAmmo()).toBe(3);
+    expect(revolver.isReloading()).toBe(true);
+
+    // Player cancels reload (e.g. via Dash)
+    const retainedAmmo = revolver.cancelReload();
+    expect(retainedAmmo).toBe(3);
+    expect(revolver.getAmmo()).toBe(3);
+    expect(revolver.isReloading()).toBe(false);
+    expect(revolver.getReloadTicksRemaining()).toBe(0);
+
+    // 3 chambers remain loaded, 3 remain spent
+    const chambers = revolver.getChambers();
+    const loadedCount = chambers.filter((c) => c === "loaded").length;
+    const spentCount = chambers.filter((c) => c === "spent").length;
+    expect(loadedCount).toBe(3);
+    expect(spentCount).toBe(3);
+
+    // Weapon can now fire its 3 retained rounds
+    const shot = revolver.fire();
+    expect(shot.fired).toBe(true);
+    expect(revolver.getAmmo()).toBe(2);
+  });
 });
+

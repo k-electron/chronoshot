@@ -7,7 +7,7 @@
  */
 
 import { TimeGovernor } from "../engine/TimeGovernor";
-import { ChamberState, FireResult, Weapon, WeaponConfig } from "./Weapon";
+import { ChamberState, FireResult, ReloadUpdateResult, Weapon, WeaponConfig } from "./Weapon";
 
 export const DEFAULT_REVOLVER_CONFIG: WeaponConfig = {
   name: "Revolver",
@@ -29,6 +29,12 @@ export class Revolver implements Weapon {
   private cooldownRemainingTicks: number = 0;
   private dryFiredThisFrame: boolean = false;
   private reloadTickBurst?: number;
+
+  private reloading: boolean = false;
+  private reloadTicksRemaining: number = 0;
+  private reloadTicksTotal: number = 0;
+  private reloadInitialSpentChambers: number = 0;
+  private reloadChambersLoadedCount: number = 0;
 
   constructor(config: Partial<WeaponConfig> = {}) {
     this.config = { ...DEFAULT_REVOLVER_CONFIG, ...config };
@@ -72,12 +78,109 @@ export class Revolver implements Weapon {
   }
 
   public isReady(): boolean {
-    return this.cooldownRemainingTicks <= 0;
+    return !this.reloading && this.cooldownRemainingTicks <= 0;
   }
 
   public isReloading(): boolean {
-    return false;
+    return this.reloading;
   }
+
+  public getReloadProgress(): number {
+    if (!this.reloading || this.reloadTicksTotal <= 0) {
+      return 0;
+    }
+    return Math.max(0, Math.min(1, (this.reloadTicksTotal - this.reloadTicksRemaining) / this.reloadTicksTotal));
+  }
+
+  public getReloadTicksRemaining(): number {
+    return this.reloadTicksRemaining;
+  }
+
+  public getReloadTicksTotal(): number {
+    return this.reloadTicksTotal;
+  }
+
+  /**
+   * Starts a stateful multi-tick reload cycle.
+   * Returns true if reload started, false if already reloading or already at full capacity.
+   */
+  public startReload(totalTicks?: number): boolean {
+    if (this.currentAmmo === this.config.magSize || this.reloading) {
+      return false;
+    }
+
+    const burst = totalTicks ?? this.getReloadTickBurst();
+    this.reloading = true;
+    this.reloadTicksTotal = Math.max(1, burst);
+    this.reloadTicksRemaining = this.reloadTicksTotal;
+    this.reloadInitialSpentChambers = this.config.magSize - this.currentAmmo;
+    this.reloadChambersLoadedCount = 0;
+    this.dryFiredThisFrame = false;
+
+    return true;
+  }
+
+  /**
+   * Advances the reload timer by deltaTicks, sequentially seating chambers.
+   */
+  public updateReload(deltaTicks: number = 1): ReloadUpdateResult {
+    if (!this.reloading) {
+      return { completed: false, justLoadedChamber: false, loadedChambers: this.currentAmmo };
+    }
+
+    const ticksToApply = Math.min(deltaTicks, this.reloadTicksRemaining);
+    this.reloadTicksRemaining -= ticksToApply;
+
+    const elapsedTicks = this.reloadTicksTotal - this.reloadTicksRemaining;
+    const isFinished = this.reloadTicksRemaining <= 0;
+
+    const shouldBeLoaded = isFinished
+      ? this.reloadInitialSpentChambers
+      : Math.min(
+          this.reloadInitialSpentChambers,
+          Math.floor((elapsedTicks / this.reloadTicksTotal) * this.reloadInitialSpentChambers)
+        );
+
+    let justLoadedChamber = false;
+    while (this.reloadChambersLoadedCount < shouldBeLoaded) {
+      this.reloadChambersLoadedCount++;
+      justLoadedChamber = true;
+
+      const spentIdx = this.chambers.indexOf("spent");
+      if (spentIdx !== -1) {
+        this.chambers[spentIdx] = "loaded";
+      }
+      this.currentAmmo = Math.min(this.config.magSize, this.currentAmmo + 1);
+    }
+
+    if (isFinished) {
+      this.reloading = false;
+      this.reloadTicksRemaining = 0;
+      this.currentAmmo = this.config.magSize;
+      this.chambers.fill("loaded");
+      this.currentChamberIndex = 0;
+      this.cooldownRemainingTicks = this.config.cooldownTicks;
+
+      return { completed: true, justLoadedChamber, loadedChambers: this.currentAmmo };
+    }
+
+    return { completed: false, justLoadedChamber, loadedChambers: this.currentAmmo };
+  }
+
+  /**
+   * Cancels an active reload, preserving any chambers that finished seating.
+   * Returns count of retained loaded chambers.
+   */
+  public cancelReload(): number {
+    if (!this.reloading) {
+      return this.currentAmmo;
+    }
+
+    this.reloading = false;
+    this.reloadTicksRemaining = 0;
+    return this.currentAmmo;
+  }
+
 
   /**
    * Returns a copy of the cylinder chambers array for HUD inspection.
@@ -125,8 +228,8 @@ export class Revolver implements Weapon {
   public fire(governor?: TimeGovernor): FireResult {
     this.dryFiredThisFrame = false;
 
-    // Cannot fire while cycling between shots
-    if (this.cooldownRemainingTicks > 0) {
+    // Cannot fire while reloading or cycling between shots
+    if (this.reloading || this.cooldownRemainingTicks > 0) {
       return {
         fired: false,
         dryFired: false,
@@ -177,9 +280,10 @@ export class Revolver implements Weapon {
    * @returns true if reload was performed, false if cylinder was already full.
    */
   public reload(governor?: TimeGovernor, reloadTickBurst?: number): boolean {
-    if (this.currentAmmo === this.config.magSize) {
+    if (this.currentAmmo === this.config.magSize && !this.reloading) {
       return false; // Cylinder is already fully loaded
     }
+    this.cancelReload();
 
     // Refill all chambers
     if (this.chambers.length !== this.config.magSize) {
@@ -204,6 +308,7 @@ export class Revolver implements Weapon {
    * Resets cylinder to full ammunition and zero cooldown.
    */
   public reset(): void {
+    this.cancelReload();
     if (this.chambers.length !== this.config.magSize) {
       this.chambers = new Array<ChamberState>(this.config.magSize).fill("loaded");
     } else {

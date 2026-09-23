@@ -6,7 +6,7 @@
  * - 6 micro-chamber pips: radiant cyan for loaded, hollow slate rings for spent
  * - Animated cylinder rotation tracking the active firing chamber
  * - Sleek chamber index alignment notch at the firing hammer
- * - Clean status typography ([R] RELOAD warning vs. READY)
+ * - Clean status typography ([R] RELOAD warning vs. READY vs. CYCLING status)
  */
 
 import { Revolver } from "../weapons/Revolver";
@@ -44,7 +44,8 @@ export class CylinderHUD {
   public render(
     ctx: CanvasRenderingContext2D,
     revolver: Revolver,
-    wallDeltaTime = 0.016
+    wallDeltaTime = 0.016,
+    isDashReady = false
   ): void {
     const { x, y, radius, chamberRadius } = this.config;
     const chambers = revolver.getChambers();
@@ -52,6 +53,7 @@ export class CylinderHUD {
     const ammo = revolver.getAmmo();
     const magSize = revolver.getMagSize();
     const isDryFired = revolver.wasDryFired();
+    const isReloading = revolver.isReloading();
 
     // Smooth rotation interpolation towards active chamber angle
     const targetRotation = (activeIndex / Math.max(1, chambers.length)) * Math.PI * 2;
@@ -66,13 +68,21 @@ export class CylinderHUD {
     ctx.fillStyle = UITheme.colors.panelBg;
     ctx.fill();
     ctx.lineWidth = 1;
-    ctx.strokeStyle = isDryFired ? UITheme.colors.crimson : UITheme.colors.hairline;
+    ctx.strokeStyle = isDryFired
+      ? UITheme.colors.crimson
+      : isReloading
+      ? UITheme.colors.amber
+      : UITheme.colors.hairline;
     ctx.stroke();
 
     // Outer accent tick ring (ultra-faint)
     ctx.beginPath();
     ctx.arc(x, y, radius + 3, 0, Math.PI * 2);
-    ctx.strokeStyle = isDryFired ? UITheme.colors.crimsonDim : "rgba(255, 255, 255, 0.05)";
+    ctx.strokeStyle = isDryFired
+      ? UITheme.colors.crimsonDim
+      : isReloading
+      ? "rgba(255, 183, 0, 0.2)"
+      : "rgba(255, 255, 255, 0.05)";
     ctx.stroke();
 
     // 2. Chambers arranged radially with rotation offset
@@ -119,7 +129,11 @@ export class CylinderHUD {
         ctx.beginPath();
         ctx.arc(cx, cy, effectiveChamberRadius + (totalChambers > 6 ? 2.0 : 2.5), 0, Math.PI * 2);
         ctx.lineWidth = 1;
-        ctx.strokeStyle = isDryFired ? UITheme.colors.crimson : UITheme.colors.cyanDim;
+        ctx.strokeStyle = isDryFired
+          ? UITheme.colors.crimson
+          : isReloading
+          ? UITheme.colors.amber
+          : UITheme.colors.cyanDim;
         ctx.stroke();
       }
     }
@@ -137,7 +151,11 @@ export class CylinderHUD {
     ctx.beginPath();
     ctx.moveTo(x, y - radius - 1);
     ctx.lineTo(x, y - radius + 4);
-    ctx.strokeStyle = isDryFired ? UITheme.colors.crimson : UITheme.colors.cyan;
+    ctx.strokeStyle = isDryFired
+      ? UITheme.colors.crimson
+      : isReloading
+      ? UITheme.colors.amber
+      : UITheme.colors.cyan;
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
@@ -149,8 +167,13 @@ export class CylinderHUD {
 
     // Ammunition counter (e.g. "6 / 6" or "8 / 8")
     ctx.font = getUIFont(15, "bold");
-    ctx.fillStyle = ammo === 0 || isDryFired ? UITheme.colors.crimson : UITheme.colors.textPrimary;
-    ctx.fillText(`${ammo} / ${magSize}`, textOffsetX, y - 8);
+    if (isReloading) {
+      ctx.fillStyle = UITheme.colors.amber;
+      ctx.fillText(`${ammo} / ${magSize} [CYCLING]`, textOffsetX, y - 8);
+    } else {
+      ctx.fillStyle = ammo === 0 || isDryFired ? UITheme.colors.crimson : UITheme.colors.textPrimary;
+      ctx.fillText(`${ammo} / ${magSize}`, textOffsetX, y - 8);
+    }
 
     const reloadTicks = typeof (revolver as any).getReloadTickBurst === "function"
       ? (revolver as any).getReloadTickBurst()
@@ -158,7 +181,17 @@ export class CylinderHUD {
 
     // Tactical action prompt
     ctx.font = getUIFont(10, "600");
-    if (ammo === 0 || isDryFired) {
+    if (isReloading) {
+      const rem = revolver.getReloadTicksRemaining();
+      const tot = revolver.getReloadTicksTotal();
+      if (isDashReady) {
+        ctx.fillStyle = UITheme.colors.cyan;
+        ctx.fillText(`CYCLING // ${rem}/${tot} [[SPACE] DASH TO ABORT]`, textOffsetX, y + 12);
+      } else {
+        ctx.fillStyle = UITheme.colors.amber;
+        ctx.fillText(`CYCLING // ${rem}/${tot} TICKS`, textOffsetX, y + 12);
+      }
+    } else if (ammo === 0 || isDryFired) {
       ctx.fillStyle = UITheme.colors.crimson;
       ctx.fillText(`[R] RELOAD (+${reloadTicks} TICKS)`, textOffsetX, y + 12);
     } else if (ammo < magSize) {

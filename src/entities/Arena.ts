@@ -18,6 +18,7 @@ import { EndlessDirector, MaterializingUnit } from "../levels/EndlessDirector";
 import { vec2, vecLength, vecNormalize, Vector2D } from "../math/vector";
 import { CylinderHUD } from "../ui/CylinderHUD";
 import { Reticle } from "../ui/Reticle";
+import { ChronoAnchorRenderer } from "../ui/ChronoAnchorRenderer";
 import { getUIFont, UITheme } from "../ui/theme";
 import { TimeHUD } from "../ui/TimeHUD";
 import { Enemy } from "./Enemy";
@@ -340,12 +341,13 @@ export class Arena {
         }
       }
 
-      // Reload cycle command
+      // Reload cycle command (smooth real-time anchored exposure)
       if (input.reload) {
-        const reloaded = this.player.reload(this.timeGovernor);
+        const reloaded = this.player.startReload();
         if (reloaded) {
-          this.timeHUD.notifyBurst(this.player.weapon.config.reloadTickBurst, "reload");
-          this.soundSynth?.playReload(this.timeGovernor.getTimeScale());
+          this.timeHUD.notifyBurst(this.player.getReloadTicksTotal(), "reload");
+          this.particles.emitShatter(this.player.position, 6, "#ffd166", 80);
+          this.soundSynth?.playReload(1.0);
         }
       }
 
@@ -361,8 +363,17 @@ export class Arena {
       }
     }
 
+    // Synchronize 1.00x real-time simulation during active reload channel
+    if (this.player.isReloading()) {
+      this.timeGovernor.setTimeScaleOverride(1.0);
+    } else if (this.timeGovernor.getTimeScaleOverride() !== null) {
+      this.timeGovernor.setTimeScaleOverride(null);
+    }
+
     const inputSpeed = vecLength(input.moveDir) * this.player.maxSpeed;
-    const activeSpeed = Math.max(this.player.getSpeed(), inputSpeed);
+    const activeSpeed = this.player.isReloading()
+      ? this.player.maxSpeed
+      : Math.max(this.player.getSpeed(), inputSpeed);
 
     // Fixed-step simulation coordinated through TimeGovernor
     this.simulator.stepWithGovernor(
@@ -413,6 +424,13 @@ export class Arena {
       width: this.width,
       height: this.height,
     });
+
+    if (this.player.wasChamberLoadedThisTick()) {
+      this.soundSynth?.playChamberLoad(1.0, this.player.weapon.getAmmo());
+    }
+    if (this.player.wasReloadCompletedThisTick()) {
+      this.soundSynth?.playReloadLatch(1.0);
+    }
 
     if (this.player.dashActiveTicks > 0) {
       this.particles.emitShatter(this.player.position, 2, "#00f0ff", 60);
@@ -666,8 +684,15 @@ export class Arena {
       }
     }
 
-    // 5. Player (Cyan directional circle and crosshair sightline)
+    // 5. Player (Cyan directional circle, crosshair sightline, and ground chrono-anchor)
     if (this.player.isAlive) {
+      ChronoAnchorRenderer.render(ctx, {
+        position: this.player.position,
+        radius: this.player.radius,
+        progress: this.player.getReloadProgress(),
+        isReloading: this.player.isReloading(),
+      });
+
       if (this.player.shields > 0) {
         ctx.save();
         ctx.beginPath();
@@ -709,7 +734,7 @@ export class Arena {
 
     // 7. HUDs (Time Gauge & Revolver Cylinder)
     this.timeHUD.render(ctx, this.timeGovernor, wallDeltaTime);
-    this.cylinderHUD.render(ctx, this.player.weapon, wallDeltaTime);
+    this.cylinderHUD.render(ctx, this.player.weapon, wallDeltaTime, this.player.isDashReady());
 
     // Boss Telemetry HUD (when active boss is present)
     const activeBoss = this.enemies.find((e) => e.isBoss && e.isAlive);
@@ -753,7 +778,13 @@ export class Arena {
 
       if (!this.isUpgradeDraftActive && !this.isPaused) {
         this.reticle.update(wallDeltaTime);
-        this.reticle.render(ctx, this.player.aimTarget, this.timeGovernor.getTimeScale());
+        this.reticle.render(
+          ctx,
+          this.player.aimTarget,
+          this.timeGovernor.getTimeScale(),
+          this.player.getReloadProgress(),
+          this.player.isReloading()
+        );
       }
     }
 

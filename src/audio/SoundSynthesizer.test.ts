@@ -226,6 +226,25 @@ describe("SoundSynthesizer Procedural Web Audio Generation", () => {
     }
   });
 
+  it("synthesizes individual chamber load ratchet and completion latch", () => {
+    const mock = createMockAudioContext();
+    const synth = new SoundSynthesizer(mock.context);
+
+    // Chamber load click
+    mock.createdOscillators.length = 0;
+    synth.playChamberLoad(1.0, 2);
+    expect(mock.createdOscillators.length).toBe(1);
+    expect(mock.createdOscillators[0].start).toHaveBeenCalled();
+    expect(mock.createdOscillators[0].stop).toHaveBeenCalled();
+
+    // Reload completion latch
+    mock.createdOscillators.length = 0;
+    synth.playReloadLatch(1.0);
+    expect(mock.createdOscillators.length).toBe(1);
+    expect(mock.createdOscillators[0].start).toHaveBeenCalled();
+    expect(mock.createdOscillators[0].stop).toHaveBeenCalled();
+  });
+
   it("synthesizes obstacle impact ricochet and thump", () => {
     const mock = createMockAudioContext();
     const synth = new SoundSynthesizer(mock.context);

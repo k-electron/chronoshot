@@ -80,6 +80,12 @@ export interface FireResult {
   readonly spreadAngle: number;
 }
 
+export interface ReloadUpdateResult {
+  readonly completed: boolean;
+  readonly justLoadedChamber: boolean;
+  readonly loadedChambers: number;
+}
+
 export interface Weapon {
   readonly config: WeaponConfig;
 
@@ -104,6 +110,43 @@ export interface Weapon {
   isReady(): boolean;
 
   /**
+   * True if weapon is currently undergoing an active multi-tick reload cycle.
+   */
+  isReloading(): boolean;
+
+  /**
+   * Returns normalized progress of active reload [0.0 .. 1.0].
+   */
+  getReloadProgress(): number;
+
+  /**
+   * Remaining simulation ticks before reload completion.
+   */
+  getReloadTicksRemaining(): number;
+
+  /**
+   * Total configured simulation ticks for the active reload cycle.
+   */
+  getReloadTicksTotal(): number;
+
+  /**
+   * Begins a stateful reload cycle over the specified duration in ticks.
+   * Returns true if reload started, false if already at full capacity or already reloading.
+   */
+  startReload(totalTicks?: number): boolean;
+
+  /**
+   * Advances the reload timer by deltaTicks, sequentially seating chambers.
+   */
+  updateReload(deltaTicks?: number): ReloadUpdateResult;
+
+  /**
+   * Cancels active reload, preserving any chambers that finished seating.
+   * Returns count of retained loaded chambers.
+   */
+  cancelReload(): number;
+
+  /**
    * Advances internal cooldown timers by the specified simulation tick count.
    */
   update(deltaTicks?: number): void;
@@ -126,3 +169,4 @@ export interface Weapon {
    */
   reset(): void;
 }
+

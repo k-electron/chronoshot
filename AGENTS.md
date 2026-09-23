@@ -27,9 +27,9 @@ ChronoShot is deliberately engineered without heavy third-party game engines (no
 - **`TimeGovernor`**: Governs global time dilation:
   - **Micro-Creep**: 5% simulation velocity (`0.05x`) when player is stationary.
   - **Movement Scaling**: Smoothly accelerates time scale up to 100% (`1.00x`) proportional to player movement velocity.
-  - **Action Tick Bursts**: Instant discrete physics advancements:
-    - Fire weapon: `+6` simulation ticks.
-    - Reload weapon: `+30` simulation ticks.
+  - **Action Tick Bursts & Anchored Real-Time Reload**:
+    - Fire weapon: `+6` simulation ticks (instantaneous recoil burst).
+    - Reload weapon: Smooth multi-frame real-time channel (`1.00x` speed) spanning 30 simulation ticks (15 with Speed Loader) while player locomotion is anchored (`velocity = 0`) with 360-degree aiming freedom, sequential chamber loading, and emergency Dash breakout with partial ammo retention.
 - **`Arena`**: Coordinates entities (`Player`, `Enemy`, `Obstacle`, `Projectile`, `ParticleSystem`), collision passes, and room progression.
 
 ### 2. Continuous Collision Detection (CCD) Ballistics & Shield Durability
@@ -49,8 +49,9 @@ ChronoShot is deliberately engineered without heavy third-party game engines (no
 - **`BossPhaseController` & `BossBlueprint`**: Declarative $N$-phase state machines governing boss progression with dynamic movement/attack swaps, transition triggers, and lifecycle actions (`BossTransitionAction`: radial particle shockwaves, dynamic audio cues, escort minion summons, and Cataclysm Overload telegraphed invulnerability channels with line-of-sight obstacle raycast cover checks). Includes `RadialNovaBehavior` for 360-degree projectile novae.
 
 ### 5. Minimalist HUD & Tactical UI
-- **In-Canvas Reticle (`src/ui/Reticle.ts`)**: Canvas cursor is set to `cursor: none`. An in-canvas precision hardware crosshair tracks mouse coordinates, dynamically expanding with movement velocity and flashing crimson on dry-fire.
-- **Hairline Revolver Dial (`src/ui/CylinderHUD.ts`)**: Minimalist 6-chamber dial (dynamically expandable to 8 chambers with Extended Cylinder) with active chamber alignment notch and smooth rotational transition.
+- **In-Canvas Reticle (`src/ui/Reticle.ts`)**: Canvas cursor is set to `cursor: none`. An in-canvas precision hardware crosshair tracks mouse coordinates, dynamically expanding with movement velocity, flashing crimson on dry-fire, and rendering a circular progress sweep with amber hue during active reload.
+- **Chrono-Anchor Telemetry (`src/ui/ChronoAnchorRenderer.ts`)**: In-world ground locking clamps, hairline pins, and a $0^\circ \to 360^\circ$ radial sweep arc rendered around the player chassis during anchored reload exposure.
+- **Hairline Revolver Dial (`src/ui/CylinderHUD.ts`)**: Minimalist 6-chamber dial (dynamically expandable to 8 chambers with Extended Cylinder) with active chamber alignment notch, smooth rotational transition, incremental chamber seating visuals, and emergency dash abort prompt.
 - **Hairline Chrono-Telemetry (`src/ui/TimeHUD.ts`)**: Top-right gauge displaying numeric multiplier (`CHRONO // 0.05x`) and transient action burst pills.
 - **Phase-Aware Boss Telemetry (`src/ui/BossTelemetryHUD.ts`) & Endless Telemetry (`src/ui/EndlessTelemetryHUD.ts`)**: Decoupled top-center boss telemetry rendering boss designation, active phase badges (e.g. `PHASE 2/2 // OVERDRIVE`), and shield charge pips. In Endless Mode, in-canvas telemetry displays real-time threat budget, elapsed survival time (MM:SS), and kill counter.
 - **Tactical Upgrade Draft & Pipeline (`src/upgrades/` & `src/ui/UpgradeDraftHUD.ts`)**: Data-driven roguelike upgrade pipeline (`UpgradePipeline`) with centralized registry (`UpgradeRegistry`), dynamic $N$-card draft UI (`UpgradeDraftHUD`), stack control, and compounded modifiers. Baseline augmentations (Extended Cylinder, Speed Loader, Reactive Shield) and advanced perks (Kinetic Stride, Chrono Burst, Phase Deflector, Overcharge Dash).

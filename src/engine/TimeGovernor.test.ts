@@ -132,4 +132,23 @@ describe("TimeGovernor - Action Tick Queuing", () => {
     expect(governor.getAccumulator()).toBe(0);
     expect(governor.getQueuedTicks()).toBe(0);
   });
+
+  it("allows setting and clearing persistent time scale override during reload channel", () => {
+    const governor = new TimeGovernor();
+    expect(governor.getTimeScale()).toBeCloseTo(0.05);
+
+    governor.setTimeScaleOverride(1.0);
+    expect(governor.getTimeScaleOverride()).toBe(1.0);
+    expect(governor.getTimeScale()).toBe(1.0);
+
+    // With 0 player speed, time scale stays 1.0
+    governor.advance(0.016, 0, 100);
+    expect(governor.getTimeScale()).toBe(1.0);
+
+    // Clear override restores velocity-driven scaling
+    governor.setTimeScaleOverride(null);
+    expect(governor.getTimeScaleOverride()).toBe(null);
+    governor.advance(0.016, 0, 100);
+    expect(governor.getTimeScale()).toBe(0.05);
+  });
 });

@@ -121,5 +121,48 @@ describe("HUD Rendering", () => {
       36
     );
   });
+
+  it("renders Reticle circular reload progress sweep and amber state during active reload", async () => {
+    const { Reticle } = await import("./Reticle");
+    const reticle = new Reticle();
+    const ctx = createMockContext();
+
+    reticle.render(ctx, { x: 200, y: 150 }, 0.05, 0.5, true);
+    expect(ctx.arc).toHaveBeenCalledWith(200, 150, 1.5, 0, Math.PI * 2);
+    // Background ring and progress arc
+    expect(ctx.arc).toHaveBeenCalledWith(200, 150, expect.any(Number), 0, Math.PI * 2);
+    expect(ctx.arc).toHaveBeenCalledWith(
+      200,
+      150,
+      expect.any(Number),
+      -Math.PI / 2,
+      expect.any(Number)
+    );
+  });
+
+  it("renders CylinderHUD with cycling status text and dash abort prompt when reloading", () => {
+    const revolver = new Revolver();
+    revolver.fire();
+    revolver.update(10);
+    revolver.startReload(30);
+
+    const hud = new CylinderHUD({ x: 100, y: 100 });
+    const ctx = createMockContext();
+
+    // Without dash ready
+    hud.render(ctx, revolver, 0.016, false);
+    expect(ctx.fillText).toHaveBeenCalledWith("5 / 6 [CYCLING]", 144, 92);
+    expect(ctx.fillText).toHaveBeenCalledWith("CYCLING // 30/30 TICKS", 144, 112);
+
+    // With dash ready
+    const ctxWithDash = createMockContext();
+    hud.render(ctxWithDash, revolver, 0.016, true);
+    expect(ctxWithDash.fillText).toHaveBeenCalledWith(
+      "CYCLING // 30/30 [[SPACE] DASH TO ABORT]",
+      144,
+      112
+    );
+  });
 });
+
 

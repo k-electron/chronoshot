@@ -51,6 +51,21 @@ describe("Combat Arena & Room Loop", () => {
       restart: false,
     });
 
+    expect(arena.player.isReloading()).toBe(true);
+    expect(arena.timeGovernor.getTimeScale()).toBe(1.0);
+
+    // Advance 30 simulation ticks across frames to complete real-time reload
+    for (let i = 0; i < 30; i++) {
+      arena.step(1 / 60, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(500, 320),
+        shoot: false,
+        reload: false,
+        restart: false,
+      });
+    }
+
+    expect(arena.player.isReloading()).toBe(false);
     expect(arena.player.weapon.getAmmo()).toBe(6);
   });
 
