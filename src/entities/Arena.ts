@@ -21,6 +21,7 @@ import { getUIFont, UITheme } from "../ui/theme";
 import { TimeHUD } from "../ui/TimeHUD";
 import { Enemy } from "./Enemy";
 import { EnemyRenderer } from "../ui/EnemyRenderer";
+import { BossTelemetryHUD } from "../ui/BossTelemetryHUD";
 import { createObstacle, createPillar, Obstacle } from "./Obstacle";
 import { ParticleSystem } from "./ParticleSystem";
 import { Player } from "./Player";
@@ -146,7 +147,17 @@ export class Arena {
     this.isPaused = false;
     this.isUpgradeDraftActive = false;
     this.obstacles = [...room.obstacles];
-    this.enemies = room.enemies.map((cfg) => new Enemy(cfg));
+    this.enemies = room.enemies.map((cfg) => {
+      const enemy = new Enemy(cfg);
+      if (enemy.phaseController) {
+        enemy.phaseController.transitionContextExtras = {
+          arena: this,
+          particles: this.particles,
+          soundSynth: this.soundSynth,
+        };
+      }
+      return enemy;
+    });
     this.player.reset(room.playerSpawn);
     this.projectiles = [];
     this.particles.clear();
@@ -803,77 +814,28 @@ export class Arena {
    * Renders real-time boss telemetry anchored at top-center during boss combat.
    */
   public renderBossTelemetry(ctx: CanvasRenderingContext2D, boss: Enemy): void {
-    ctx.save();
-    const barW = 380;
-    const barH = 34;
-    const barX = (this.width - barW) / 2;
-    const barY = 16;
-
-    // Glass panel backing
-    ctx.fillStyle = "rgba(10, 14, 20, 0.92)";
-    ctx.fillRect(barX, barY, barW, barH);
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = boss.isEnraged ? UITheme.colors.crimson : UITheme.colors.panelBorder;
-    ctx.strokeRect(barX, barY, barW, barH);
-
-    // Corner accent tabs
-    const corner = 6;
-    ctx.strokeStyle = boss.isEnraged ? UITheme.colors.crimson : UITheme.colors.cyan;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(barX, barY + corner);
-    ctx.lineTo(barX, barY);
-    ctx.lineTo(barX + corner, barY);
-    ctx.moveTo(barX + barW - corner, barY);
-    ctx.lineTo(barX + barW, barY);
-    ctx.lineTo(barX + barW, barY + corner);
-    ctx.stroke();
-
-    // Boss Designation
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.font = getUIFont(11, "bold");
-    ctx.fillStyle = boss.isEnraged ? UITheme.colors.crimson : UITheme.colors.cyan;
-    const title = boss.bossName ?? "GOLIATH-01: AEGIS COLOSSUS";
-    ctx.fillText(title, barX + 16, barY + barH / 2);
-
-    // Shield Pips or Enraged Status
-    if (boss.isEnraged) {
-      ctx.textAlign = "right";
-      ctx.font = getUIFont(10, "bold");
-      ctx.fillStyle = UITheme.colors.crimson;
-      ctx.fillText("CORE VULNERABLE // ENRAGED", barX + barW - 16, barY + barH / 2);
-    } else {
-      ctx.textAlign = "right";
-      ctx.font = getUIFont(9, "bold");
-      ctx.fillStyle = UITheme.colors.textMuted;
-      ctx.fillText("SHIELDS", barX + barW - 90, barY + barH / 2);
-
-      const pipSize = 10;
-      const pipGap = 5;
-      const totalPips = boss.maxShields || 4;
-      const pipsStartX = barX + barW - 16 - totalPips * (pipSize + pipGap);
-
-      for (let p = 0; p < totalPips; p++) {
-        const px = pipsStartX + p * (pipSize + pipGap);
-        const py = barY + (barH - pipSize) / 2;
-        if (p < boss.shields) {
-          ctx.fillStyle = UITheme.colors.cyan;
-          ctx.fillRect(px, py, pipSize, pipSize);
-          ctx.strokeStyle = UITheme.colors.white;
-          ctx.lineWidth = 1;
-          ctx.strokeRect(px, py, pipSize, pipSize);
-        } else {
-          ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
-          ctx.fillRect(px, py, pipSize, pipSize);
-          ctx.strokeStyle = UITheme.colors.hairline;
-          ctx.lineWidth = 1;
-          ctx.strokeRect(px, py, pipSize, pipSize);
-        }
-      }
-    }
-
-    ctx.restore();
+    BossTelemetryHUD.render(
+      ctx,
+      {
+        name: boss.bossName ?? "GOLIATH-01: AEGIS COLOSSUS",
+        currentPhase: boss.phaseController
+          ? boss.phaseController.currentPhaseIndex + 1
+          : boss.isEnraged
+            ? 2
+            : 1,
+        totalPhases: boss.phaseController
+          ? boss.phaseController.phases.length
+          : 2,
+        phaseTitle: boss.phaseController
+          ? boss.phaseController.currentPhase.phaseTitle
+          : undefined,
+        shields: boss.shields,
+        maxShields: boss.maxShields || 4,
+        isAlive: boss.isAlive,
+        isEnraged: boss.isEnraged,
+      },
+      this.width
+    );
   }
 
   /**

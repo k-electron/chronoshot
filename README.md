@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg)](https://vitejs.dev/)
-[![Tests](https://img.shields.io/badge/Tests-166%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-313%20passing-brightgreen.svg)]()
 
 ---
 
@@ -72,7 +72,8 @@ Hostiles are differentiated across mobility, shields, weapon cadence, ballistic 
 - **Stalker Rusher (Crimson Chevron)**: 210 px/s high-velocity glass cannon with aggressive pursuit and run-and-gun rapid fire (32-tick cadence) that never halts.
 - **Aegis Warden (Heavy Crimson Hexagon)**: 60 px/s frontline tank with 2-hit shield durability (requiring 3 total rounds to eliminate) and heavy suppressive slugs at a 65-tick cadence.
 - **Marksman Sniper (Crimson 4-Point Star)**: 80 px/s long-range sniper that kites players, halts movement to project a charging red targeting laser for 30 ticks, and discharges hyper-velocity rounds (850 px/s) at a 110-tick cadence.
-- **Goliath-01 Aegis Colossus (Sector 1 Boss - Octagonal Titan)**: Heavy command titan with 4-hit multi-layer shields, dual heavy slug cannons, dedicated top-center telemetry HUD, and an enraged phase 2 that surges forward at 95 px/s with a 3-way scatter shot when shields are shattered.
+- **Goliath-01 Aegis Colossus (Sector 1 Boss - Octagonal Titan)**: Driven by the modular `BossPhaseController` and declarative `BossBlueprint` system. Phase 1 (AEGIS FORTRESS) deploys 4-hit multi-layer shields with pinpoint heavy slugs at 55 px/s; upon shield depletion, emits an expanding radial particle shockwave and triggers Phase 2 (OVERDRIVE RAM) surging forward at 95 px/s with a 3-way scatter shot.
+- **Chrono-Weaver (Milestone Boss Archetype)**: Dual-phase boss combining long-range kiting laser beams in Phase 1 with 12-pellet 360-degree rotating radial novae (`RadialNovaBehavior`) in Phase 2.
 
 ### 6. Roguelike Tactical Augmentations
 Destroying the Sector 1 Boss triggers an immediate freeze-frame draft presenting 3 curated combat augmentations:

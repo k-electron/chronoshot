@@ -73,4 +73,40 @@ describe("EnemyFactory & Blueprints", () => {
     bossAttack.reset();
     expect(bossAttack.isEnraged).toBe(false);
   });
+
+  it("creates boss instances using EnemyFactory.createBoss()", () => {
+    const goliath = EnemyFactory.createBoss(undefined, { x: 400, y: 300 });
+    expect(goliath.isBoss).toBe(true);
+    expect(goliath.bossName).toBe("GOLIATH-01: AEGIS COLOSSUS");
+    expect(goliath.phaseController).toBeDefined();
+    expect(goliath.shields).toBe(4);
+    expect(goliath.chassis).toBe("octagon");
+
+    const chronoWeaver = EnemyFactory.createBoss(
+      {
+        id: "custom-chrono",
+        name: "CHRONO-WEAVER",
+        radius: 22,
+        chassis: "star",
+        phases: [
+          {
+            phaseIndex: 0,
+            phaseTitle: "PHASE 1",
+            maxShields: 3,
+            speed: 70,
+            movement: () => new KiterBehavior(),
+            attack: () => new SingleSlugBehavior(),
+            transitionTrigger: (ctx) => ctx.shields <= 0,
+          },
+        ],
+      },
+      { x: 500, y: 250 }
+    );
+    expect(chronoWeaver.isBoss).toBe(true);
+    expect(chronoWeaver.bossName).toBe("CHRONO-WEAVER");
+    expect(chronoWeaver.shields).toBe(3);
+    expect(chronoWeaver.chassis).toBe("star");
+    expect(chronoWeaver.position.x).toBe(500);
+    expect(chronoWeaver.position.y).toBe(250);
+  });
 });

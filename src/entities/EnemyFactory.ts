@@ -16,6 +16,11 @@ import { MovementBehavior } from "./behaviors/movement/MovementBehavior";
 import { Enemy, EnemyConfig, EnemyType } from "./Enemy";
 import { createProjectile, Projectile } from "./Projectile";
 import { vec2 } from "../math/vector";
+import {
+  BossBlueprint,
+  createBossPhaseController,
+  GOLIATH_01_BLUEPRINT,
+} from "./boss/BossBlueprint";
 
 export interface EnemyBlueprint {
   readonly type: EnemyType;
@@ -313,5 +318,26 @@ export class EnemyFactory {
    */
   public static createEnemy(config: EnemyConfig): Enemy {
     return new Enemy(config);
+  }
+
+  /**
+   * Constructs a Boss Enemy configured with a specific BossBlueprint and phase engine.
+   */
+  public static createBoss(
+    blueprint: BossBlueprint = GOLIATH_01_BLUEPRINT,
+    config: Partial<EnemyConfig> & { x: number; y: number } = { x: 500, y: 300 }
+  ): Enemy {
+    const phaseController = createBossPhaseController(blueprint, { x: config.x, y: config.y });
+    return new Enemy({
+      ...config,
+      id: config.id ?? `${blueprint.id}-${Date.now()}`,
+      type: "boss",
+      x: config.x,
+      y: config.y,
+      radius: config.radius ?? blueprint.radius,
+      chassis: config.chassis ?? blueprint.chassis,
+      bossName: config.bossName ?? blueprint.name,
+      phaseController,
+    });
   }
 }

@@ -28,6 +28,8 @@ import {
 import { EnemyChassisType } from "../ui/EnemyRenderer";
 import { AttackBehavior, AttackContext } from "./behaviors/attack/AttackBehavior";
 import { MovementBehavior, MovementContext } from "./behaviors/movement/MovementBehavior";
+import { createBossPhaseController, GOLIATH_01_BLUEPRINT } from "./boss/BossBlueprint";
+import { BossPhaseController } from "./boss/BossPhaseController";
 import { BLUEPRINTS } from "./EnemyFactory";
 import { Obstacle } from "./Obstacle";
 import { CombatUnit, DamageResult, Projectile } from "./Projectile";
@@ -58,6 +60,7 @@ export interface EnemyConfig {
   movement?: MovementBehavior;
   attack?: AttackBehavior;
   chassis?: EnemyChassisType;
+  phaseController?: BossPhaseController;
 }
 
 export class Enemy implements CombatUnit {
@@ -80,13 +83,28 @@ export class Enemy implements CombatUnit {
 
   public readonly isBoss: boolean;
   public readonly bossName?: string;
+  public phaseController?: BossPhaseController;
   private _isEnraged: boolean = false;
 
   public get isEnraged(): boolean {
+    if (this.phaseController) {
+      return this.phaseController.currentPhaseIndex > 0;
+    }
     return this._isEnraged;
   }
   public set isEnraged(val: boolean) {
     this._isEnraged = val;
+    if (this.phaseController) {
+      if (val && this.phaseController.currentPhaseIndex === 0 && this.phaseController.hasNextPhase) {
+        this.phaseController.transitionToPhase(1, this.position);
+        this.movement = this.phaseController.movement;
+        this.attack = this.phaseController.attack;
+      } else if (!val && this.phaseController.currentPhaseIndex !== 0) {
+        this.phaseController.transitionToPhase(0, this.position);
+        this.movement = this.phaseController.movement;
+        this.attack = this.phaseController.attack;
+      }
+    }
     if ("isEnraged" in this.attack) {
       (this.attack as any).isEnraged = val;
     }
@@ -94,6 +112,9 @@ export class Enemy implements CombatUnit {
 
   private _speed: number = 0;
   public get speed(): number {
+    if (this.phaseController) {
+      return this.phaseController.speed;
+    }
     if (this.isBoss && this.isEnraged) {
       return 95;
     }
@@ -188,9 +209,15 @@ export class Enemy implements CombatUnit {
       this.bossName = config.bossName;
     }
 
+    if (config.phaseController) {
+      this.phaseController = config.phaseController;
+    } else if (config.type === "boss") {
+      this.phaseController = createBossPhaseController(GOLIATH_01_BLUEPRINT, this.position);
+    }
+
     this.radius = config.radius ?? blueprint.radius;
-    this.speed = config.speed ?? blueprint.speed;
-    this.maxShields = config.maxShields ?? blueprint.maxShields;
+    this.speed = config.speed ?? (this.phaseController ? this.phaseController.speed : blueprint.speed);
+    this.maxShields = config.maxShields ?? (this.phaseController ? this.phaseController.maxShields : blueprint.maxShields);
     this.fireCadenceTicks = config.fireCadenceTicks ?? blueprint.fireCadenceTicks;
     this.bulletSpeed = config.bulletSpeed ?? blueprint.bulletSpeed;
     this.spreadAngle = config.spreadAngle ?? blueprint.spreadAngle;
@@ -199,10 +226,19 @@ export class Enemy implements CombatUnit {
     this.runAndGun = blueprint.runAndGun;
     this.chassis = config.chassis ?? blueprint.chassis;
 
-    this.movement = config.movement ?? blueprint.createMovement(config);
-    this.attack = config.attack ?? blueprint.createAttack(config);
+    if (this.phaseController) {
+      if (config.initialDelayTicks !== undefined) {
+        this.phaseController.attack.fireCooldownTicks = config.initialDelayTicks;
+      }
+      this.movement = config.movement ?? this.phaseController.movement;
+      this.attack = config.attack ?? this.phaseController.attack;
+      this.shields = this.phaseController.shields;
+    } else {
+      this.movement = config.movement ?? blueprint.createMovement(config);
+      this.attack = config.attack ?? blueprint.createAttack(config);
+      this.shields = this.maxShields;
+    }
 
-    this.shields = this.maxShields;
     this.isEnraged = false;
   }
 
@@ -306,7 +342,18 @@ export class Enemy implements CombatUnit {
       this.aimAngle = vecAngle(diff);
     }
 
-    // 3. Firing cadence and charging telegraph logic delegated to attack behavior
+    // 3. Boss Phase Controller tick advancement & transitions
+    if (this.phaseController) {
+      const transitioned = this.phaseController.update(deltaTicks, this.position);
+      if (transitioned) {
+        this.movement = this.phaseController.movement;
+        this.attack = this.phaseController.attack;
+        this.shields = this.phaseController.shields;
+        this._isEnraged = this.phaseController.currentPhaseIndex > 0;
+      }
+    }
+
+    // 4. Firing cadence and charging telegraph logic delegated to attack behavior
     const attackCtx: AttackContext = {
       id: this.id,
       position: this.position,
@@ -319,7 +366,7 @@ export class Enemy implements CombatUnit {
       deltaTicks
     );
 
-    // 4. Movement AI delegated to movement behavior
+    // 5. Movement AI delegated to movement behavior
     if (this.stutterTimerTicks > 0 && !this.runAndGun) {
       this.velocity = vec2(0, 0);
     } else if (this.isChargingLaser) {
@@ -344,14 +391,14 @@ export class Enemy implements CombatUnit {
       );
     }
 
-    // 5. Position integration
+    // 6. Position integration
     this.position.x += this.velocity.x * fixedDeltaTime;
     this.position.y += this.velocity.y * fixedDeltaTime;
 
-    // 6. Obstacle collision sliding
+    // 7. Obstacle collision sliding
     this.resolveObstacleCollisions(obstacles);
 
-    // 7. Clamp to arena perimeter
+    // 8. Clamp to arena perimeter
     this.position.x = Math.max(
       this.radius,
       Math.min(960 - this.radius, this.position.x)
@@ -381,6 +428,30 @@ export class Enemy implements CombatUnit {
    * Applies damage to shields first before lethal elimination.
    */
   public takeDamage(damage: number = 1): DamageResult {
+    if (this.phaseController) {
+      const res = this.phaseController.takeDamage(damage, this.shields, this.position);
+      if (res.eliminated) {
+        this.kill();
+        return {
+          absorbed: false,
+          eliminated: true,
+          remainingShields: 0,
+        };
+      }
+
+      this.shields = res.remainingShields;
+      if (res.transitioned) {
+        this.movement = this.phaseController.movement;
+        this.attack = this.phaseController.attack;
+        this._isEnraged = true;
+      }
+      return {
+        absorbed: res.absorbed,
+        eliminated: false,
+        remainingShields: this.shields,
+      };
+    }
+
     if (this.shields > 0) {
       this.shields = Math.max(0, this.shields - damage);
       if (this.isBoss) {
@@ -407,6 +478,9 @@ export class Enemy implements CombatUnit {
   public kill(): void {
     this.isAlive = false;
     this.shields = 0;
+    if (this.phaseController) {
+      this.phaseController.shields = 0;
+    }
     this.velocity = vec2(0, 0);
     this.hasLineOfSight = false;
     this.isChargingLaser = false;
@@ -420,11 +494,20 @@ export class Enemy implements CombatUnit {
     this.previousPosition = { ...this.spawnPosition };
     this.velocity = vec2(0, 0);
     this.isAlive = true;
-    this.shields = this.maxShields;
-    this.isEnraged = false;
     this.hasLineOfSight = false;
     this.isChargingLaser = false;
-    this.movement.reset();
-    this.attack.reset();
+
+    if (this.phaseController) {
+      this.phaseController.reset();
+      this.movement = this.phaseController.movement;
+      this.attack = this.phaseController.attack;
+      this.shields = this.phaseController.shields;
+      this.isEnraged = false;
+    } else {
+      this.shields = this.maxShields;
+      this.isEnraged = false;
+      this.movement.reset();
+      this.attack.reset();
+    }
   }
 }
