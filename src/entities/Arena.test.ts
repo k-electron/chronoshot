@@ -892,6 +892,80 @@ describe("Combat Arena & Room Loop", () => {
         expect.any(Number)
       );
     });
+
+    it("evaluates desired cursor across combat, upgrade draft, pause, and game over states", () => {
+      const arena = new Arena();
+
+      // In active combat
+      expect(arena.getDesiredCursor(vec2(100, 100))).toBe("none");
+
+      // In paused state
+      arena.isPaused = true;
+      expect(arena.getDesiredCursor(vec2(100, 100))).toBe("default");
+      arena.isPaused = false;
+
+      // In defeat state
+      arena.status = "defeat";
+      expect(arena.getDesiredCursor(vec2(100, 100))).toBe("default");
+
+      // In victory state
+      arena.status = "victory";
+      expect(arena.getDesiredCursor(vec2(100, 100))).toBe("default");
+
+      // In upgrade draft state
+      arena.status = "playing";
+      arena.openUpgradeDraft();
+      expect(arena.isUpgradeDraftActive).toBe(true);
+
+      // Over card 0 (e.g. x: 100, y: 200 is inside Card 0 [60..320, 145..465])
+      expect(arena.getDesiredCursor(vec2(100, 200))).toBe("pointer");
+
+      // Over backdrop outside cards (e.g. x: 20, y: 20 or in gap)
+      expect(arena.getDesiredCursor(vec2(20, 20))).toBe("default");
+      expect(arena.getDesiredCursor(vec2(335, 200))).toBe("default");
+    });
+
+    it("tracks hoveredUpgradeCardIndex during step and handles mouse click upgrade selection", () => {
+      const arena = new Arena();
+      arena.openUpgradeDraft();
+
+      // Step with mouse over Card 1 [350..610, 145..465]
+      arena.step(0.016, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(400, 200),
+        shoot: false,
+        reload: false,
+        restart: false,
+      });
+
+      expect(arena.hoveredUpgradeCardIndex).toBe(1);
+
+      // Step with mouse over background outside cards
+      arena.step(0.016, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(20, 20),
+        shoot: false,
+        reload: false,
+        restart: false,
+      });
+
+      expect(arena.hoveredUpgradeCardIndex).toBeNull();
+
+      // Click on Card 0 [60..320, 145..465] to select upgrade
+      arena.step(0.016, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(100, 200),
+        shoot: true,
+        reload: false,
+        restart: false,
+      });
+
+      // Draft should be dismissed and upgrade applied
+      expect(arena.isUpgradeDraftActive).toBe(false);
+      expect(arena.hoveredUpgradeCardIndex).toBeNull();
+      expect(arena.player.upgradePipeline.getActiveIds().length).toBeGreaterThan(0);
+    });
   });
 });
+
 

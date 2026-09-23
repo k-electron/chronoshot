@@ -354,6 +354,18 @@ describe("UpgradeDraftHUD", () => {
       ).not.toThrow();
       expect(ctx.fillText).toHaveBeenCalledWith("EXTENDED CYLINDER", expect.any(Number), expect.any(Number));
     });
+
+    it("renders hovered card with illuminated surface and accent button styling", () => {
+      const ctx = createMockContext();
+      // Hover over card 1 (Speed Loader, accent #ffb703)
+      renderUpgradeDraft(ctx, mockDraftOptions, 960, 640, 1);
+
+      // Verify strokeRect called with card 1 bounds
+      expect(ctx.strokeRect).toHaveBeenCalledWith(350, 145, 260, 320);
+
+      // Verify install button text for card 2 called
+      expect(ctx.fillText).toHaveBeenCalledWith("INSTALL [2]", 480, 434);
+    });
   });
 
   describe("wrapText helper", () => {
