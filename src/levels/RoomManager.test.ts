@@ -213,9 +213,9 @@ describe("Room Configuration & Sequence Schema", () => {
     expect(room9.exitPortal).toBeDefined();
   });
 
-  it("constructs standard room sequence containing all 19 rooms", () => {
+  it("constructs standard room sequence containing all 20 rooms", () => {
     const sequence = createStandardRoomSequence();
-    expect(sequence).toHaveLength(19);
+    expect(sequence).toHaveLength(20);
     sequence.forEach((room, index) => {
       expect(room.roomNumber).toBe(index + 1);
       expect(room.id).toBe(`room-${index + 1}`);
@@ -230,7 +230,7 @@ describe("RoomManager Tactical Puzzle Progression", () => {
   it("initializes at Room 1 with locked exit portal and incomplete game status", () => {
     const manager = new RoomManager();
 
-    expect(manager.getRoomCount()).toBe(19);
+    expect(manager.getRoomCount()).toBe(20);
     expect(manager.getCurrentRoomIndex()).toBe(0);
     expect(manager.getCurrentRoom().roomNumber).toBe(1);
     expect(manager.isBossRoom()).toBe(false);
@@ -285,6 +285,12 @@ describe("RoomManager Tactical Puzzle Progression", () => {
       manager.advanceRoom();
       expect(manager.isBossRoom()).toBe(false);
     }
+
+    // Room 20 is Milestone Final Boss (Chrono-Zenith) room
+    manager.setExitUnlocked(true);
+    manager.advanceRoom();
+    expect(manager.getCurrentRoom().roomNumber).toBe(20);
+    expect(manager.isBossRoom()).toBe(true);
 
     // Custom room with boss enemy is also detected
     const customBossManager = new RoomManager([
@@ -347,11 +353,11 @@ describe("RoomManager Tactical Puzzle Progression", () => {
     expect(manager.isPlayerInExitPortal(outsidePos, 14)).toBe(false);
   });
 
-  it("advances sequentially across 19 rooms and triggers game completion", () => {
+  it("advances sequentially across 20 rooms and triggers game completion", () => {
     const manager = new RoomManager();
 
-    // Rooms 1 -> 2 -> ... -> 19
-    for (let i = 1; i <= 18; i++) {
+    // Rooms 1 -> 2 -> ... -> 20
+    for (let i = 1; i <= 19; i++) {
       manager.setExitUnlocked(true);
       expect(manager.advanceRoom()).toBe(true);
       expect(manager.getCurrentRoomIndex()).toBe(i);
@@ -382,8 +388,8 @@ describe("RoomManager Tactical Puzzle Progression", () => {
     expect(manager.getCurrentRoomIndex()).toBe(1);
     expect(manager.isExitUnlocked()).toBe(false);
 
-    // Advance to room 19 then complete
-    for (let i = 2; i <= 19; i++) {
+    // Advance to room 20 then complete
+    for (let i = 2; i <= 20; i++) {
       manager.advanceRoom();
     }
     expect(manager.isGameCompleted()).toBe(true);
@@ -418,15 +424,75 @@ describe("RoomManager Tactical Puzzle Progression", () => {
       245
     );
     expect(ctx.fillText).toHaveBeenCalledWith(
-      "ALL 19 TACTICAL PROTOCOLS CONQUERED",
+      "ALL 20 TACTICAL PROTOCOLS CONQUERED",
       480,
       300
     );
     expect(ctx.fillText).toHaveBeenCalledWith(
-      "✓ Goliath-01 Defeated  |  ✓ Chrono-Weaver Neutralized  |  ✓ Vektor-Prime Obliterated  |  ✓ Zenith Sector Conquered",
+      "✓ Goliath-01 Defeated  |  ✓ Chrono-Weaver Neutralized  |  ✓ Vektor-Prime Obliterated  |  ✓ Chrono-Zenith Overthrown",
       480,
       350
     );
+  });
+
+  describe("Room 20 Golden Portal & Endless Mode Transition", () => {
+    it("identifies golden portal only on Room 20 when unlocked", () => {
+      const manager = new RoomManager();
+
+      // Room 1 unlocked: normal portal
+      manager.setExitUnlocked(true);
+      expect(manager.isGoldenPortal()).toBe(false);
+
+      // Advance to Room 20
+      for (let i = 1; i <= 19; i++) {
+        manager.advanceRoom();
+      }
+      expect(manager.getCurrentRoom().roomNumber).toBe(20);
+
+      // Locked Room 20: not golden yet
+      expect(manager.isExitUnlocked()).toBe(false);
+      expect(manager.isGoldenPortal()).toBe(false);
+
+      // Unlocked Room 20: radiant golden portal!
+      manager.setExitUnlocked(true);
+      expect(manager.isGoldenPortal()).toBe(true);
+    });
+
+    it("renders golden portal visuals and label on Room 20", () => {
+      const manager = new RoomManager();
+      for (let i = 1; i <= 19; i++) {
+        manager.advanceRoom();
+      }
+      manager.setExitUnlocked(true);
+
+      const ctx = createMockContext();
+      manager.renderPortal(ctx, 0.016);
+
+      expect(ctx.fillText).toHaveBeenCalledWith("ENDLESS GATE", 0, expect.any(Number));
+    });
+
+    it("transitions seamlessly into Endless Survival Mode via startEndlessMode()", () => {
+      const manager = new RoomManager();
+      for (let i = 1; i <= 19; i++) {
+        manager.advanceRoom();
+      }
+      expect(manager.getCurrentRoom().roomNumber).toBe(20);
+
+      const endlessRoom = manager.startEndlessMode();
+      expect(endlessRoom.id).toBe("endless-colosseum");
+      expect(manager.isEndlessMode()).toBe(true);
+      expect(manager.hasNextRoom()).toBe(true);
+      expect(manager.isGameCompleted()).toBe(false);
+      expect(manager.endlessDirector).toBeDefined();
+
+      const ctx = createMockContext();
+      expect(() => manager.renderRoomHeader(ctx, 960)).not.toThrow();
+      expect(ctx.fillText).toHaveBeenCalledWith(
+        expect.stringContaining("APEX COLOSSEUM // ENDLESS PROTOCOL"),
+        24,
+        20
+      );
+    });
   });
 
   describe("LevelDirector & Endless Mode Integration", () => {

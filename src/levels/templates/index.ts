@@ -31,6 +31,14 @@ import {
   ArenaQuadrantTemplate,
   arenaQuadrantTemplate,
 } from "./ArenaQuadrantTemplate";
+import {
+  ApexRedoubtTemplate,
+  apexRedoubtTemplate,
+} from "./ApexRedoubtTemplate";
+import {
+  ApexColosseumTemplate,
+  apexColosseumTemplate,
+} from "./ApexColosseumTemplate";
 
 export type { RoomLayoutTemplate, SpawnZone };
 export {
@@ -51,6 +59,10 @@ export {
   killboxLanesTemplate,
   ArenaQuadrantTemplate,
   arenaQuadrantTemplate,
+  ApexRedoubtTemplate,
+  apexRedoubtTemplate,
+  ApexColosseumTemplate,
+  apexColosseumTemplate,
 };
 
 export const ALL_LAYOUT_TEMPLATES: readonly RoomLayoutTemplate[] = [
@@ -59,10 +71,12 @@ export const ALL_LAYOUT_TEMPLATES: readonly RoomLayoutTemplate[] = [
   SplitCorridorTemplate,
   KillboxLanesTemplate,
   ArenaQuadrantTemplate,
+  ApexRedoubtTemplate,
+  ApexColosseumTemplate,
 ];
 
 /**
- * Registers the standard 5 layout templates into the specified registry.
+ * Registers all layout templates into the specified registry.
  * Defaults to DEFAULT_LAYOUT_REGISTRY.
  */
 export function registerDefaultTemplates(
@@ -73,5 +87,5 @@ export function registerDefaultTemplates(
   }
 }
 
-// Auto-register the 5 standard templates into DEFAULT_LAYOUT_REGISTRY
+// Auto-register the templates into DEFAULT_LAYOUT_REGISTRY
 registerDefaultTemplates(DEFAULT_LAYOUT_REGISTRY);

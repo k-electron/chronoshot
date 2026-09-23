@@ -383,6 +383,42 @@ describe("Player Entity", () => {
         expect(player.isDashReady()).toBe(true);
       });
     });
+
+    it("equips full 7-upgrade loadout and replenishes shields to max capacity", () => {
+      const player = new Player({ x: 100, y: 100 });
+      expect(player.shields).toBe(0);
+      expect(player.weapon.getMagSize()).toBe(6);
+
+      player.equipFullEndlessLoadout();
+
+      // All 7 upgrades installed
+      const activeIds = player.upgradePipeline.getActiveIds();
+      expect(activeIds).toContain("extended-cylinder");
+      expect(activeIds).toContain("speed-loader");
+      expect(activeIds).toContain("reactive-shield");
+      expect(activeIds).toContain("kinetic-stride");
+      expect(activeIds).toContain("chrono-burst");
+      expect(activeIds).toContain("phase-deflector");
+      expect(activeIds).toContain("overcharge-dash");
+
+      // Weapon upgraded to 8 rounds & full
+      expect(player.weapon.getMagSize()).toBe(8);
+      expect(player.weapon.getAmmo()).toBe(8);
+
+      // Shields replenished to max capacity (reactive-shield 1 + phase-deflector 2 = 3)
+      expect(player.maxShields).toBe(3);
+      expect(player.shields).toBe(3);
+
+      // Dash is ready
+      expect(player.hasOverchargeDash()).toBe(true);
+      expect(player.isDashReady()).toBe(true);
+
+      // Deplete shields and verify re-topping off
+      player.takeDamage(3);
+      expect(player.shields).toBe(0);
+      player.equipFullEndlessLoadout();
+      expect(player.shields).toBe(3);
+    });
   });
 });
 

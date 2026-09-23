@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { vec2 } from "../math/vector";
 import { Arena } from "./Arena";
+import { Enemy } from "./Enemy";
 import { createProjectile } from "./Projectile";
+import { RoomManager } from "../levels/RoomManager";
+import { CHRONO_ZENITH_BLUEPRINT } from "./boss/BossBlueprint";
 
 describe("Combat Arena & Room Loop", () => {
   it("initializes arena with player, tactical obstacles, enemies, and HUDs", () => {
@@ -719,6 +722,176 @@ describe("Combat Arena & Room Loop", () => {
     expect(arena.player.isAlive).toBe(true);
     expect(arena.status).toBe("playing");
     expect(arena.player.dashCooldownTicks).toBeGreaterThan(0);
+  });
+
+  describe("Endless Mode & Final Boss Integration", () => {
+    it("transitions into Endless Mode upon Room 20 golden portal entry and equips full loadout", () => {
+      const roomManager = new RoomManager();
+      const arena = new Arena(960, 640, roomManager);
+
+      // Advance through first 19 rooms to Room 20
+      for (let i = 1; i <= 19; i++) {
+        roomManager.setExitUnlocked(true);
+        roomManager.advanceRoom();
+        arena.loadRoom(roomManager.getCurrentRoom());
+      }
+
+      expect(roomManager.getCurrentRoom().roomNumber).toBe(20);
+      expect(arena.endlessDirector).toBeUndefined();
+
+      // Slay Chrono-Zenith and escorts
+      for (const enemy of arena.enemies) {
+        enemy.isAlive = false;
+      }
+
+      // Check victory unlocks portal
+      roomManager.updateEnemyState(arena.enemies);
+      expect(roomManager.isExitUnlocked()).toBe(true);
+      expect(roomManager.isGoldenPortal()).toBe(true);
+
+      // Move player into exit portal
+      const portal = roomManager.getCurrentRoom().exitPortal;
+      arena.player.position = vec2(portal.x, portal.y);
+
+      // Step arena to trigger portal stepping
+      arena.step(0.016, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(500, 320),
+        shoot: false,
+        reload: false,
+        restart: false,
+      });
+
+      // Seamlessly transitioned to Endless Survival Mode!
+      expect(arena.endlessDirector).toBeDefined();
+      expect(roomManager.isEndlessMode()).toBe(true);
+      expect(roomManager.getCurrentRoom().id).toBe("endless-colosseum");
+      expect(arena.status).toBe("playing");
+
+      // Player possesses all 7 tactical augmentations
+      const activeUpgrades = arena.player.upgradePipeline.getActiveIds();
+      expect(activeUpgrades).toContain("extended-cylinder");
+      expect(activeUpgrades).toContain("speed-loader");
+      expect(activeUpgrades).toContain("reactive-shield");
+      expect(activeUpgrades).toContain("kinetic-stride");
+      expect(activeUpgrades).toContain("chrono-burst");
+      expect(activeUpgrades).toContain("phase-deflector");
+      expect(activeUpgrades).toContain("overcharge-dash");
+
+      // Shields topped off to full capacity (3) and ammo full (8)
+      expect(arena.player.shields).toBe(3);
+      expect(arena.player.maxShields).toBe(3);
+      expect(arena.player.weapon.getAmmo()).toBe(8);
+      expect(arena.player.weapon.getMagSize()).toBe(8);
+    });
+
+    it("spawns reinforcement waves dynamically via EndlessDirector and tracks kills", () => {
+      const arena = new Arena();
+      arena.startEndlessMode();
+
+      expect(arena.endlessDirector).toBeDefined();
+      expect(arena.enemies.length).toBe(0);
+
+      // Advance physics simulation to trigger EndlessDirector wave generation
+      for (let i = 0; i < 35; i++) {
+        arena.step(0.016, {
+          moveDir: vec2(1, 0),
+          mousePos: vec2(500, 320),
+          shoot: false,
+          reload: false,
+          restart: false,
+        });
+      }
+
+      // Reinforcement hostiles materialized into arena!
+      expect(arena.enemies.length).toBeGreaterThan(0);
+      const enemy = arena.enemies[0];
+      expect(enemy.isAlive).toBe(true);
+      enemy.shields = 0; // Ensure lethal hit
+      enemy.speed = 0;
+      enemy.velocity = vec2(0, 0);
+
+      // Slay enemy with player projectile
+      const bullet = createProjectile(
+        "test-player-shot",
+        vec2(enemy.position.x - 20, enemy.position.y),
+        0,
+        800,
+        "player"
+      );
+      arena.projectiles.push(bullet);
+
+      for (let i = 0; i < 3; i++) {
+        arena.step(0.016, {
+          moveDir: vec2(1, 0),
+          mousePos: vec2(500, 320),
+          shoot: false,
+          reload: false,
+          restart: false,
+        });
+      }
+
+      // Kill registered in EndlessDirector!
+      expect(arena.endlessDirector?.getKills()).toBeGreaterThanOrEqual(1);
+    });
+
+    it("renders Cataclysm hazard aura and materialization telegraph without throwing", () => {
+      const arena = new Arena();
+      arena.startEndlessMode();
+
+      const mockCtx = {
+        save: vi.fn(),
+        restore: vi.fn(),
+        beginPath: vi.fn(),
+        closePath: vi.fn(),
+        arc: vi.fn(),
+        fill: vi.fn(),
+        stroke: vi.fn(),
+        fillRect: vi.fn(),
+        strokeRect: vi.fn(),
+        fillText: vi.fn(),
+        moveTo: vi.fn(),
+        lineTo: vi.fn(),
+        translate: vi.fn(),
+        rotate: vi.fn(),
+        setLineDash: vi.fn(),
+        createLinearGradient: vi.fn().mockReturnValue({
+          addColorStop: vi.fn(),
+        }),
+        createRadialGradient: vi.fn().mockReturnValue({
+          addColorStop: vi.fn(),
+        }),
+      } as unknown as CanvasRenderingContext2D;
+
+      // Add an overloading boss
+      arena.enemies = [
+        new Enemy({
+          id: "boss-test",
+          type: "boss",
+          x: 400,
+          y: 300,
+          blueprint: CHRONO_ZENITH_BLUEPRINT,
+        }),
+      ];
+      if (arena.enemies[0].phaseController) {
+        arena.enemies[0].phaseController.overloadTicksRemaining = 40;
+      }
+
+      // Render frame
+      arena.render(mockCtx, 0.016);
+
+      // Verified Cataclysm aura and Endless telemetry rendering
+      expect(mockCtx.fillText).toHaveBeenCalledWith(
+        expect.stringContaining("CATACLYSM OVERLOAD // SEEK COVER"),
+        400,
+        expect.any(Number)
+      );
+      expect(mockCtx.fillText).toHaveBeenCalledWith(
+        expect.stringContaining("ENDLESS PROTOCOL // SURVIVAL TELEMETRY"),
+        480,
+        expect.any(Number)
+      );
+    });
   });
 });
 

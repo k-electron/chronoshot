@@ -19,10 +19,12 @@ import {
   createRoom17,
   createRoom18,
   createRoom19,
+  createRoom20,
   createStandardRoomSequence,
 } from "./Room";
 import {
   CHRONO_WEAVER_BLUEPRINT,
+  CHRONO_ZENITH_BLUEPRINT,
   VEKTOR_PRIME_BLUEPRINT,
 } from "../entities/boss/BossBlueprint";
 
@@ -195,11 +197,18 @@ describe("Room Level Configurations (Rooms 1 to 19)", () => {
     expect(r19.enemies.filter((e) => e.type === "warden")).toHaveLength(3);
     expect(r19.enemies.filter((e) => e.type === "marksman")).toHaveLength(2);
     expect(r19.enemies.filter((e) => e.type === "stalker")).toHaveLength(2);
+
+    const r20 = createRoom20();
+    expect(r20.id).toBe("room-20");
+    expect(r20.roomNumber).toBe(20);
+    expect(r20.title).toContain("ROOM 20: PROTOCOL OMEGA");
+    expect(r20.enemies.some((e) => e.type === "boss" && e.bossName === CHRONO_ZENITH_BLUEPRINT.name)).toBe(true);
+    expect(r20.obstacles.length).toBeGreaterThan(4);
   });
 
-  it("createStandardRoomSequence returns complete 19-room campaign sequence", () => {
+  it("createStandardRoomSequence returns complete 20-room campaign sequence", () => {
     const sequence = createStandardRoomSequence();
-    expect(sequence).toHaveLength(19);
+    expect(sequence).toHaveLength(20);
 
     sequence.forEach((room, index) => {
       expect(room.roomNumber).toBe(index + 1);
@@ -209,9 +218,11 @@ describe("Room Level Configurations (Rooms 1 to 19)", () => {
       expect(room.exitPortal).toBeDefined();
     });
 
-    // Milestone bosses in Room 5, Room 10, and Room 15
+    // Milestone bosses in Room 5, Room 10, Room 15, and Room 20
     expect(sequence[4].enemies.some((e) => e.type === "boss")).toBe(true);
     expect(sequence[9].enemies.some((e) => e.type === "boss")).toBe(true);
     expect(sequence[14].enemies.some((e) => e.type === "boss")).toBe(true);
+    expect(sequence[19].enemies.some((e) => e.type === "boss" && e.bossName === CHRONO_ZENITH_BLUEPRINT.name)).toBe(true);
   });
 });
+

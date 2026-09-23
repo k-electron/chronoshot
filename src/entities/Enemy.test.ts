@@ -5,6 +5,7 @@ import { Enemy } from "./Enemy";
 import { createObstacle, createPillar } from "./Obstacle";
 import { Player } from "./Player";
 import { CHRONO_WEAVER_BLUEPRINT, createBossPhaseController } from "./boss/BossBlueprint";
+import { BossPhaseController } from "./boss/BossPhaseController";
 
 describe("Enemy Tactical AI & Archetypes", () => {
   it("detects unobstructed line-of-sight to player", () => {
@@ -462,6 +463,62 @@ describe("Enemy - Boss Archetype (Goliath-01)", () => {
       expect(boss.shields).toBe(4);
       expect(boss.isEnraged).toBe(false);
       expect(boss.speed).toBe(55);
+    });
+
+    it("deflects projectiles during overload channel and accepts damage once channel expires (pre-fire timing)", () => {
+      const p0 = {
+        phaseIndex: 0,
+        phaseTitle: "PHASE 1",
+        maxShields: 1,
+        speed: 50,
+        movement: () => ({ update: () => vec2(0, 0), reset: () => {} }),
+        attack: () => ({ fireCadenceTicks: 50, fireCooldownTicks: 50, isChargingLaser: false, stutterTimerTicks: 0, update: () => [], discharge: () => [], reset: () => {} }),
+        transitionTrigger: (c: any) => c.shields <= 0,
+      };
+      const p1 = {
+        phaseIndex: 1,
+        phaseTitle: "PHASE 2 // OVERLOAD",
+        maxShields: 3,
+        speed: 100,
+        movement: () => ({ update: () => vec2(0, 0), reset: () => {} }),
+        attack: () => ({ fireCadenceTicks: 50, fireCooldownTicks: 50, isChargingLaser: false, stutterTimerTicks: 0, update: () => [], discharge: () => [], reset: () => {} }),
+        transitionTrigger: () => false,
+        overloadChannelTicks: 30,
+      };
+
+      const controller = new BossPhaseController([p0, p1]);
+      const boss = new Enemy({
+        id: "boss-overload-test",
+        type: "boss",
+        x: 600,
+        y: 320,
+        phaseController: controller,
+      });
+      const player = new Player({ x: 200, y: 320 });
+
+      // Break p0 shield -> transitions to p1 with 30 ticks overload channel
+      boss.takeDamage(1);
+      expect(boss.phaseController?.currentPhaseIndex).toBe(1);
+      expect(boss.isOverloading).toBe(true);
+      expect(boss.isInvulnerable).toBe(true);
+      expect(boss.speed).toBe(0);
+
+      // Mid-channel shot at tick 15: deflected!
+      const midChannelHit = boss.takeDamage(1);
+      expect(midChannelHit.deflected).toBe(true);
+      expect(boss.shields).toBe(3);
+
+      // Boss updates 30 ticks -> channel finishes
+      boss.update(player, [], 30);
+      expect(boss.isOverloading).toBe(false);
+      expect(boss.isInvulnerable).toBe(false);
+      expect(boss.speed).toBe(100);
+
+      // Pre-fired bullet arrives post-channel -> successfully damages boss
+      const postChannelHit = boss.takeDamage(1);
+      expect(postChannelHit.deflected).toBeUndefined();
+      expect(postChannelHit.remainingShields).toBe(2);
+      expect(boss.shields).toBe(2);
     });
   });
 });

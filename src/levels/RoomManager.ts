@@ -15,9 +15,30 @@ import { vecDistance, Vector2D } from "../math/vector";
 import { getUIFont, UITheme } from "../ui/theme";
 import { createStandardRoomSequence, RoomConfig } from "./Room";
 import { LevelDirector } from "./LevelDirector";
+import { EndlessDirector } from "./EndlessDirector";
+import { ApexColosseumTemplate } from "./templates/ApexColosseumTemplate";
+
+/**
+ * Creates the dynamic Apex Colosseum room for Endless Survival Mode.
+ */
+export function createEndlessSurvivalRoom(width = 960, height = 640): RoomConfig {
+  return {
+    id: "endless-colosseum",
+    roomNumber: 21,
+    title: "APEX COLOSSEUM // ENDLESS PROTOCOL",
+    subtitle: "Continuous Threat Escalation Matrix",
+    tacticalTip:
+      "Survive against continuously climbing hostile squads. Reinforcements materialize distant from your position with 30-tick warning rings.",
+    playerSpawn: ApexColosseumTemplate.playerSpawn,
+    obstacles: ApexColosseumTemplate.buildObstacles(width, height),
+    enemies: [],
+    exitPortal: ApexColosseumTemplate.exitPortal,
+  };
+}
 
 export class RoomManager {
   public readonly levelDirector?: LevelDirector;
+  public endlessDirector?: EndlessDirector;
   private rooms: RoomConfig[];
   private currentRoomIndex: number = 0;
   private exitUnlocked: boolean = false;
@@ -42,7 +63,14 @@ export class RoomManager {
    * Returns whether the manager is running in dynamic endless mode.
    */
   public isEndlessMode(): boolean {
-    return this.levelDirector !== undefined;
+    return this.levelDirector !== undefined || this.endlessDirector !== undefined;
+  }
+
+  /**
+   * Returns whether the current room has unlocked a radiant golden portal (Room 20 completion).
+   */
+  public isGoldenPortal(): boolean {
+    return this.getCurrentRoom().roomNumber === 20 && this.exitUnlocked;
   }
 
   /**
@@ -93,10 +121,10 @@ export class RoomManager {
 
   /**
    * Returns whether there is a subsequent room after the current one.
-   * In endless mode (with LevelDirector), always returns true.
+   * In endless mode (with LevelDirector or EndlessDirector), always returns true.
    */
   public hasNextRoom(): boolean {
-    if (this.levelDirector) {
+    if (this.levelDirector || this.endlessDirector) {
       return true;
     }
     return this.currentRoomIndex < this.rooms.length - 1;
@@ -169,6 +197,20 @@ export class RoomManager {
   }
 
   /**
+   * Seamlessly transitions the campaign into Endless Survival Mode in Apex Colosseum.
+   */
+  public startEndlessMode(endlessDirector?: EndlessDirector): RoomConfig {
+    this.endlessDirector = endlessDirector ?? new EndlessDirector();
+    this.endlessDirector.reset();
+    const endlessRoom = createEndlessSurvivalRoom();
+    this.rooms.push(endlessRoom);
+    this.currentRoomIndex = this.rooms.length - 1;
+    this.exitUnlocked = false;
+    this.gameCompleted = false;
+    return endlessRoom;
+  }
+
+  /**
    * Restarts the current room back to its initial locked state.
    */
   public restartCurrentRoom(): void {
@@ -179,6 +221,12 @@ export class RoomManager {
    * Restarts the entire mission back to Room 1.
    */
   public restartGame(): void {
+    if (this.endlessDirector) {
+      this.endlessDirector = undefined;
+      if (this.rooms.length > 20) {
+        this.rooms = this.rooms.slice(0, 20);
+      }
+    }
     if (this.levelDirector) {
       this.rooms = [this.levelDirector.generateRoom(1)];
     }
@@ -201,15 +249,22 @@ export class RoomManager {
     ctx.translate(portal.x, portal.y);
 
     if (this.exitUnlocked) {
-      // Unlocked: Radiant pulsing cyan/emerald energy vortex
+      const isGolden = this.isGoldenPortal();
+      // Unlocked: Radiant pulsing energy vortex (Golden for Room 20, Cyan for others)
       const pulse = Math.sin(this.portalAnimationTimer * 4) * 3;
       const r = Math.max(1, portal.radius + pulse);
 
       // Outer radial glow
       const grad = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 1.5);
-      grad.addColorStop(0, "rgba(0, 240, 255, 0.45)");
-      grad.addColorStop(0.5, "rgba(0, 255, 170, 0.25)");
-      grad.addColorStop(1, "rgba(0, 240, 255, 0)");
+      if (isGolden) {
+        grad.addColorStop(0, "rgba(255, 215, 0, 0.55)");
+        grad.addColorStop(0.5, "rgba(255, 170, 0, 0.30)");
+        grad.addColorStop(1, "rgba(255, 215, 0, 0)");
+      } else {
+        grad.addColorStop(0, "rgba(0, 240, 255, 0.45)");
+        grad.addColorStop(0.5, "rgba(0, 255, 170, 0.25)");
+        grad.addColorStop(1, "rgba(0, 240, 255, 0)");
+      }
       ctx.fillStyle = grad;
       ctx.beginPath();
       ctx.arc(0, 0, r * 1.5, 0, Math.PI * 2);
@@ -218,7 +273,7 @@ export class RoomManager {
       // Spinning vortex ring
       ctx.rotate(this.portalAnimationTimer * 2.5);
       ctx.lineWidth = 3;
-      ctx.strokeStyle = "#00f0ff";
+      ctx.strokeStyle = isGolden ? "#ffd700" : "#00f0ff";
       ctx.setLineDash([8, 6]);
       ctx.beginPath();
       ctx.arc(0, 0, r, 0, Math.PI * 2);
@@ -226,7 +281,7 @@ export class RoomManager {
 
       // Radiant white core
       ctx.setLineDash([]);
-      ctx.fillStyle = "#ffffff";
+      ctx.fillStyle = isGolden ? "#fffde0" : "#ffffff";
       ctx.beginPath();
       ctx.arc(0, 0, portal.radius * 0.35, 0, Math.PI * 2);
       ctx.fill();
@@ -236,8 +291,8 @@ export class RoomManager {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.font = "900 11px monospace";
-      ctx.fillStyle = "#00f0ff";
-      ctx.fillText("EXIT GATE", 0, portal.radius + 18);
+      ctx.fillStyle = isGolden ? "#ffd700" : "#00f0ff";
+      ctx.fillText(isGolden ? "ENDLESS GATE" : "EXIT GATE", 0, portal.radius + 18);
     } else {
       // Locked: Dim crimson barrier with lock indicator
       const pulse = Math.sin(this.portalAnimationTimer * 2) * 0.15;
@@ -282,6 +337,22 @@ export class RoomManager {
 
     const x = 24;
     const y = 20;
+
+    if (this.endlessDirector) {
+      ctx.font = "bold 11px monospace";
+      ctx.fillStyle = "#00f0ff";
+      ctx.fillText(`${room.title.toUpperCase()}`, x, y);
+
+      ctx.font = "10px monospace";
+      ctx.fillStyle = "#64748b";
+      ctx.fillText(
+        `THREAT: ${this.endlessDirector.getThreatBudget()} // SURVIVED: ${this.endlessDirector.getSurvivalTimeFormatted()} // KILLS: ${this.endlessDirector.getKills()}`,
+        x,
+        y + 18
+      );
+      ctx.restore();
+      return;
+    }
 
     // Room title badge
     ctx.font = "bold 11px monospace";
@@ -351,13 +422,13 @@ export class RoomManager {
     // Subtitle
     ctx.font = getUIFont(13, "600");
     ctx.fillStyle = UITheme.colors.textPrimary;
-    ctx.fillText("ALL 19 TACTICAL PROTOCOLS CONQUERED", width / 2, height / 2 - 20);
+    ctx.fillText("ALL 20 TACTICAL PROTOCOLS CONQUERED", width / 2, height / 2 - 20);
 
     // Protocol checkmarks
     ctx.font = getUIFont(11, "600");
     ctx.fillStyle = UITheme.colors.green;
     ctx.fillText(
-      "✓ Goliath-01 Defeated  |  ✓ Chrono-Weaver Neutralized  |  ✓ Vektor-Prime Obliterated  |  ✓ Zenith Sector Conquered",
+      "✓ Goliath-01 Defeated  |  ✓ Chrono-Weaver Neutralized  |  ✓ Vektor-Prime Obliterated  |  ✓ Chrono-Zenith Overthrown",
       width / 2,
       height / 2 + 30
     );

@@ -1,13 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { vec2 } from "../../math/vector";
+import { createObstacle } from "../Obstacle";
 import { BossPhaseConfig, BossPhaseController, BossTransitionContext } from "./BossPhaseController";
 import {
   combineTransitionActions,
   createAudioCue,
+  createCataclysmPulse,
   createMinionEscortSpawn,
   createShockwavePulse,
   generateRadialParticleConfigs,
   resolveEscortDefinitions,
+  testLineOfSightOcclusion,
 } from "./BossTransitionAction";
 
 describe("BossTransitionAction", () => {
@@ -349,6 +352,76 @@ describe("BossTransitionAction", () => {
       expect(spawnedMinions[0].x).toBe(450); // 400 + 50
       expect(spawnedMinions[0].y).toBe(300);
       expect(spawnedMinions[0].type).toBe("stalker");
+    });
+  });
+
+  describe("testLineOfSightOcclusion and createCataclysmPulse", () => {
+    it("reports clear sightline when no obstacles are between boss and player", () => {
+      const bossPos = vec2(700, 320);
+      const playerPos = vec2(200, 320);
+      const obstacles = [
+        createObstacle("obs-top", 400, 50, 40, 40),
+        createObstacle("obs-bottom", 400, 500, 40, 40),
+      ];
+
+      const res = testLineOfSightOcclusion(bossPos, playerPos, obstacles);
+      expect(res.occluded).toBe(false);
+      expect(res.obstacle).toBeUndefined();
+    });
+
+    it("detects obstacle occlusion when cover blocks the sightline", () => {
+      const bossPos = vec2(700, 320);
+      const playerPos = vec2(200, 320);
+      const pillar = createObstacle("pillar-center", 450, 280, 80, 80);
+
+      const res = testLineOfSightOcclusion(bossPos, playerPos, [pillar]);
+      expect(res.occluded).toBe(true);
+      expect(res.obstacle?.id).toBe("pillar-center");
+    });
+
+    it("delivers zero damage and triggers deflection audio/particles when player is behind cover", () => {
+      const pulse = createCataclysmPulse({ particleCount: 20, damage: 1 });
+      const takeDamageSpy = vi.fn();
+      const emitSparksSpy = vi.fn();
+      const playDeflectSpy = vi.fn();
+
+      const pillar = createObstacle("cover-wall", 400, 250, 60, 140);
+      const ctx: BossTransitionContext = {
+        bossPosition: vec2(700, 320),
+        currentPhase: 0,
+        nextPhase: 1,
+        player: { position: vec2(150, 320), isAlive: true, takeDamage: takeDamageSpy } as any,
+        obstacles: [pillar],
+        particles: { emitImpactSparks: emitSparksSpy, emitShatter: vi.fn() } as any,
+        soundSynth: { playShieldDeflect: playDeflectSpy, playShieldBreak: vi.fn() } as any,
+      };
+
+      const result = pulse(ctx);
+      expect(result.occluded).toBe(true);
+      expect(result.damageDealt).toBe(0);
+      expect(takeDamageSpy).not.toHaveBeenCalled();
+      expect(playDeflectSpy).toHaveBeenCalledWith(1.0);
+      expect(emitSparksSpy).toHaveBeenCalled();
+    });
+
+    it("inflicts damage when player is in clear line-of-sight during detonation", () => {
+      const pulse = createCataclysmPulse({ particleCount: 20, damage: 1 });
+      const takeDamageSpy = vi.fn();
+
+      const ctx: BossTransitionContext = {
+        bossPosition: vec2(700, 320),
+        currentPhase: 0,
+        nextPhase: 1,
+        player: { position: vec2(150, 320), isAlive: true, takeDamage: takeDamageSpy } as any,
+        obstacles: [],
+        particles: { emitImpactSparks: vi.fn(), emitShatter: vi.fn() } as any,
+        soundSynth: { playShieldDeflect: vi.fn(), playShieldBreak: vi.fn() } as any,
+      };
+
+      const result = pulse(ctx);
+      expect(result.occluded).toBe(false);
+      expect(result.damageDealt).toBe(1);
+      expect(takeDamageSpy).toHaveBeenCalledWith(1);
     });
   });
 });

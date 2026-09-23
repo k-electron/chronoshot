@@ -113,6 +113,20 @@ describe("LevelDirector & PRNG", () => {
       expect(boss?.blueprint?.id).toBe("vektor-prime");
     });
 
+    it("automatically generates a milestone boss encounter on Room 20 (Sector 4 Boss: Chrono-Zenith)", () => {
+      const director = new LevelDirector({ seed: 999 });
+      const room20 = director.generateRoom(20);
+
+      expect(room20.roomNumber).toBe(20);
+      expect(room20.title).toContain("CHRONO-ZENITH: ZERO SOVEREIGN");
+      expect(room20.subtitle).toContain("Sector 4 Milestone Boss");
+
+      const boss = room20.enemies.find((e) => e.type === "boss");
+      expect(boss).toBeDefined();
+      expect(boss?.maxShields).toBe(5);
+      expect(boss?.blueprint?.id).toBe("chrono-zenith");
+    });
+
     it("respects explicit custom boss blueprint in constructor config", () => {
       const director = new LevelDirector({ bossBlueprint: GOLIATH_01_BLUEPRINT });
       const room10 = director.generateRoom(10);

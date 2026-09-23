@@ -18,6 +18,7 @@ import { BossPhaseConfig, BossPhaseController } from "./BossPhaseController";
 import {
   combineTransitionActions,
   createAudioCue,
+  createCataclysmPulse,
   createMinionEscortSpawn,
   createShockwavePulse,
 } from "./BossTransitionAction";
@@ -259,10 +260,151 @@ export const VEKTOR_PRIME_BLUEPRINT: BossBlueprint = {
   ],
 };
 
+/**
+ * Milestone Final Boss 4: Chrono-Zenith Zero Sovereign (Room 20 Climax)
+ * Phase 1: Citadel Bastion with 5-hit shield durability, heavy slugs + fan spread.
+ * Phase 2: Temporal Warp (3 shields, 75-tick Cataclysm Overload channel, 95 px/s standoff sniper kiter, 1 shotgun + 1 stalker escort).
+ * Phase 3: Singularity Tempest (2 shields, 65-tick Cataclysm Overload channel, 105 px/s strafing, twin 12-pellet counter-rotating novae).
+ * Phase 4: Zero-Point Overdrive (0 shields, 60-tick Cataclysm Overload channel, 125 px/s hyper-speed pursuit, continuous rotating 16-pellet novae).
+ */
+export const CHRONO_ZENITH_BLUEPRINT: BossBlueprint = {
+  id: "chrono-zenith",
+  name: "CHRONO-ZENITH: ZERO SOVEREIGN",
+  radius: 28,
+  chassis: "star",
+  phases: [
+    {
+      phaseIndex: 0,
+      phaseTitle: "CITADEL BASTION",
+      maxShields: 5,
+      speed: 45,
+      movement: () => new DirectAdvanceBehavior(),
+      attack: () =>
+        new AlternatingAttackBehavior({
+          behaviors: [
+            new SingleSlugBehavior({
+              fireCadenceTicks: 45,
+              bulletSpeed: 580,
+              spreadAngle: 0.02,
+              stutterTicks: 6,
+            }),
+            new FanSpreadBehavior({
+              fireCadenceTicks: 55,
+              bulletSpeed: 500,
+              spreadAngle: 0.25,
+              pellets: 3,
+              stutterTicks: 6,
+            }),
+          ],
+        }),
+      transitionTrigger: (ctx) => ctx.shields <= 0,
+      onPhaseExit: (ctx) => {
+        const action = combineTransitionActions(
+          createCataclysmPulse({ particleCount: 36, speed: 340, color: "#00f0ff", damage: 1 }),
+          createMinionEscortSpawn([
+            {
+              type: "shotgun",
+              offsetX: -120,
+              offsetY: -70,
+              maxShields: 1,
+              fireCadenceTicks: 70,
+              initialDelayTicks: 30,
+            },
+            {
+              type: "stalker",
+              offsetX: -120,
+              offsetY: 70,
+              fireCadenceTicks: 30,
+              initialDelayTicks: 25,
+            },
+          ]),
+          createAudioCue("shieldBreak")
+        );
+        action(ctx);
+      },
+    },
+    {
+      phaseIndex: 1,
+      phaseTitle: "TEMPORAL WARP",
+      maxShields: 3,
+      speed: 95,
+      overloadChannelTicks: 75,
+      movement: () => new KiterBehavior({ minDist: 260, maxDist: 440 }),
+      attack: () =>
+        new TelegraphedBeamBehavior({
+          fireCadenceTicks: 65,
+          bulletSpeed: 850,
+          spreadAngle: 0.01,
+          laserChargeTicks: 25,
+        }),
+      transitionTrigger: (ctx) => ctx.shields <= 0,
+      onPhaseExit: (ctx) => {
+        const action = combineTransitionActions(
+          createCataclysmPulse({ particleCount: 42, speed: 380, color: "#a855f7", damage: 1 }),
+          createMinionEscortSpawn([
+            {
+              type: "warden",
+              offsetX: -100,
+              offsetY: 0,
+              maxShields: 2,
+              fireCadenceTicks: 65,
+              initialDelayTicks: 35,
+            },
+          ]),
+          createAudioCue("shieldBreak")
+        );
+        action(ctx);
+      },
+    },
+    {
+      phaseIndex: 2,
+      phaseTitle: "SINGULARITY TEMPEST",
+      maxShields: 2,
+      speed: 105,
+      overloadChannelTicks: 65,
+      movement: () => new KiterBehavior({ minDist: 200, maxDist: 380 }),
+      attack: () =>
+        new RadialNovaBehavior({
+          fireCadenceTicks: 60,
+          bulletSpeed: 420,
+          pellets: 12,
+          stutterTicks: 6,
+          angularOffsetStep: 0.14,
+        }),
+      transitionTrigger: (ctx) => ctx.shields <= 0,
+      onPhaseExit: (ctx) => {
+        const action = combineTransitionActions(
+          createCataclysmPulse({ particleCount: 48, speed: 420, color: "#ff1744", damage: 1 }),
+          createAudioCue("shieldBreak")
+        );
+        action(ctx);
+      },
+    },
+    {
+      phaseIndex: 3,
+      phaseTitle: "ZERO-POINT OVERDRIVE",
+      maxShields: 0,
+      speed: 125,
+      overloadChannelTicks: 60,
+      movement: () => new DirectAdvanceBehavior(),
+      attack: () =>
+        new RadialNovaBehavior({
+          fireCadenceTicks: 55,
+          bulletSpeed: 460,
+          pellets: 16,
+          stutterTicks: 6,
+          angularOffsetStep: 0.18,
+        }),
+      transitionTrigger: () => false,
+    },
+  ],
+};
+
 export const BOSS_BLUEPRINTS: Record<string, BossBlueprint> = {
   "goliath-01": GOLIATH_01_BLUEPRINT,
   "chrono-weaver": CHRONO_WEAVER_BLUEPRINT,
   "vektor-prime": VEKTOR_PRIME_BLUEPRINT,
+  "chrono-zenith": CHRONO_ZENITH_BLUEPRINT,
 };
 
 /**
