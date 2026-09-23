@@ -551,5 +551,84 @@ describe("RoomManager Tactical Puzzle Progression", () => {
       expect(manager.getRoomCount()).toBe(1);
     });
   });
+
+  describe("Rollback Checkpoint Mechanics", () => {
+    it("computes rollback target for standard campaign rooms", () => {
+      const manager = new RoomManager();
+      // Room 1 (Sector 1) -> Room 1
+      expect(manager.getRollbackTarget().roomNumber).toBe(1);
+
+      // Advance to Room 5 (Sector 1 Boss) -> Room 1
+      for (let i = 0; i < 4; i++) manager.advanceRoom();
+      expect(manager.getCurrentRoom().roomNumber).toBe(5);
+      expect(manager.getRollbackTarget().roomNumber).toBe(1);
+
+      // Advance to Room 7 (Sector 2) -> Room 5 (Goliath-01)
+      manager.advanceRoom(); // R6
+      manager.advanceRoom(); // R7
+      expect(manager.getCurrentRoom().roomNumber).toBe(7);
+      expect(manager.getRollbackTarget().roomNumber).toBe(5);
+      expect(manager.getRollbackTarget().bossName).toBe("GOLIATH-01");
+
+      // Advance to Room 10 (Sector 2 Boss) -> Room 5
+      manager.advanceRoom(); // R8
+      manager.advanceRoom(); // R9
+      manager.advanceRoom(); // R10
+      expect(manager.getCurrentRoom().roomNumber).toBe(10);
+      expect(manager.getRollbackTarget().roomNumber).toBe(5);
+
+      // Advance to Room 11 (Sector 3) -> Room 10 (Chrono-Weaver)
+      manager.advanceRoom(); // R11
+      expect(manager.getCurrentRoom().roomNumber).toBe(11);
+      expect(manager.getRollbackTarget().roomNumber).toBe(10);
+      expect(manager.getRollbackTarget().bossName).toBe("CHRONO-WEAVER");
+
+      // Advance to Room 16 (Sector 4) -> Room 15 (Vektor-Prime)
+      for (let i = 0; i < 5; i++) manager.advanceRoom(); // R12, 13, 14, 15, 16
+      expect(manager.getCurrentRoom().roomNumber).toBe(16);
+      expect(manager.getRollbackTarget().roomNumber).toBe(15);
+      expect(manager.getRollbackTarget().bossName).toBe("VEKTOR-PRIME");
+    });
+
+    it("rolls back room manager progression to target room index", () => {
+      const manager = new RoomManager();
+      // Advance to Room 8
+      for (let i = 0; i < 7; i++) manager.advanceRoom();
+      expect(manager.getCurrentRoom().roomNumber).toBe(8);
+
+      const target = manager.rollbackToCheckpoint();
+      expect(target.roomNumber).toBe(5);
+      expect(manager.getCurrentRoomIndex()).toBe(4);
+      expect(manager.getCurrentRoom().roomNumber).toBe(5);
+      expect(manager.isExitUnlocked()).toBe(false);
+    });
+
+    it("rolls back Endless Mode to Room 20", () => {
+      const manager = new RoomManager();
+      manager.startEndlessMode();
+      expect(manager.isEndlessMode()).toBe(true);
+
+      const target = manager.rollbackToCheckpoint();
+      expect(target.roomNumber).toBe(20);
+      expect(manager.getCurrentRoomIndex()).toBe(19);
+      expect(manager.getCurrentRoom().roomNumber).toBe(20);
+      expect(manager.endlessDirector).toBeUndefined();
+    });
+
+    it("rolls back dynamic LevelDirector sequence cleanly", async () => {
+      const { LevelDirector } = await import("./LevelDirector");
+      const director = new LevelDirector({ seed: 777 });
+      const manager = new RoomManager(director);
+
+      // Advance to Room 12
+      for (let i = 0; i < 11; i++) manager.advanceRoom();
+      expect(manager.getCurrentRoom().roomNumber).toBe(12);
+
+      const target = manager.rollbackToCheckpoint();
+      expect(target.roomNumber).toBe(10);
+      expect(manager.getCurrentRoomIndex()).toBe(9);
+      expect(manager.getCurrentRoom().roomNumber).toBe(10);
+    });
+  });
 });
 

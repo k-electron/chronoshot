@@ -47,6 +47,7 @@ window.addEventListener("DOMContentLoaded", () => {
   let reloadRequested = false;
   let dashRequested = false;
   let restartRequested = false;
+  let fullResetRequested = false;
   let pauseRequested = false;
   let upgradeChoiceRequested: 1 | 2 | 3 | number | undefined = undefined;
   let isMuted = false;
@@ -91,7 +92,13 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 
     if (e.code === "KeyR") {
-      if (arena.status === "defeat" || arena.status === "victory") {
+      if (arena.status === "defeat") {
+        if (e.shiftKey) {
+          fullResetRequested = true;
+        } else {
+          restartRequested = true;
+        }
+      } else if (arena.status === "victory") {
         restartRequested = true;
       } else if (e.shiftKey) {
         // Shift+R quick restart of current room
@@ -126,7 +133,9 @@ window.addEventListener("DOMContentLoaded", () => {
     if (e.button === 0) {
       const coords = getCanvasCoords(e);
       mousePos = vec2(coords.x, coords.y);
-      if (arena.status === "defeat" || arena.status === "victory") {
+      if (arena.status === "defeat") {
+        shootRequested = true;
+      } else if (arena.status === "victory") {
         restartRequested = true;
       } else if (arena.isPaused) {
         pauseRequested = true;
@@ -161,6 +170,7 @@ window.addEventListener("DOMContentLoaded", () => {
       reload: reloadRequested,
       dash: dashRequested,
       restart: restartRequested,
+      fullReset: fullResetRequested,
       togglePause: pauseRequested,
       upgradeChoice: upgradeChoiceRequested,
     };
@@ -170,6 +180,7 @@ window.addEventListener("DOMContentLoaded", () => {
     reloadRequested = false;
     dashRequested = false;
     restartRequested = false;
+    fullResetRequested = false;
     pauseRequested = false;
     upgradeChoiceRequested = undefined;
 

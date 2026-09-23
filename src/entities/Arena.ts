@@ -35,6 +35,7 @@ import { extendedCylinder } from "../upgrades/definitions/extendedCylinder";
 import { reactiveShield } from "../upgrades/definitions/reactiveShield";
 import { speedLoader } from "../upgrades/definitions/speedLoader";
 import { UpgradeDraftHUD } from "../ui/UpgradeDraftHUD";
+import { DefeatHUD } from "../ui/DefeatHUD";
 
 export type ArenaStatus = "playing" | "victory" | "defeat";
 
@@ -44,6 +45,7 @@ export interface ArenaInput {
   shoot: boolean;
   reload: boolean;
   restart: boolean;
+  fullReset?: boolean;
   dash?: boolean;
   togglePause?: boolean;
   upgradeChoice?: 1 | 2 | 3 | number;
@@ -75,6 +77,8 @@ export class Arena {
   public isUpgradeDraftActive: boolean = false;
   public activeUpgradeDraft: UpgradeDefinition[] = [];
   public hoveredUpgradeCardIndex: number | null = null;
+  public hoveredDefeatCardIndex: number | null = null;
+  public checkpointLoadouts: Map<number, string[]> = new Map();
 
   constructor(
     width = 960,
@@ -181,6 +185,13 @@ export class Arena {
     if (this.roomManager && !this.roomManager.isEndlessMode()) {
       this.endlessDirector = undefined;
     }
+
+    // Capture pre-combat loadout snapshot upon milestone boss room entry
+    if ([5, 10, 15, 20].includes(room.roomNumber)) {
+      if (!this.checkpointLoadouts.has(room.roomNumber)) {
+        this.checkpointLoadouts.set(room.roomNumber, [...this.player.upgradePipeline.getActiveIds()]);
+      }
+    }
   }
 
   /**
@@ -278,7 +289,44 @@ export class Arena {
    * enforces 1-hit lethality, and monitors win/loss conditions.
    */
   public step(wallDeltaTime: number, input: ArenaInput): void {
+    // In defeat state, track hovered defeat card and process defeat actions
+    if (this.status === "defeat") {
+      this.hoveredDefeatCardIndex = DefeatHUD.getCardAt(
+        input.mousePos.x,
+        input.mousePos.y,
+        this.width,
+        this.height
+      );
+
+      if (input.fullReset) {
+        this.restart();
+        return;
+      }
+
+      if (input.restart) {
+        this.rollbackToCheckpoint();
+        return;
+      }
+
+      if (input.shoot) {
+        if (this.hoveredDefeatCardIndex === 0) {
+          this.rollbackToCheckpoint();
+          return;
+        } else if (this.hoveredDefeatCardIndex === 1) {
+          this.restart();
+          return;
+        }
+      }
+      return;
+    } else {
+      this.hoveredDefeatCardIndex = null;
+    }
+
     // Instant room restart trigger
+    if (input.fullReset) {
+      this.restart();
+      return;
+    }
     if (input.restart) {
       this.restart();
       return;
@@ -580,10 +628,38 @@ export class Arena {
   }
 
   /**
-   * Instantly restarts the combat room back to pristine initial setup.
-   * In campaign mode, player defeat enforces pure permadeath back to Room 1.
+   * Rolls back combat progression to the calculated boss checkpoint and restores
+   * the exact augmentation set possessed upon initially entering that boss room.
+   */
+  public rollbackToCheckpoint(): void {
+    this.hoveredDefeatCardIndex = null;
+    if (!this.roomManager) {
+      this.restart();
+      return;
+    }
+    const target = this.roomManager.rollbackToCheckpoint();
+    let snapshot = this.checkpointLoadouts.get(target.roomNumber);
+    if (!snapshot) {
+      const defaultAugs = [
+        "extended-cylinder",
+        "speed-loader",
+        "reactive-shield",
+      ];
+      snapshot = defaultAugs.slice(0, target.requiredAugmentationCount);
+    }
+    this.player.setLoadoutFromIds(snapshot);
+    this.isUpgradeDraftActive = false;
+    this.activeUpgradeDraft = [];
+    this.hoveredUpgradeCardIndex = null;
+    this.loadRoom(this.roomManager.getCurrentRoom());
+  }
+
+  /**
+   * Instantly restarts the combat room back to pristine initial setup (Full Run Reset).
    */
   public restart(): void {
+    this.checkpointLoadouts.clear();
+    this.hoveredDefeatCardIndex = null;
     this.endlessDirector = undefined;
     if (this.roomManager) {
       this.roomManager.restartGame();
@@ -795,61 +871,52 @@ export class Arena {
 
     // 9. Modernized Game Over / Victory Overlays
     if (this.status === "defeat") {
-      ctx.save();
-      ctx.fillStyle = "rgba(7, 9, 14, 0.88)";
-      ctx.fillRect(0, 0, this.width, this.height);
-
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
       const roomNum = this.roomManager ? this.roomManager.getCurrentRoom().roomNumber : 1;
-      const totalRooms = this.roomManager ? this.roomManager.getRoomCount() : 9;
-      const tier = roomNum <= 5 ? "TIER 1" : "TIER 2";
+      const totalRooms = this.roomManager ? this.roomManager.getRoomCount() : 20;
+      const tier =
+        roomNum <= 5
+          ? "TIER 1"
+          : roomNum <= 10
+            ? "TIER 2"
+            : roomNum <= 15
+              ? "TIER 3"
+              : "TIER 4";
       const roomTitle = this.roomManager ? this.roomManager.getCurrentRoom().title : "ROOM 01";
+      const isEndless =
+        this.endlessDirector !== undefined || (this.roomManager?.isEndlessMode() ?? false);
+      const rollbackTarget = this.roomManager
+        ? this.roomManager.getRollbackTarget()
+        : {
+            roomNumber: 1,
+            roomIndex: 0,
+            bossName: "BASIC COVER",
+            loadoutDescription: "Full expedition reset (0 Augmentations)",
+            requiredAugmentationCount: 0,
+          };
 
-      const augs = this.player.getAugmentations();
-      let augText = "NONE";
-      if (augs.extendedCylinder) augText = "EXTENDED CYLINDER (8 CHAMBERS)";
-      else if (augs.speedLoader) augText = "SPEED LOADER (+15 TICKS)";
-      else if (augs.reactiveShield) augText = "REACTIVE SHIELD (1 HIT BUFFER)";
+      const endlessStats = this.endlessDirector
+        ? {
+            survivalTime: this.endlessDirector.getSurvivalTimeFormatted(),
+            maxThreat: this.endlessDirector.getThreatBudget(),
+            kills: this.endlessDirector.getKills(),
+          }
+        : undefined;
 
-      // Subtle hairline border
-      ctx.beginPath();
-      ctx.moveTo(this.width / 2 - 200, this.height / 2 - 70);
-      ctx.lineTo(this.width / 2 + 200, this.height / 2 - 70);
-      ctx.strokeStyle = UITheme.colors.crimsonDim;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      ctx.font = getUIFont(30, "800");
-      ctx.fillStyle = UITheme.colors.crimson;
-      ctx.fillText("PROTOCOL TERMINATED", this.width / 2, this.height / 2 - 38);
-
-      ctx.font = getUIFont(11, "600");
-      ctx.fillStyle = UITheme.colors.textMuted;
-      ctx.fillText("CRITICAL LETHAL TRAUMA SUSTAINED // RUN FAILED", this.width / 2, this.height / 2 - 10);
-
-      // Run Statistics
-      ctx.font = getUIFont(11, "bold");
-      ctx.fillStyle = UITheme.colors.cyan;
-      ctx.fillText(`SECTOR: ${tier}  |  ${roomTitle}  [${roomNum}/${totalRooms}]`, this.width / 2, this.height / 2 + 20);
-
-      ctx.font = getUIFont(10, "600");
-      ctx.fillStyle = UITheme.colors.textSecondary;
-      ctx.fillText(`INSTALLED AUGMENTATION: ${augText}`, this.width / 2, this.height / 2 + 42);
-
-      ctx.font = getUIFont(12, "bold");
-      ctx.fillStyle = UITheme.colors.textPrimary;
-      ctx.fillText("PRESS [R] TO INITIATE NEW RUN (LEVEL 1)", this.width / 2, this.height / 2 + 76);
-
-      ctx.beginPath();
-      ctx.moveTo(this.width / 2 - 200, this.height / 2 + 105);
-      ctx.lineTo(this.width / 2 + 200, this.height / 2 + 105);
-      ctx.strokeStyle = UITheme.colors.crimsonDim;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      ctx.restore();
+      DefeatHUD.render(
+        ctx,
+        {
+          roomNumber: roomNum,
+          totalRooms,
+          tier,
+          roomTitle,
+          rollbackTarget,
+          isEndless,
+          endlessStats,
+          hoveredCardIndex: this.hoveredDefeatCardIndex,
+        },
+        this.width,
+        this.height
+      );
     } else if (this.status === "victory") {
       if (this.roomManager && this.roomManager.isGameCompleted()) {
         this.roomManager.renderGameVictory(ctx, this.width, this.height);
@@ -1051,7 +1118,22 @@ export class Arena {
       return "default";
     }
 
-    if (this.isPaused || this.status === "defeat" || this.status === "victory") {
+    if (this.status === "defeat") {
+      if (mousePos) {
+        const cardIndex = DefeatHUD.getCardAt(
+          mousePos.x,
+          mousePos.y,
+          this.width,
+          this.height
+        );
+        if (cardIndex !== null) {
+          return "pointer";
+        }
+      }
+      return "default";
+    }
+
+    if (this.isPaused || this.status === "victory") {
       return "default";
     }
 

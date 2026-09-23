@@ -1,0 +1,104 @@
+import { describe, expect, it, vi } from "vitest";
+import { computeDefeatLayout, DefeatHUD, DefeatRenderData } from "./DefeatHUD";
+
+function createMockContext(): CanvasRenderingContext2D {
+  return {
+    save: vi.fn(),
+    restore: vi.fn(),
+    beginPath: vi.fn(),
+    arc: vi.fn(),
+    fill: vi.fn(),
+    stroke: vi.fn(),
+    fillRect: vi.fn(),
+    strokeRect: vi.fn(),
+    fillText: vi.fn(),
+    translate: vi.fn(),
+    rotate: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+  } as unknown as CanvasRenderingContext2D;
+}
+
+describe("DefeatHUD", () => {
+  it("computes two centered cards for 960x640 canvas", () => {
+    const layout = computeDefeatLayout(960, 640);
+    expect(layout.cards).toHaveLength(2);
+    const [card0, card1] = layout.cards;
+
+    // Card 0 (Rollback) on left, Card 1 (Reset) on right
+    expect(card0.x).toBeLessThan(card1.x);
+    expect(card0.width).toBe(280);
+    expect(card1.width).toBe(280);
+    expect(card0.height).toBe(200);
+    expect(card1.height).toBe(200);
+
+    // Total width is 600, centered in 960 => startX = 180
+    expect(card0.x).toBe(180);
+    expect(card1.x).toBe(180 + 280 + 40); // 500
+  });
+
+  it("detects mouse hit inside card 0 and card 1, and null elsewhere", () => {
+    // Card 0 bounds: x in [180..460], y in [290..490]
+    expect(DefeatHUD.getCardAt(250, 350)).toBe(0);
+
+    // Card 1 bounds: x in [500..780], y in [290..490]
+    expect(DefeatHUD.getCardAt(600, 350)).toBe(1);
+
+    // Outside (in the gap between cards)
+    expect(DefeatHUD.getCardAt(480, 350)).toBeNull();
+
+    // Outside (above or below)
+    expect(DefeatHUD.getCardAt(250, 100)).toBeNull();
+    expect(DefeatHUD.getCardAt(250, 550)).toBeNull();
+  });
+
+  it("renders campaign defeat overlay without throwing", () => {
+    const ctx = createMockContext();
+    const data: DefeatRenderData = {
+      roomNumber: 8,
+      totalRooms: 20,
+      tier: "TIER 2",
+      roomTitle: "KILLBOX ENCLOSURE",
+      rollbackTarget: {
+        roomNumber: 5,
+        roomIndex: 4,
+        bossName: "GOLIATH-01",
+        loadoutDescription: "Restores Sector 1 entry loadout (0 Augmentations)",
+        requiredAugmentationCount: 0,
+      },
+      isEndless: false,
+      hoveredCardIndex: 0,
+    };
+
+    expect(() => DefeatHUD.render(ctx, data, 960, 640)).not.toThrow();
+    expect(ctx.fillRect).toHaveBeenCalled();
+    expect(ctx.fillText).toHaveBeenCalled();
+  });
+
+  it("renders endless mode defeat overlay with survival stats without throwing", () => {
+    const ctx = createMockContext();
+    const data: DefeatRenderData = {
+      roomNumber: 21,
+      totalRooms: 20,
+      tier: "APEX",
+      roomTitle: "APEX COLOSSEUM",
+      rollbackTarget: {
+        roomNumber: 20,
+        roomIndex: 19,
+        bossName: "CHRONO-ZENITH",
+        loadoutDescription: "Restores Sector 4 loadout (3 Augmentations)",
+        requiredAugmentationCount: 3,
+      },
+      isEndless: true,
+      endlessStats: {
+        survivalTime: "03:45",
+        maxThreat: 285,
+        kills: 42,
+      },
+      hoveredCardIndex: 1,
+    };
+
+    expect(() => DefeatHUD.render(ctx, data, 960, 640)).not.toThrow();
+    expect(ctx.fillText).toHaveBeenCalled();
+  });
+});

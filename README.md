@@ -126,7 +126,7 @@ Powered by a decoupled data-driven architecture (`UpgradePipeline`, `UpgradeRegi
   - **Room 18 (`CHRONO CHOKE`)**: Relentless close-quarters containment testing rapid target prioritization against triple stalkers and wardens.
   - **Room 19 (`PROTOCOL ZENITH`)**: Ultimate campaign gauntlet featuring a coordinated quadrant matrix of Wardens, Snipers, and Stalkers.
   - **Room 20 (`PROTOCOL OMEGA`)**: Supreme campaign climax against Chrono-Zenith: Zero Sovereign inside the fortified Apex Redoubt. Overcoming its 4 escalating phases and Cataclysm Pulses unlocks the golden exit gate to Endless Survival Mode.
-- **Pure Permadeath**: There are no lives or checkpoints. Lethal trauma terminates the run, displays sector and upgrade statistics, and resets progress back to Room 1.
+- **Cascading Boss Checkpoint Rollback**: On defeat, the dual-card defeat screen gives players the choice between **Rollback** (<kbd>R</kbd> or click) and **Full Reset** (<kbd>Shift+R</kbd> or click). Rollback evaluates the room of elimination, cascading down sector-by-sector (Rooms 1–5 $\to$ Room 1, Rooms 6–10 $\to$ Room 5 Goliath-01, Rooms 11–15 $\to$ Room 10 Chrono-Weaver, Rooms 16–20 $\to$ Room 15 Vektor-Prime, Endless Mode $\to$ Room 20 Chrono-Zenith), restoring clean pre-boss upgrade snapshots. Repeated failure in a boss fight or sector demotes the player down the checkpoint ladder tier-by-tier until Room 1.
 
 ### 11. Modular Level Director & Endless Survival Mode
 - **Composable Tactical Layouts**: 7 geometry templates (`CenterPillarsTemplate`, `TwinBunkersTemplate`, `SplitCorridorTemplate`, `KillboxLanesTemplate`, `ArenaQuadrantTemplate`, `ApexRedoubtTemplate`, `ApexColosseumTemplate`) providing varied obstacle geometries, tactical sightlines, and verified spawn safety ($\ge 280\text{px}$ from player).
@@ -147,11 +147,11 @@ Powered by a decoupled data-driven architecture (`UpgradePipeline`, `UpgradeRegi
 |---|---|
 | <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> | Move (Smoothly accelerates time to 100%) |
 | <kbd>Mouse</kbd> | 360° Hardware Aim Reticle (Does not advance time) |
-| <kbd>Left Click</kbd> | Fire Revolver (+6 simulation ticks) / Resume from Pause / Select Upgrade Card |
+| <kbd>Left Click</kbd> | Fire Revolver (+6 simulation ticks) / Resume from Pause / Select Upgrade Card / Select Defeat Card |
 | <kbd>Space</kbd> / <kbd>Shift</kbd> | Overcharge Dash (+12 tick burst, 480 px/s sprint, deflection frames) |
 | <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> | Select Tactical Augmentation during Post-Boss Draft |
-| <kbd>R</kbd> | Reload Revolver / Initiate New Run on Defeat |
-| <kbd>Shift</kbd> + <kbd>R</kbd> | Quick Restart Run |
+| <kbd>R</kbd> | Reload Revolver / Checkpoint Rollback on Defeat |
+| <kbd>Shift</kbd> + <kbd>R</kbd> | Quick Restart Current Room / Full Expedition Reset on Defeat |
 | <kbd>Esc</kbd> / <kbd>P</kbd> | Toggle Tactical Pause & Controls Matrix |
 | <kbd>M</kbd> | Toggle Audio Mute |
 
