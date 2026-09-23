@@ -1,28 +1,6 @@
-# Spec: Weapon System
+# Spec Delta
 
-## Purpose
-
-Provides a configurable weapon architecture supporting modular firearm configurations, raycast ballistics, magazine capacity tracking, and an interactive revolver cylinder HUD.
-
-## Requirements
-
-### Requirement: Modular Weapon Configuration Schema
-The weapon system SHALL define firearms using a structured configuration specifying magazine capacity, firing tick burst, reload tick burst, cooldown intervals, projectile velocity, and projectile spread.
-
-#### Scenario: Registering a weapon configuration
-- **WHEN** a weapon profile is loaded into the weapon system
-- **THEN** weapon actions (firing, reloading, cooldowns) execute according to the defined parameters
-
-### Requirement: 6-Round Revolver Mechanics
-The system SHALL provide a default revolver weapon profile configured with a 6-round capacity, single-pellet precision firing, and cooldown between consecutive shots.
-
-#### Scenario: Firing revolver with loaded rounds
-- **WHEN** the player issues a fire command and the revolver has at least 1 chambered round
-- **THEN** one projectile is discharged toward the aim target, ammunition decrements by 1, and the fire cooldown is triggered
-
-#### Scenario: Firing revolver with empty cylinder
-- **WHEN** the player issues a fire command when remaining rounds is 0
-- **THEN** no projectile is discharged and a reload reminder or dry-fire indicator is triggered
+## MODIFIED Requirements
 
 ### Requirement: Reload Cycle and Cylinder HUD Display
 The system SHALL support an anchored, multi-tick reload cycle that seats ammunition sequentially, immobilizes player ground locomotion while preserving free aiming, provides visual telemetry across the cylinder HUD and targeting reticle, and permits tactical dash interruption with sequential chamber retention.

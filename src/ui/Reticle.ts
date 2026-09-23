@@ -5,6 +5,7 @@
  * - Ultra-fine central micro-dot (1.5px) for pixel-precise aiming
  * - Directional hairline tick marks that subtly expand with time dilation acceleration
  * - High-visibility signal crimson flash when attempting to fire an empty weapon
+ * - Tactile amber reload arc visualizing active reload progress
  */
 
 import { Vector2D } from "../math/vector";
@@ -35,11 +36,15 @@ export class Reticle {
    * @param ctx - The target Canvas 2D rendering context
    * @param target - Mouse/aim target position
    * @param timeScale - Current time governor scale [0.05 .. 1.0]
+   * @param reloadProgress - Optional reload progress [0.0 .. 1.0]
+   * @param isReloading - Whether player is actively reloading
    */
   public render(
     ctx: CanvasRenderingContext2D,
     target: Vector2D,
-    timeScale: number = 0.05
+    timeScale: number = 0.05,
+    reloadProgress: number = 0,
+    isReloading: boolean = false
   ): void {
     const x = target ? target.x : 0;
     const y = target ? target.y : 0;
@@ -52,8 +57,16 @@ export class Reticle {
     const innerGap = 5 + speedFactor * 3.5;
     const tickLength = 5;
 
-    const strokeColor = isDryFiring ? UITheme.colors.crimson : UITheme.colors.cyan;
-    const dotColor = isDryFiring ? UITheme.colors.crimson : UITheme.colors.white;
+    let strokeColor: string = UITheme.colors.cyan;
+    let dotColor: string = UITheme.colors.white;
+
+    if (isDryFiring) {
+      strokeColor = UITheme.colors.crimson;
+      dotColor = UITheme.colors.crimson;
+    } else if (isReloading) {
+      strokeColor = UITheme.colors.amber;
+      dotColor = UITheme.colors.amber;
+    }
 
     ctx.strokeStyle = strokeColor;
     ctx.fillStyle = dotColor;
@@ -80,7 +93,31 @@ export class Reticle {
     ctx.lineTo(x + innerGap + tickLength, y);
     ctx.stroke();
 
-    // 3. Dry-fire tactile warning ring
+    // 3. Circular Reload Progress Arc when actively reloading
+    if (isReloading) {
+      const reloadRadius = innerGap + 2;
+      const clampedProg = Math.max(0, Math.min(1, reloadProgress));
+
+      // Faint background ring
+      ctx.beginPath();
+      ctx.arc(x, y, reloadRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255, 183, 0, 0.25)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Active progress arc
+      if (clampedProg > 0) {
+        const startAngle = -Math.PI / 2;
+        const endAngle = startAngle + clampedProg * Math.PI * 2;
+        ctx.beginPath();
+        ctx.arc(x, y, reloadRadius, startAngle, endAngle);
+        ctx.strokeStyle = UITheme.colors.amber;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    }
+
+    // 4. Dry-fire tactile warning ring
     if (isDryFiring) {
       ctx.beginPath();
       ctx.arc(x, y, 12, 0, Math.PI * 2);

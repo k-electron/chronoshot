@@ -419,6 +419,95 @@ describe("Player Entity", () => {
       player.equipFullEndlessLoadout();
       expect(player.shields).toBe(3);
     });
+
+    it("immobilizes player movement while maintaining mouse aiming during reload", () => {
+      const player = new Player({ x: 200, y: 200 });
+      // Fire a shot so player can reload
+      player.fire();
+      expect(player.weapon.getAmmo()).toBe(5);
+
+      // Start reload
+      const started = player.startReload(30);
+      expect(started).toBe(true);
+      expect(player.isReloading()).toBe(true);
+      expect(player.getReloadProgress()).toBe(0);
+
+      // Mouse aiming remains free
+      player.setAimTarget(vec2(300, 200)); // Facing right (angle 0)
+      expect(player.aimAngle).toBeCloseTo(0);
+      player.setAimTarget(vec2(200, 300)); // Facing down (angle PI/2)
+      expect(player.aimAngle).toBeCloseTo(Math.PI / 2);
+
+      // Attempt to move with WASD: velocity should remain 0 and position unchanged
+      const dt = 1 / 60;
+      for (let i = 0; i < 15; i++) {
+        player.update(vec2(1, 0), dt); // Trying to move right
+        expect(player.velocity.x).toBe(0);
+        expect(player.velocity.y).toBe(0);
+        expect(player.position.x).toBe(200);
+        expect(player.position.y).toBe(200);
+      }
+
+      expect(player.getReloadProgress()).toBe(0.5);
+      expect(player.getReloadTicksRemaining()).toBe(15);
+
+      // Finish remaining ticks
+      for (let i = 0; i < 15; i++) {
+        player.update(vec2(1, 0), dt);
+      }
+
+      // Reload finishes
+      expect(player.isReloading()).toBe(false);
+      expect(player.weapon.getAmmo()).toBe(6);
+
+      // Player can now move again
+      player.update(vec2(1, 0), dt);
+      expect(player.velocity.x).toBeGreaterThan(0);
+    });
+
+    it("allows emergency Overcharge Dash to break reload lock while retaining loaded chambers", () => {
+      const player = new Player({ x: 200, y: 200 });
+      player.acquireUpgrade("overcharge-dash");
+      expect(player.isDashReady()).toBe(true);
+
+      // Fire all 6 rounds
+      for (let i = 0; i < 6; i++) {
+        player.fire();
+        player.weapon.update(10);
+      }
+      expect(player.weapon.getAmmo()).toBe(0);
+
+      // Start 30-tick reload
+      player.startReload(30);
+      expect(player.isReloading()).toBe(true);
+
+      const dt = 1 / 60;
+      // Advance 16 ticks (ticks 5, 10, 15 seated 3 rounds)
+      for (let i = 0; i < 16; i++) {
+        player.update(vec2(0, 0), dt);
+      }
+      expect(player.weapon.getAmmo()).toBe(3);
+      expect(player.isReloading()).toBe(true);
+
+      // Panic dash to evade
+      const dashed = player.triggerDash(undefined, vec2(0, -1));
+      expect(dashed).toBe(true);
+
+      // Reload lock is broken!
+      expect(player.isReloading()).toBe(false);
+      expect(player.dashActiveTicks).toBe(player.dashDurationTicks);
+
+      // Retained 3 chambers
+      expect(player.weapon.getAmmo()).toBe(3);
+
+      // Can fire retained rounds after dash
+      player.dashActiveTicks = 0;
+      player.weapon.update(10);
+      const shot = player.fire();
+      expect(shot).toHaveLength(1);
+      expect(player.weapon.getAmmo()).toBe(2);
+    });
   });
 });
+
 

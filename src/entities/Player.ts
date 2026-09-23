@@ -73,6 +73,9 @@ export class Player implements CombatUnit {
   public readonly dashDurationTicks: number = 12;
   public readonly dashCooldownMaxTicks: number = 90;
 
+  private justLoadedChamberThisTick: boolean = false;
+  private justCompletedReloadThisTick: boolean = false;
+
   public readonly baseMaxSpeed: number;
   private spawnPosition: Vector2D;
 
@@ -135,8 +138,16 @@ export class Player implements CombatUnit {
       return;
     }
 
-    // 1. Advance weapon cooldown ticks and active upgrade ticks
+    // 1. Advance weapon cooldown ticks, reload progression, and active upgrade ticks
     this.weapon.update(1);
+    if (this.weapon.isReloading()) {
+      const reloadRes = this.weapon.updateReload(1);
+      this.justLoadedChamberThisTick = reloadRes.justLoadedChamber;
+      this.justCompletedReloadThisTick = reloadRes.completed;
+    } else {
+      this.justLoadedChamberThisTick = false;
+      this.justCompletedReloadThisTick = false;
+    }
     this.upgradePipeline.onTick(this, 1);
 
     if (this.dashCooldownTicks > 0) {
@@ -147,7 +158,10 @@ export class Player implements CombatUnit {
     }
 
     // 2. Velocity Integration
-    if (this.dashActiveTicks <= 0) {
+    if (this.weapon.isReloading()) {
+      // Anchored during reload: ignore directional movement inputs and zero velocity
+      this.velocity = vec2(0, 0);
+    } else if (this.dashActiveTicks <= 0) {
       const inputLenSq = vecLengthSq(inputDir);
       if (inputLenSq > 1e-4) {
         const normalizedInput = vecNormalize(inputDir);
@@ -274,6 +288,11 @@ export class Player implements CombatUnit {
   public triggerDash(governor?: TimeGovernor, explicitDir?: Vector2D): boolean {
     if (!this.isDashReady()) {
       return false;
+    }
+
+    // Break active reload lock if dashing
+    if (this.weapon.isReloading()) {
+      this.cancelReload();
     }
 
     // Determine dash direction: explicitDir -> current velocity -> aim direction
@@ -456,6 +475,61 @@ export class Player implements CombatUnit {
     }
     // Refill ammunition to 8 rounds (max magazine size)
     this.weapon.reset();
+  }
+
+  /**
+   * Whether player is actively undergoing an anchored reload channel.
+   */
+  public isReloading(): boolean {
+    return this.weapon.isReloading();
+  }
+
+  public getReloadProgress(): number {
+    return this.weapon.getReloadProgress();
+  }
+
+  public getReloadTicksRemaining(): number {
+    return this.weapon.getReloadTicksRemaining();
+  }
+
+  public getReloadTicksTotal(): number {
+    return this.weapon.getReloadTicksTotal();
+  }
+
+  /**
+   * Initiates anchored multi-tick reload channel, immobilizing ground movement.
+   */
+  public startReload(totalTicks?: number): boolean {
+    if (!this.isAlive || this.weapon.isReloading()) {
+      return false;
+    }
+    const reloadTicks = totalTicks ?? this.weapon.getReloadTickBurst();
+    const started = this.weapon.startReload(reloadTicks);
+    if (started) {
+      this.velocity = vec2(0, 0);
+    }
+    return started;
+  }
+
+  /**
+   * Cancels active reload, preserving any completed chambers.
+   */
+  public cancelReload(): number {
+    return this.weapon.cancelReload();
+  }
+
+  /**
+   * Whether a chamber completed seating on the most recent tick.
+   */
+  public wasChamberLoadedThisTick(): boolean {
+    return this.justLoadedChamberThisTick;
+  }
+
+  /**
+   * Whether the active reload sequence completed on the most recent tick.
+   */
+  public wasReloadCompletedThisTick(): boolean {
+    return this.justCompletedReloadThisTick;
   }
 
   /**

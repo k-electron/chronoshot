@@ -43,6 +43,7 @@ export class TimeGovernor {
   private fixedDeltaTime: number;
   private maxDeltaTime: number;
   private rampRate: number;
+  private timeScaleOverride: number | null = null;
 
   private currentTimeScale: number;
   private timeAccumulator: number = 0;
@@ -74,6 +75,11 @@ export class TimeGovernor {
    * Updates current time scale towards target given elapsed wall time.
    */
   public updateTimeScale(currentSpeed: number, maxSpeed: number, wallDeltaTime: number): number {
+    if (this.timeScaleOverride !== null) {
+      this.currentTimeScale = this.timeScaleOverride;
+      return this.currentTimeScale;
+    }
+
     const target = this.calculateTargetTimeScale(currentSpeed, maxSpeed);
 
     if (this.rampRate === Infinity || wallDeltaTime <= 0) {
@@ -200,9 +206,28 @@ export class TimeGovernor {
   }
 
   /**
+   * Sets or clears a persistent time scale override (e.g. 1.00x during active tactical reload channel).
+   * While set, velocity-driven scaling and ramp rates are bypassed.
+   */
+  public setTimeScaleOverride(scale: number | null): void {
+    this.timeScaleOverride = scale !== null ? Math.max(0, Math.min(this.maxTimeScale, scale)) : null;
+    if (this.timeScaleOverride !== null) {
+      this.currentTimeScale = this.timeScaleOverride;
+    }
+  }
+
+  /**
+   * Returns active time scale override or null if velocity scaling is active.
+   */
+  public getTimeScaleOverride(): number | null {
+    return this.timeScaleOverride;
+  }
+
+  /**
    * Resets accumulator, queued ticks, and time scale to initial baseline.
    */
   public reset(): void {
+    this.timeScaleOverride = null;
     this.currentTimeScale = this.baselineTimeScale;
     this.timeAccumulator = 0;
     this.queuedTicks = 0;

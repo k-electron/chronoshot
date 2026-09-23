@@ -25,7 +25,7 @@ The simulation SHALL scale time dynamically between the baseline rate and 100% r
 - **THEN** the player decelerates and the time scale ramps smoothly back down to the 5% baseline rate
 
 ### Requirement: Action Tick Bursts for Combat Actions
-The simulation SHALL immediately advance a discrete burst of simulation ticks whenever the player fires a weapon or initiates a reload, regardless of movement status.
+The simulation SHALL advance discrete simulation ticks for combat actions, executing immediate discrete tick bursts for weapon discharge and running a continuous real-time (1.00x) simulation channel during active weapon reloads.
 
 #### Scenario: Player fires weapon
 - **WHEN** the player discharges the equipped weapon
@@ -33,4 +33,4 @@ The simulation SHALL immediately advance a discrete burst of simulation ticks wh
 
 #### Scenario: Player initiates reload
 - **WHEN** the player executes a reload command
-- **THEN** the simulation advances by a larger discrete block of simulation ticks, advancing all active enemy bullets and entities while the reload completes
+- **THEN** the simulation enforces a real-time (1.00x) simulation rate across the duration of the reload rather than executing an instantaneous single-frame tick jump, advancing all active enemy bullets and entities smoothly across multiple rendering frames while the reload progresses

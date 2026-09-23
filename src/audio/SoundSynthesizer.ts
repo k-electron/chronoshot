@@ -290,6 +290,68 @@ export class SoundSynthesizer {
   }
 
   /**
+   * Synthesizes an individual chamber ratchet click when a round seats during reload.
+   */
+  public playChamberLoad(timeScale: number = 1.0, chamberIndex: number = 0): void {
+    if (!this.context || !this.masterGain || this.isMuted) return;
+    this.resume();
+
+    const pitch = this.calculatePitch(timeScale);
+    const dur = this.calculateDuration(timeScale);
+    const t0 = this.context.currentTime;
+
+    try {
+      const osc = this.context.createOscillator();
+      const gain = this.context.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime((1200 + (chamberIndex % 6) * 120) * pitch, t0);
+
+      gain.gain.setValueAtTime(0.28, t0);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.02 * dur);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+
+      osc.start(t0);
+      osc.stop(t0 + 0.02 * dur);
+    } catch {
+      // Ignore
+    }
+  }
+
+  /**
+   * Synthesizes the solid mechanical cylinder latch lock when reload completes.
+   */
+  public playReloadLatch(timeScale: number = 1.0): void {
+    if (!this.context || !this.masterGain || this.isMuted) return;
+    this.resume();
+
+    const pitch = this.calculatePitch(timeScale);
+    const dur = this.calculateDuration(timeScale);
+    const t0 = this.context.currentTime;
+
+    try {
+      const latchOsc = this.context.createOscillator();
+      const latchGain = this.context.createGain();
+
+      latchOsc.type = "triangle";
+      latchOsc.frequency.setValueAtTime(640 * pitch, t0);
+
+      latchGain.gain.setValueAtTime(0.45, t0);
+      latchGain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.04 * dur);
+
+      latchOsc.connect(latchGain);
+      latchGain.connect(this.masterGain);
+
+      latchOsc.start(t0);
+      latchOsc.stop(t0 + 0.04 * dur);
+    } catch {
+      // Ignore
+    }
+  }
+
+  /**
    * Projectile impact on solid obstacle: concrete/barrier thwack and ricochet crack.
    */
   public playImpact(timeScale: number = 1.0): void {
