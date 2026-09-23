@@ -238,4 +238,84 @@ describe("Player Entity", () => {
     expect(player.weapon.getMagSize()).toBe(6);
     expect(player.weapon.getReloadTickBurst()).toBe(30);
   });
+
+  describe("UpgradePipeline Integration", () => {
+    it("boosts maxSpeed when acquiring kineticStride upgrade", () => {
+      const player = new Player({ x: 100, y: 100, maxSpeed: 240 });
+      expect(player.maxSpeed).toBe(240);
+
+      const acquired = player.acquireUpgrade("kinetic-stride");
+      expect(acquired).toBe(true);
+      expect(player.maxSpeed).toBe(300); // 240 * 1.25
+      expect(player.upgradePipeline.has("kinetic-stride")).toBe(true);
+    });
+
+    it("scales projectile velocity when acquiring chronoBurst upgrade", () => {
+      const player = new Player({ x: 100, y: 100 });
+      const baseBullets = player.fire();
+      expect(baseBullets).toHaveLength(1);
+      const baseSpeed = Math.hypot(baseBullets[0].velocity.x, baseBullets[0].velocity.y);
+      expect(baseSpeed).toBeCloseTo(800);
+
+      player.acquireUpgrade("chrono-burst");
+      player.weapon.update(10);
+      const boostedBullets = player.fire();
+      expect(boostedBullets).toHaveLength(1);
+      const boostedSpeed = Math.hypot(boostedBullets[0].velocity.x, boostedBullets[0].velocity.y);
+      expect(boostedSpeed).toBeCloseTo(1040); // 800 * 1.30
+    });
+
+    it("grants 2 shield charges with phaseDeflector upgrade", () => {
+      const player = new Player({ x: 100, y: 100 });
+      expect(player.shields).toBe(0);
+
+      player.acquireUpgrade("phase-deflector");
+      expect(player.shields).toBe(2);
+      expect(player.maxShields).toBe(2);
+
+      // Can absorb 2 hits
+      expect(player.takeDamage(1).eliminated).toBe(false);
+      expect(player.shields).toBe(1);
+      expect(player.takeDamage(1).eliminated).toBe(false);
+      expect(player.shields).toBe(0);
+      expect(player.takeDamage(1).eliminated).toBe(true);
+    });
+
+    it("compounds multiple tactical upgrades simultaneously", () => {
+      const player = new Player({ x: 100, y: 100 });
+      player.acquireUpgrade("extended-cylinder");
+      player.acquireUpgrade("speed-loader");
+      player.acquireUpgrade("reactive-shield");
+      player.acquireUpgrade("kinetic-stride");
+
+      expect(player.weapon.getMagSize()).toBe(8);
+      expect(player.weapon.getReloadTickBurst()).toBe(15);
+      expect(player.shields).toBe(1);
+      expect(player.maxSpeed).toBe(300);
+      expect(player.augmentations.extendedCylinder).toBe(true);
+      expect(player.augmentations.speedLoader).toBe(true);
+      expect(player.augmentations.reactiveShield).toBe(true);
+    });
+
+    it("enforces maxStacks when attempting duplicate acquisitions", () => {
+      const player = new Player({ x: 100, y: 100 });
+      expect(player.acquireUpgrade("reactive-shield")).toBe(true);
+      expect(player.acquireUpgrade("reactive-shield")).toBe(false);
+    });
+
+    it("refreshes shields on room reset with active shield upgrades", () => {
+      const player = new Player({ x: 100, y: 100 });
+      player.acquireUpgrade("phase-deflector");
+      expect(player.shields).toBe(2);
+
+      player.takeDamage(2);
+      expect(player.shields).toBe(0);
+
+      player.reset();
+      expect(player.shields).toBe(2);
+      expect(player.maxShields).toBe(2);
+      expect(player.isAlive).toBe(true);
+    });
+  });
 });
+

@@ -53,7 +53,7 @@ ChronoShot is deliberately engineered without heavy third-party game engines (no
 - **Hairline Revolver Dial (`src/ui/CylinderHUD.ts`)**: Minimalist 6-chamber dial (dynamically expandable to 8 chambers with Extended Cylinder) with active chamber alignment notch and smooth rotational transition.
 - **Hairline Chrono-Telemetry (`src/ui/TimeHUD.ts`)**: Top-right gauge displaying numeric multiplier (`CHRONO // 0.05x`) and transient action burst pills.
 - **Phase-Aware Boss Telemetry (`src/ui/BossTelemetryHUD.ts`)**: Decoupled top-center telemetry rendering boss designation, active phase badges (e.g. `PHASE 2/2 // OVERDRIVE`), and shield charge pips.
-- **Tactical Upgrade Draft**: Immediate freeze-frame 3-card tactical augmentation draft (Extended Cylinder, Speed Loader, Reactive Shield) upon milestone boss victory.
+- **Tactical Upgrade Draft & Pipeline (`src/upgrades/` & `src/ui/UpgradeDraftHUD.ts`)**: Data-driven roguelike upgrade pipeline (`UpgradePipeline`) with centralized registry (`UpgradeRegistry`), dynamic $N$-card draft UI (`UpgradeDraftHUD`), stack control, and compounded modifiers. Baseline augmentations (Extended Cylinder, Speed Loader, Reactive Shield) and advanced perks (Kinetic Stride, Chrono Burst, Phase Deflector).
 - **Pause Lifecycle**: Toggleable with <kbd>Esc</kbd> or <kbd>P</kbd>. Halts simulation ticks and displays a frosted Swiss-style control matrix card.
 
 ---
@@ -91,7 +91,7 @@ npm run dev
    - Use mock Canvas 2D contexts (`createMockContext()`) with `vi.fn()` for rendering tests.
    - Use mock audio contexts to verify audio trigger calls without requiring real audio devices.
 3. **Keep Tests Fast & Deterministic**:
-   - The entire suite (313+ tests) runs in under 500ms. Avoid arbitrary `setTimeout` or wall-clock waits in tests.
+   - The entire suite (374+ tests) runs in under 600ms. Avoid arbitrary `setTimeout` or wall-clock waits in tests.
 
 ---
 

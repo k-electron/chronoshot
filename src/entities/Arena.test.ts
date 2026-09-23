@@ -638,4 +638,57 @@ describe("Combat Arena & Room Loop", () => {
     expect(arena.status).toBe("playing");
     expect(arena.player.isAlive).toBe(true);
   });
+
+  it("supports dynamic upgrade draft with custom cards via openUpgradeDraft()", async () => {
+    const arena = new Arena(960, 640);
+    const customUpgrade1 = {
+      id: "custom-kinetic",
+      name: "CUSTOM KINETIC",
+      archetype: "LOCOMOTION // KINETIC",
+      description: "Boosts speed.",
+      statHighlight: "+25% SPEED",
+      accentColor: "#00f0ff",
+      modifiers: { speedMultiplier: 1.25 },
+    };
+    const customUpgrade2 = {
+      id: "custom-chrono",
+      name: "CUSTOM CHRONO",
+      archetype: "BALLISTICS // ACCEL",
+      description: "Boosts bullet velocity.",
+      statHighlight: "+30% BULLET VELOCITY",
+      accentColor: "#f72585",
+      modifiers: { bulletSpeedMultiplier: 1.3 },
+    };
+
+    arena.openUpgradeDraft([customUpgrade1, customUpgrade2]);
+    expect(arena.isUpgradeDraftActive).toBe(true);
+    expect(arena.activeUpgradeDraft).toHaveLength(2);
+    expect(arena.getDraftOptions()).toEqual([customUpgrade1, customUpgrade2]);
+
+    // Render draft with custom cards without error
+    const ctx = {
+      save: () => {},
+      restore: () => {},
+      fillRect: () => {},
+      strokeRect: () => {},
+      fillText: () => {},
+      measureText: () => ({ width: 80 }),
+    } as unknown as CanvasRenderingContext2D;
+    expect(() => arena.renderUpgradeDraft(ctx)).not.toThrow();
+
+    // Select custom upgrade [1]
+    arena.step(0.016, {
+      moveDir: vec2(0, 0),
+      mousePos: vec2(500, 320),
+      shoot: false,
+      reload: false,
+      restart: false,
+      upgradeChoice: 1,
+    });
+
+    expect(arena.isUpgradeDraftActive).toBe(false);
+    expect(arena.player.upgradePipeline.has("custom-kinetic")).toBe(true);
+    expect(arena.player.maxSpeed).toBe(300); // 240 * 1.25
+  });
 });
+
