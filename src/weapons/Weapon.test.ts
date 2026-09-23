@@ -140,4 +140,83 @@ describe("Revolver Weapon State Machine", () => {
     expect(revolver.getCooldownRemaining()).toBe(0);
     expect(revolver.getChambers().every((c) => c === "loaded")).toBe(true);
   });
+
+  it("supports 8-chamber extended cylinder capacity and cycles all 8 rounds", () => {
+    const governor = new TimeGovernor();
+    const revolver = new Revolver({ magSize: 8 });
+
+    expect(revolver.getMagSize()).toBe(8);
+    expect(revolver.getAmmo()).toBe(8);
+    expect(revolver.getChambers()).toHaveLength(8);
+    expect(revolver.getChambers().every((c) => c === "loaded")).toBe(true);
+
+    // Discharge all 8 rounds
+    for (let i = 0; i < 8; i++) {
+      expect(revolver.isReady()).toBe(true);
+      const res = revolver.fire(governor);
+      expect(res.fired).toBe(true);
+      expect(res.dryFired).toBe(false);
+      expect(revolver.getAmmo()).toBe(7 - i);
+      revolver.update(DEFAULT_REVOLVER_CONFIG.cooldownTicks);
+    }
+
+    expect(revolver.getAmmo()).toBe(0);
+    expect(revolver.getChambers().every((c) => c === "spent")).toBe(true);
+
+    // 9th pull triggers dry fire
+    const dryResult = revolver.fire(governor);
+    expect(dryResult.fired).toBe(false);
+    expect(dryResult.dryFired).toBe(true);
+
+    // Reload replenishes all 8 rounds
+    expect(revolver.reload(governor)).toBe(true);
+    expect(revolver.getAmmo()).toBe(8);
+    expect(revolver.getChambers()).toHaveLength(8);
+    expect(revolver.getChambers().every((c) => c === "loaded")).toBe(true);
+
+    // Advance cooldown after reload, fire 2 rounds, and reset
+    revolver.update(DEFAULT_REVOLVER_CONFIG.cooldownTicks);
+    revolver.fire();
+    revolver.update(DEFAULT_REVOLVER_CONFIG.cooldownTicks);
+    revolver.fire();
+    expect(revolver.getAmmo()).toBe(6);
+    revolver.reset();
+    expect(revolver.getAmmo()).toBe(8);
+    expect(revolver.getChambers().every((c) => c === "loaded")).toBe(true);
+  });
+
+  it("supports custom reloadTickBurst via config, setter, or reload parameter", () => {
+    const governor = new TimeGovernor();
+    const revolver = new Revolver({ reloadTickBurst: 15 });
+
+    expect(revolver.getReloadTickBurst()).toBe(15);
+
+    // Fire a round and reload with configured burst
+    revolver.fire(governor);
+    governor.advance(0);
+    expect(governor.getQueuedTicks()).toBe(0);
+
+    revolver.reload(governor);
+    expect(governor.getQueuedTicks()).toBe(15);
+
+    // Update via setter
+    revolver.setReloadTickBurst(20);
+    expect(revolver.getReloadTickBurst()).toBe(20);
+    revolver.update(DEFAULT_REVOLVER_CONFIG.cooldownTicks);
+    governor.advance(0);
+    revolver.fire(governor);
+    governor.advance(0);
+
+    revolver.reload(governor);
+    expect(governor.getQueuedTicks()).toBe(20);
+
+    // Override via reload() parameter
+    revolver.update(DEFAULT_REVOLVER_CONFIG.cooldownTicks);
+    governor.advance(0);
+    revolver.fire(governor);
+    governor.advance(0);
+
+    revolver.reload(governor, 12);
+    expect(governor.getQueuedTicks()).toBe(12);
+  });
 });

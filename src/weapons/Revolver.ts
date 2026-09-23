@@ -28,11 +28,35 @@ export class Revolver implements Weapon {
   private currentAmmo: number;
   private cooldownRemainingTicks: number = 0;
   private dryFiredThisFrame: boolean = false;
+  private reloadTickBurst?: number;
 
   constructor(config: Partial<WeaponConfig> = {}) {
     this.config = { ...DEFAULT_REVOLVER_CONFIG, ...config };
     this.currentAmmo = this.config.magSize;
     this.chambers = new Array<ChamberState>(this.config.magSize).fill("loaded");
+    if (config.reloadTickBurst !== undefined) {
+      this.reloadTickBurst = config.reloadTickBurst;
+    }
+  }
+
+  public getReloadTickBurst(): number {
+    return this.reloadTickBurst ?? this.config.reloadTickBurst;
+  }
+
+  public setReloadTickBurst(burst: number): void {
+    this.reloadTickBurst = burst;
+  }
+
+  public reconfigure(config: Partial<WeaponConfig>): void {
+    Object.assign(this.config, config);
+    if (config.reloadTickBurst !== undefined) {
+      this.reloadTickBurst = config.reloadTickBurst;
+    }
+    if (config.magSize !== undefined) {
+      this.chambers = new Array<ChamberState>(this.config.magSize).fill("loaded");
+      this.currentAmmo = this.config.magSize;
+      this.currentChamberIndex = 0;
+    }
   }
 
   public getAmmo(): number {
@@ -147,25 +171,30 @@ export class Revolver implements Weapon {
   }
 
   /**
-   * Reloads the cylinder to full capacity (6 loaded rounds),
+   * Reloads the cylinder to full capacity (e.g. 6 or 8 loaded rounds),
    * sets cooldown to prevent instant spamming, and queues the reload tick burst on TimeGovernor.
    *
    * @returns true if reload was performed, false if cylinder was already full.
    */
-  public reload(governor?: TimeGovernor): boolean {
+  public reload(governor?: TimeGovernor, reloadTickBurst?: number): boolean {
     if (this.currentAmmo === this.config.magSize) {
       return false; // Cylinder is already fully loaded
     }
 
     // Refill all chambers
-    this.chambers.fill("loaded");
+    if (this.chambers.length !== this.config.magSize) {
+      this.chambers = new Array<ChamberState>(this.config.magSize).fill("loaded");
+    } else {
+      this.chambers.fill("loaded");
+    }
     this.currentAmmo = this.config.magSize;
     this.currentChamberIndex = 0;
     this.cooldownRemainingTicks = this.config.cooldownTicks;
     this.dryFiredThisFrame = false;
 
+    const burst = reloadTickBurst ?? this.getReloadTickBurst();
     if (governor) {
-      governor.queueReloadBurst(this.config.reloadTickBurst);
+      governor.queueReloadBurst(burst);
     }
 
     return true;
@@ -175,7 +204,11 @@ export class Revolver implements Weapon {
    * Resets cylinder to full ammunition and zero cooldown.
    */
   public reset(): void {
-    this.chambers.fill("loaded");
+    if (this.chambers.length !== this.config.magSize) {
+      this.chambers = new Array<ChamberState>(this.config.magSize).fill("loaded");
+    } else {
+      this.chambers.fill("loaded");
+    }
     this.currentAmmo = this.config.magSize;
     this.currentChamberIndex = 0;
     this.cooldownRemainingTicks = 0;

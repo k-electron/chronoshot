@@ -343,7 +343,7 @@ describe("Combat Arena & Room Loop", () => {
     arena.status = "defeat";
     arena.render(mockCtx, 0.016);
     expect(mockCtx.fillText).toHaveBeenCalledWith(
-      "PROTOCOL FAILED",
+      "PROTOCOL TERMINATED",
       480,
       expect.any(Number)
     );
@@ -467,5 +467,175 @@ describe("Combat Arena & Room Loop", () => {
     arena.enemies[2].isChargingLaser = true;
 
     expect(() => arena.render(mockCtx, 0.016)).not.toThrow();
+  });
+
+  it("renders Boss Telemetry HUD when active boss is present", async () => {
+    const { Enemy } = await import("./Enemy");
+    const mockCtx = {
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      arc: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+      fillRect: vi.fn(),
+      strokeRect: vi.fn(),
+      fillText: vi.fn(),
+      translate: vi.fn(),
+      rotate: vi.fn(),
+      setLineDash: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      closePath: vi.fn(),
+      createLinearGradient: vi.fn().mockReturnValue({
+        addColorStop: vi.fn(),
+      }),
+      createRadialGradient: vi.fn().mockReturnValue({
+        addColorStop: vi.fn(),
+      }),
+    } as unknown as CanvasRenderingContext2D;
+
+    const arena = new Arena();
+    const boss = new Enemy({
+      id: "goliath",
+      type: "boss",
+      x: 700,
+      y: 320,
+      maxShields: 4,
+      bossName: "GOLIATH-01: AEGIS COLOSSUS",
+    });
+    arena.enemies = [boss];
+
+    arena.render(mockCtx, 0.016);
+    expect(mockCtx.fillText).toHaveBeenCalledWith(
+      "GOLIATH-01: AEGIS COLOSSUS",
+      expect.any(Number),
+      expect.any(Number)
+    );
+
+    // When enraged: displays enraged warning
+    boss.isEnraged = true;
+    arena.render(mockCtx, 0.016);
+    expect(mockCtx.fillText).toHaveBeenCalledWith(
+      "CORE VULNERABLE // ENRAGED",
+      expect.any(Number),
+      expect.any(Number)
+    );
+  });
+
+  it("triggers freeze-frame upgrade selection overlay when boss is destroyed and applies upgrade on choice", async () => {
+    const { RoomManager } = await import("../levels/RoomManager");
+    const roomManager = new RoomManager();
+    const arena = new Arena(960, 640, roomManager);
+
+    // Advance directly to Room 5 (Sector 1 Boss)
+    while (arena.roomManager?.getCurrentRoomIndex() !== 4) {
+      arena.roomManager?.advanceRoom();
+    }
+    arena.loadRoom(arena.roomManager.getCurrentRoom());
+    expect(arena.roomManager.getCurrentRoom().roomNumber).toBe(5);
+
+    // Find the boss enemy in Room 5
+    const boss = arena.enemies.find((e) => e.isBoss);
+    expect(boss).toBeDefined();
+
+    // Crack all 4 shields of Goliath
+    boss!.takeDamage(4);
+    expect(boss!.shields).toBe(0);
+    expect(boss!.isEnraged).toBe(true);
+
+    // Deliver lethal 5th hit from outside boss radius (boss radius is 24)
+    const lethalShot = createProjectile(
+      "lethal-boss-shot",
+      vec2(boss!.position.x - 45, boss!.position.y),
+      0,
+      1000,
+      "player"
+    );
+    arena.projectiles.push(lethalShot);
+
+    arena.step(0.05, {
+      moveDir: vec2(1, 0),
+      mousePos: vec2(500, 320),
+      shoot: false,
+      reload: false,
+      restart: false,
+    });
+
+    expect(boss!.isAlive).toBe(false);
+    expect(arena.isUpgradeDraftActive).toBe(true);
+
+    // Selecting upgrade [1] (Extended Cylinder)
+    arena.step(0.016, {
+      moveDir: vec2(0, 0),
+      mousePos: vec2(500, 320),
+      shoot: false,
+      reload: false,
+      restart: false,
+      upgradeChoice: 1,
+    });
+
+    expect(arena.isUpgradeDraftActive).toBe(false);
+    expect(arena.player.getAugmentations().extendedCylinder).toBe(true);
+    expect(arena.player.weapon.getMagSize()).toBe(8);
+    // Successfully advanced to Room 6 (Zone 2 Baseline)
+    expect(arena.roomManager.getCurrentRoomIndex()).toBe(5);
+    expect(arena.roomManager.getCurrentRoom().roomNumber).toBe(6);
+  });
+
+  it("supports upgrade selection via mouse click inside card boundaries", async () => {
+    const { RoomManager } = await import("../levels/RoomManager");
+    const roomManager = new RoomManager();
+    const arena = new Arena(960, 640, roomManager);
+
+    // Simulate active upgrade draft
+    arena.isUpgradeDraftActive = true;
+
+    // Click inside Card 2 bounds (Speed Loader: x: 350..610, y: 170..460)
+    arena.step(0.016, {
+      moveDir: vec2(0, 0),
+      mousePos: vec2(480, 250),
+      shoot: true,
+      reload: false,
+      restart: false,
+    });
+
+    expect(arena.isUpgradeDraftActive).toBe(false);
+    expect(arena.player.getAugmentations().speedLoader).toBe(true);
+  });
+
+  it("enforces pure permadeath run reset back to Room 1 on defeat and clears augmentations", async () => {
+    const { RoomManager } = await import("../levels/RoomManager");
+    const roomManager = new RoomManager();
+    const arena = new Arena(960, 640, roomManager);
+
+    // Advance to Room 7 with an augmentation
+    while (arena.roomManager?.getCurrentRoomIndex() !== 6) {
+      arena.roomManager?.advanceRoom();
+    }
+    arena.loadRoom(arena.roomManager.getCurrentRoom());
+    arena.player.setAugmentation("speedLoader", true);
+    expect(arena.roomManager.getCurrentRoom().roomNumber).toBe(7);
+    expect(arena.player.getAugmentations().speedLoader).toBe(true);
+
+    // Player dies in Room 7
+    arena.player.kill();
+    arena.status = "defeat";
+
+    // Player presses [R] to restart
+    arena.step(0.016, {
+      moveDir: vec2(0, 0),
+      mousePos: vec2(500, 320),
+      shoot: false,
+      reload: false,
+      restart: true,
+    });
+
+    // Permadeath: back to Room 1, augmentations wiped!
+    expect(arena.roomManager.getCurrentRoomIndex()).toBe(0);
+    expect(arena.roomManager.getCurrentRoom().roomNumber).toBe(1);
+    expect(arena.player.getAugmentations().speedLoader).toBeUndefined();
+    expect(arena.status).toBe("playing");
+    expect(arena.player.isAlive).toBe(true);
   });
 });

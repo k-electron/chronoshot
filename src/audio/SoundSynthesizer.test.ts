@@ -158,6 +158,8 @@ describe("SoundSynthesizer Pitch & Time Modulation", () => {
     expect(() => synth.playShieldDeflect(0.5)).not.toThrow();
     expect(() => synth.playShieldBreak(0.5)).not.toThrow();
     expect(() => synth.playSniperCharge(0.5)).not.toThrow();
+    expect(() => synth.playUpgradeChime(0.5)).not.toThrow();
+    expect(() => synth.playBossDefeat(0.5)).not.toThrow();
     expect(() => synth.setMuted(true)).not.toThrow();
   });
 });
@@ -354,6 +356,127 @@ describe("SoundSynthesizer Procedural Web Audio Generation", () => {
     expect(osc.start).toHaveBeenCalled();
   });
 
+  it("synthesizes triumphant cyberpunk upgrade chime with pitch and duration scaling", () => {
+    const mock = createMockAudioContext();
+    const synth = new SoundSynthesizer(mock.context);
+
+    mock.createdOscillators.length = 0;
+    mock.createdGains.length = 0;
+    synth.playUpgradeChime(1.0);
+
+    // 4 ascending chord notes: C5 (523.25), E5 (659.25), G5 (783.99), C6 (1046.5)
+    expect(mock.createdOscillators.length).toBe(4);
+    expect(mock.createdGains.length).toBe(4);
+
+    expect(mock.createdOscillators[0].type).toBe("triangle");
+    expect(mock.createdOscillators[1].type).toBe("sine");
+    expect(mock.createdOscillators[0].frequency.setValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(523.25, 1),
+      0
+    );
+    expect(mock.createdOscillators[3].frequency.setValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(1046.5, 1),
+      expect.any(Number)
+    );
+
+    // Oscillators and gains should connect and start/stop
+    for (const osc of mock.createdOscillators) {
+      expect(osc.start).toHaveBeenCalled();
+      expect(osc.stop).toHaveBeenCalled();
+      expect(osc.connect).toHaveBeenCalled();
+    }
+    for (const g of mock.createdGains) {
+      expect(g.connect).toHaveBeenCalled();
+      expect(g.gain.setValueAtTime).toHaveBeenCalled();
+      expect(g.gain.linearRampToValueAtTime).toHaveBeenCalled();
+      expect(g.gain.exponentialRampToValueAtTime).toHaveBeenCalled();
+    }
+
+    // With micro-creep timeScale pitch and duration modulation
+    mock.createdOscillators.length = 0;
+    synth.playUpgradeChime(0.05);
+
+    const pitch = synth.calculatePitch(0.05);
+    expect(mock.createdOscillators[0].frequency.setValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(523.25 * pitch, 1),
+      0
+    );
+    expect(mock.createdOscillators[3].frequency.setValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(1046.5 * pitch, 1),
+      expect.any(Number)
+    );
+  });
+
+  it("synthesizes deep boss defeat rumble, sub-bass sweep, and sparkle", () => {
+    const mock = createMockAudioContext();
+    const synth = new SoundSynthesizer(mock.context);
+
+    mock.createdOscillators.length = 0;
+    mock.createdBufferSources.length = 0;
+    mock.createdFilters.length = 0;
+    mock.createdGains.length = 0;
+
+    synth.playBossDefeat(1.0);
+
+    // 1 noise rumble buffer source + 1 filter + 1 sub-bass osc + 3 sparkle oscs
+    expect(mock.createdBufferSources.length).toBe(1);
+    expect(mock.createdFilters.length).toBe(1);
+    expect(mock.createdOscillators.length).toBe(4);
+
+    expect(mock.createdFilters[0].type).toBe("lowpass");
+    expect(mock.createdFilters[0].frequency.setValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(260, 1),
+      0
+    );
+
+    // Sub-bass sweep
+    const subOsc = mock.createdOscillators[0];
+    expect(subOsc.type).toBe("triangle");
+    expect(subOsc.frequency.setValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(160, 1),
+      0
+    );
+    expect(subOsc.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(26, 1),
+      expect.any(Number)
+    );
+
+    // Sparkle oscillators
+    expect(mock.createdOscillators[1].frequency.setValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(2000, 1),
+      expect.any(Number)
+    );
+    expect(mock.createdOscillators[2].frequency.setValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(3200, 1),
+      expect.any(Number)
+    );
+    expect(mock.createdOscillators[3].frequency.setValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(4400, 1),
+      expect.any(Number)
+    );
+
+    for (const osc of mock.createdOscillators) {
+      expect(osc.start).toHaveBeenCalled();
+      expect(osc.stop).toHaveBeenCalled();
+      expect(osc.connect).toHaveBeenCalled();
+    }
+
+    // Micro-creep pitch scaling
+    mock.createdOscillators.length = 0;
+    mock.createdFilters.length = 0;
+    synth.playBossDefeat(0.05);
+
+    const pitch = synth.calculatePitch(0.05);
+    expect(mock.createdFilters[0].frequency.setValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(260 * pitch, 1),
+      0
+    );
+    expect(mock.createdOscillators[0].frequency.setValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(160 * pitch, 1),
+      0
+    );
+  });
+
   it("suppresses audio synthesis when muted", () => {
     const mock = createMockAudioContext();
     const synth = new SoundSynthesizer(mock.context);
@@ -365,6 +488,8 @@ describe("SoundSynthesizer Procedural Web Audio Generation", () => {
     synth.playShieldDeflect(1.0);
     synth.playShieldBreak(1.0);
     synth.playSniperCharge(1.0);
+    synth.playUpgradeChime(1.0);
+    synth.playBossDefeat(1.0);
 
     expect(mock.createdOscillators.length).toBe(0);
     expect(mock.createdBufferSources.length).toBe(0);

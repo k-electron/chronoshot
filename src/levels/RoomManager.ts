@@ -2,11 +2,12 @@
  * RoomManager module for ChronoShot.
  *
  * Coordinates puzzle room lifecycle, exit portal locking/unlocking,
- * room transitions, and overall mission victory state:
+ * room transitions, boss encounter detection, and overall mission victory state:
  * - Locks exit portal until all active enemies in the current room are eliminated
  * - Detects player entrance into the exit portal to trigger room progression
- * - Manages sequential transition across Room 1 -> Room 2 -> Room 3
- * - Displays the final Mission Accomplished victory screen upon room 3 completion
+ * - Manages sequential transition across 9 rooms spanning Sector 1 and Zone 2
+ * - Identifies milestone boss rooms (Room 5: Goliath-01 Aegis Colossus)
+ * - Displays the final Mission Accomplished victory screen upon room 9 completion
  * - Renders dynamic portal animations (locked hazard ring vs. radiant cyan vortex)
  */
 
@@ -33,6 +34,17 @@ export class RoomManager {
    */
   public getRoomCount(): number {
     return this.rooms.length;
+  }
+
+  /**
+   * Returns whether the active room is a boss encounter.
+   */
+  public isBossRoom(): boolean {
+    const currentRoom = this.getCurrentRoom();
+    return (
+      currentRoom.roomNumber === 5 ||
+      currentRoom.enemies.some((e) => (e.type as string) === "boss")
+    );
   }
 
   /**
@@ -306,13 +318,13 @@ export class RoomManager {
     // Subtitle
     ctx.font = getUIFont(13, "600");
     ctx.fillStyle = UITheme.colors.textPrimary;
-    ctx.fillText("ALL 5 PUZZLE PROTOCOLS CONQUERED", width / 2, height / 2 - 20);
+    ctx.fillText("ALL 9 TACTICAL PROTOCOLS CONQUERED", width / 2, height / 2 - 20);
 
     // Protocol checkmarks
     ctx.font = getUIFont(11, "600");
     ctx.fillStyle = UITheme.colors.green;
     ctx.fillText(
-      "✓ 1v1 Cover  |  ✓ Armored Breach  |  ✓ Infiltration  |  ✓ Line of Fire  |  ✓ Tactical Gauntlet",
+      "✓ Sector 1 Protocols  |  ✓ Goliath-01 Defeated  |  ✓ Zone 2 Protocols",
       width / 2,
       height / 2 + 30
     );

@@ -49,6 +49,24 @@ describe("HUD Rendering", () => {
     expect(ctx.fillText).toHaveBeenCalledWith("[R] RELOAD (+30 TICKS)", 144, 112);
   });
 
+  it("renders CylinderHUD with 8 chambers (extended cylinder) without throwing", () => {
+    const revolver = new Revolver({ magSize: 8, reloadTickBurst: 15 });
+    const hud = new CylinderHUD({ x: 100, y: 100 });
+    const ctx = createMockContext();
+
+    expect(() => hud.render(ctx, revolver)).not.toThrow();
+    expect(ctx.arc).toHaveBeenCalled();
+    expect(ctx.fill).toHaveBeenCalled();
+    expect(ctx.fillText).toHaveBeenCalledWith("8 / 8", 144, 92);
+    expect(ctx.fillText).toHaveBeenCalledWith("READY", 144, 112);
+
+    // Drain one round and verify prompt displays speedLoader reload burst
+    revolver.fire();
+    hud.render(ctx, revolver);
+    expect(ctx.fillText).toHaveBeenCalledWith("7 / 8", 144, 92);
+    expect(ctx.fillText).toHaveBeenCalledWith("[R] RELOAD (+15 TICKS)", 144, 112);
+  });
+
   it("renders TimeHUD scale gauge and burst notifications", () => {
     const governor = new TimeGovernor();
     const hud = new TimeHUD({ x: 20, y: 20, width: 200, height: 3 });

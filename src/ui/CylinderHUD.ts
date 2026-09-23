@@ -75,9 +75,11 @@ export class CylinderHUD {
     ctx.strokeStyle = isDryFired ? UITheme.colors.crimsonDim : "rgba(255, 255, 255, 0.05)";
     ctx.stroke();
 
-    // 2. 6 Chambers arranged radially with rotation offset
-    const chamberRingRadius = radius * 0.58;
+    // 2. Chambers arranged radially with rotation offset
     const totalChambers = chambers.length;
+    // Scale chamber geometry dynamically for higher capacity (e.g. 8 chambers) to preserve crisp spacing
+    const effectiveChamberRadius = totalChambers > 6 ? chamberRadius * 0.82 : chamberRadius;
+    const chamberRingRadius = totalChambers > 6 ? radius * 0.60 : radius * 0.58;
 
     for (let i = 0; i < totalChambers; i++) {
       const baseAngle = (i / totalChambers) * Math.PI * 2 - Math.PI / 2;
@@ -88,7 +90,7 @@ export class CylinderHUD {
       const isActive = i === activeIndex;
 
       ctx.beginPath();
-      ctx.arc(cx, cy, chamberRadius, 0, Math.PI * 2);
+      ctx.arc(cx, cy, effectiveChamberRadius, 0, Math.PI * 2);
 
       if (state === "loaded") {
         // High-energy radiant cyan pip
@@ -100,7 +102,7 @@ export class CylinderHUD {
 
         // White micro-core center
         ctx.beginPath();
-        ctx.arc(cx, cy, chamberRadius * 0.4, 0, Math.PI * 2);
+        ctx.arc(cx, cy, effectiveChamberRadius * 0.4, 0, Math.PI * 2);
         ctx.fillStyle = UITheme.colors.white;
         ctx.fill();
       } else {
@@ -115,7 +117,7 @@ export class CylinderHUD {
       // Active chamber alignment ring
       if (isActive) {
         ctx.beginPath();
-        ctx.arc(cx, cy, chamberRadius + 2.5, 0, Math.PI * 2);
+        ctx.arc(cx, cy, effectiveChamberRadius + (totalChambers > 6 ? 2.0 : 2.5), 0, Math.PI * 2);
         ctx.lineWidth = 1;
         ctx.strokeStyle = isDryFired ? UITheme.colors.crimson : UITheme.colors.cyanDim;
         ctx.stroke();
@@ -124,7 +126,7 @@ export class CylinderHUD {
 
     // 3. Central spindle axle
     ctx.beginPath();
-    ctx.arc(x, y, chamberRadius * 0.6, 0, Math.PI * 2);
+    ctx.arc(x, y, effectiveChamberRadius * 0.6, 0, Math.PI * 2);
     ctx.fillStyle = "#161c26";
     ctx.fill();
     ctx.strokeStyle = UITheme.colors.panelBorder;
@@ -145,19 +147,23 @@ export class CylinderHUD {
 
     const textOffsetX = x + radius + 16;
 
-    // Ammunition counter (e.g. "6 / 6")
+    // Ammunition counter (e.g. "6 / 6" or "8 / 8")
     ctx.font = getUIFont(15, "bold");
     ctx.fillStyle = ammo === 0 || isDryFired ? UITheme.colors.crimson : UITheme.colors.textPrimary;
     ctx.fillText(`${ammo} / ${magSize}`, textOffsetX, y - 8);
+
+    const reloadTicks = typeof (revolver as any).getReloadTickBurst === "function"
+      ? (revolver as any).getReloadTickBurst()
+      : revolver.config.reloadTickBurst;
 
     // Tactical action prompt
     ctx.font = getUIFont(10, "600");
     if (ammo === 0 || isDryFired) {
       ctx.fillStyle = UITheme.colors.crimson;
-      ctx.fillText("[R] RELOAD (+30 TICKS)", textOffsetX, y + 12);
+      ctx.fillText(`[R] RELOAD (+${reloadTicks} TICKS)`, textOffsetX, y + 12);
     } else if (ammo < magSize) {
       ctx.fillStyle = UITheme.colors.textSecondary;
-      ctx.fillText("[R] RELOAD (+30 TICKS)", textOffsetX, y + 12);
+      ctx.fillText(`[R] RELOAD (+${reloadTicks} TICKS)`, textOffsetX, y + 12);
     } else {
       ctx.fillStyle = UITheme.colors.textMuted;
       ctx.fillText("READY", textOffsetX, y + 12);

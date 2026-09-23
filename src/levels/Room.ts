@@ -1,17 +1,23 @@
 /**
  * Room Configuration and Level Definitions for ChronoShot.
  *
- * Defines the tactical puzzle room data schema and the 5-room progression sequence:
- * - Room 1 (Basic Cover): 1v1 engagement against a mobile Pistol Grunt with central cover.
- *   Teaches 5% micro-creep dodging, leading shots, and peeking behind obstacles.
- * - Room 2 (Armored Breach): Shotgun Guard (1 shield) + Pistol Grunt pressure.
- *   Teaches shield durability (requiring 2 hits) and evading wide buckshot spreads.
- * - Room 3 (Infiltration): High-speed Stalker rusher + Pistol Grunt flank in a zigzag corridor.
- *   Teaches rapid target acquisition, run-and-gun hostile evasion, and leading fast targets.
- * - Room 4 (The Line of Fire): Marksman sniper nest with 30-tick laser telegraph + Shotgun Guard advance.
- *   Teaches dodging telegraphed high-velocity laser sightlines and cover peeking.
- * - Room 5 (Tactical Gauntlet): Aegis Warden (2 shields) + Stalker rusher + Grunt support.
- *   Tests complete 6-cylinder ammunition budgeting, target prioritization, and reload timing.
+ * Defines the tactical puzzle room data schema and the 9-room progression sequence across 2 zones:
+ * - Sector 1 (Rooms 1–5):
+ *   - Room 1 (Basic Cover): 1v1 engagement against a mobile Pistol Grunt with central cover.
+ *     Teaches 5% micro-creep dodging, leading shots, and peeking behind obstacles.
+ *   - Room 2 (Armored Breach): Shotgun Guard (1 shield) + Pistol Grunt pressure.
+ *     Teaches shield durability (requiring 2 hits) and evading wide buckshot spreads.
+ *   - Room 3 (Infiltration): High-speed Stalker rusher + Pistol Grunt flank in a zigzag corridor.
+ *     Teaches rapid target acquisition, run-and-gun hostile evasion, and leading fast targets.
+ *   - Room 4 (The Line of Fire): Marksman sniper nest with 30-tick laser telegraph + Shotgun Guard advance.
+ *     Teaches dodging telegraphed high-velocity laser sightlines and cover peeking.
+ *   - Room 5 (Sector 1 Boss): Goliath-01 Aegis Colossus (4 shields) + Grunt escorts.
+ *     Tests multi-layer shield stripping, target prioritization, and spatial dodging.
+ * - Zone 2 Escalated Baseline (Rooms 6–9):
+ *   - Room 6 (Breach Protocol): Dual Stalker pincer + Shotgun Guard area denial in central choke.
+ *   - Room 7 (Crossfire Corridor): Crisscrossing dual Marksman snipers + advancing Aegis Warden.
+ *   - Room 8 (Killbox Enclosure): Dual Shotgun Guards + Grunts + Stalker in narrow pillar lanes.
+ *   - Room 9 (The Iron Gate): Final defensive line with dual Aegis Wardens + Marksman + Stalker.
  */
 
 import { EnemyConfig } from "../entities/Enemy";
@@ -220,48 +226,49 @@ export function createRoom4(width = 960, height = 640): RoomConfig {
 }
 
 /**
- * Room 5: Tactical Gauntlet (Aegis Warden [2 shields] + Stalker + Grunt).
- * Tests complete 6-cylinder ammunition budgeting, target prioritization, and reload timing.
+ * Room 5: Sector 1 Boss (Goliath-01 Aegis Colossus [4 shields] + Grunt escorts).
+ * Demands multi-layer shield stripping, cover maneuvering, and escort management.
  */
 export function createRoom5(width = 960, height = 640): RoomConfig {
   return {
     id: "room-5",
     roomNumber: 5,
-    title: "ROOM 05: TACTICAL GAUNTLET",
-    subtitle: "Aegis Warden Final Defense",
-    tacticalTip: "Budget cylinder ammunition! Wardens require 3 rounds to neutralize—time reloads behind pillars.",
+    title: "ROOM 05: SECTOR 1 BOSS",
+    subtitle: "Goliath-01 Aegis Colossus",
+    tacticalTip:
+      "Eliminate Goliath's 4 energy shields before targeting its exposed core! Watch for flanking grunts.",
     playerSpawn: vec2(140, height / 2),
     obstacles: [
       ...createPerimeterWalls(width, height),
-      createPillar("pillar-gauntlet-top", 360, 180, 50),
-      createPillar("pillar-gauntlet-bottom", 360, height - 180, 50),
-      createObstacle("divider-core", 540, height / 2 - 70, 30, 140),
+      createPillar("pillar-bunker-left", 380, 190, 55),
+      createPillar("pillar-bunker-right", 380, height - 190, 55),
+      createObstacle("divider-block", 540, height / 2 - 70, 30, 140),
     ],
     enemies: [
       {
-        id: "warden-boss",
-        type: "warden",
-        x: width - 240,
+        id: "goliath-boss",
+        type: "boss",
+        x: width - 200,
         y: height / 2,
-        maxShields: 2,
-        fireCadenceTicks: 65,
-        initialDelayTicks: 30,
+        maxShields: 4,
+        fireCadenceTicks: 60,
+        initialDelayTicks: 25,
       },
       {
-        id: "stalker-flank",
-        type: "stalker",
-        x: width - 280,
-        y: 160,
-        fireCadenceTicks: 32,
-        initialDelayTicks: 45,
-      },
-      {
-        id: "grunt-support",
+        id: "grunt-escort-top",
         type: "grunt",
-        x: width - 280,
-        y: height - 160,
+        x: width - 260,
+        y: 140,
         fireCadenceTicks: 50,
-        initialDelayTicks: 50,
+        initialDelayTicks: 35,
+      },
+      {
+        id: "grunt-escort-bottom",
+        type: "grunt",
+        x: width - 260,
+        y: height - 140,
+        fireCadenceTicks: 50,
+        initialDelayTicks: 45,
       },
     ],
     exitPortal: {
@@ -273,7 +280,249 @@ export function createRoom5(width = 960, height = 640): RoomConfig {
 }
 
 /**
- * Generates the complete 5-room tactical puzzle progression.
+ * Room 6: Breach Protocol (Dual Stalker Pincer + Shotgun Guard in central choke).
+ * Escalates baseline threat with coordinated high-speed rushers.
+ */
+export function createRoom6(width = 960, height = 640): RoomConfig {
+  return {
+    id: "room-6",
+    roomNumber: 6,
+    title: "ROOM 06: BREACH PROTOCOL",
+    subtitle: "Dual Stalker Pincer",
+    tacticalTip:
+      "Zone 2 hostiles attack without hesitation. Use your tactical augmentation to survive the pincer.",
+    playerSpawn: vec2(140, height / 2),
+    obstacles: [
+      ...createPerimeterWalls(width, height),
+      createObstacle("barrier-top", 440, 0, 30, height / 2 - 60),
+      createObstacle("barrier-bottom", 440, height / 2 + 60, 30, height / 2 - 60),
+    ],
+    enemies: [
+      {
+        id: "stalker-north",
+        type: "stalker",
+        x: width - 240,
+        y: 150,
+        fireCadenceTicks: 32,
+        initialDelayTicks: 15,
+      },
+      {
+        id: "stalker-south",
+        type: "stalker",
+        x: width - 240,
+        y: height - 150,
+        fireCadenceTicks: 32,
+        initialDelayTicks: 20,
+      },
+      {
+        id: "guard-center",
+        type: "shotgun",
+        x: width - 220,
+        y: height / 2,
+        maxShields: 1,
+        fireCadenceTicks: 70,
+        initialDelayTicks: 25,
+      },
+    ],
+    exitPortal: {
+      x: width - 80,
+      y: height / 2,
+      radius: 28,
+    },
+  };
+}
+
+/**
+ * Room 7: Crossfire Corridor (Dual Marksman snipers + advancing Aegis Warden).
+ * Forces cover transitions against crisscrossing sniper sightlines.
+ */
+export function createRoom7(width = 960, height = 640): RoomConfig {
+  return {
+    id: "room-7",
+    roomNumber: 7,
+    title: "ROOM 07: CROSSFIRE CORRIDOR",
+    subtitle: "Crisscrossing Sniper Sightlines",
+    tacticalTip:
+      "Two snipers lock sightlines across the corridor while an armored warden advances. Break lines of sight!",
+    playerSpawn: vec2(140, height / 2),
+    obstacles: [
+      ...createPerimeterWalls(width, height),
+      createObstacle("bunker-left", 360, height / 2 - 70, 35, 140),
+      createObstacle("bunker-top", 540, 90, 35, 150),
+      createObstacle("bunker-bottom", 540, height - 240, 35, 150),
+    ],
+    enemies: [
+      {
+        id: "sniper-top",
+        type: "marksman",
+        x: width - 180,
+        y: 130,
+        fireCadenceTicks: 100,
+        initialDelayTicks: 30,
+      },
+      {
+        id: "sniper-bottom",
+        type: "marksman",
+        x: width - 180,
+        y: height - 130,
+        fireCadenceTicks: 100,
+        initialDelayTicks: 45,
+      },
+      {
+        id: "warden-advance",
+        type: "warden",
+        x: width - 300,
+        y: height / 2,
+        maxShields: 2,
+        fireCadenceTicks: 65,
+        initialDelayTicks: 25,
+      },
+    ],
+    exitPortal: {
+      x: width - 80,
+      y: height / 2,
+      radius: 28,
+    },
+  };
+}
+
+/**
+ * Room 8: Killbox Enclosure (Dual Shotgun Guards + Grunts + Stalker in narrow lanes).
+ * Tests quick weapon cycling, reload timing behind pillars, and crowd control.
+ */
+export function createRoom8(width = 960, height = 640): RoomConfig {
+  return {
+    id: "room-8",
+    roomNumber: 8,
+    title: "ROOM 08: KILLBOX ENCLOSURE",
+    subtitle: "Close-Quarters Shotgun Suppression",
+    tacticalTip:
+      "Heavy shotgun guards suppress narrow corridors. Time your reloads behind pillars.",
+    playerSpawn: vec2(140, height / 2),
+    obstacles: [
+      ...createPerimeterWalls(width, height),
+      createPillar("pillar-top-left", 360, 190, 48),
+      createPillar("pillar-bottom-left", 360, height - 190, 48),
+      createPillar("pillar-top-right", 580, 190, 48),
+      createPillar("pillar-bottom-right", 580, height - 190, 48),
+    ],
+    enemies: [
+      {
+        id: "guard-upper",
+        type: "shotgun",
+        x: width - 240,
+        y: height / 2 - 130,
+        maxShields: 1,
+        fireCadenceTicks: 75,
+        initialDelayTicks: 25,
+      },
+      {
+        id: "guard-lower",
+        type: "shotgun",
+        x: width - 240,
+        y: height / 2 + 130,
+        maxShields: 1,
+        fireCadenceTicks: 75,
+        initialDelayTicks: 35,
+      },
+      {
+        id: "grunt-support-1",
+        type: "grunt",
+        x: width - 320,
+        y: 150,
+        fireCadenceTicks: 50,
+        initialDelayTicks: 30,
+      },
+      {
+        id: "grunt-support-2",
+        type: "grunt",
+        x: width - 320,
+        y: height - 150,
+        fireCadenceTicks: 50,
+        initialDelayTicks: 40,
+      },
+      {
+        id: "stalker-rusher",
+        type: "stalker",
+        x: width - 180,
+        y: height / 2,
+        fireCadenceTicks: 32,
+        initialDelayTicks: 15,
+      },
+    ],
+    exitPortal: {
+      x: width - 80,
+      y: height / 2,
+      radius: 28,
+    },
+  };
+}
+
+/**
+ * Room 9: The Iron Gate (Zone 2 Final Defense: Dual Wardens + Marksman + Stalker).
+ * Requires careful ammunition budgeting to deplete 6 total enemy shields and neutralize hostiles.
+ */
+export function createRoom9(width = 960, height = 640): RoomConfig {
+  return {
+    id: "room-9",
+    roomNumber: 9,
+    title: "ROOM 09: THE IRON GATE",
+    subtitle: "Zone 2 Final Defense",
+    tacticalTip:
+      "6 enemy shield hits to break. Budget your ammunition and maintain distance from the warden pair.",
+    playerSpawn: vec2(140, height / 2),
+    obstacles: [
+      ...createPerimeterWalls(width, height),
+      createObstacle("heavy-divider-core", 480, height / 2 - 90, 40, 180),
+      createPillar("pillar-gate-top", 340, 180, 50),
+      createPillar("pillar-gate-bottom", 340, height - 180, 50),
+    ],
+    enemies: [
+      {
+        id: "warden-lead",
+        type: "warden",
+        x: width - 240,
+        y: height / 2 - 120,
+        maxShields: 2,
+        fireCadenceTicks: 65,
+        initialDelayTicks: 25,
+      },
+      {
+        id: "warden-flank",
+        type: "warden",
+        x: width - 240,
+        y: height / 2 + 120,
+        maxShields: 2,
+        fireCadenceTicks: 65,
+        initialDelayTicks: 35,
+      },
+      {
+        id: "marksman-anchor",
+        type: "marksman",
+        x: width - 160,
+        y: height / 2,
+        fireCadenceTicks: 105,
+        initialDelayTicks: 40,
+      },
+      {
+        id: "stalker-infiltrator",
+        type: "stalker",
+        x: width - 320,
+        y: height / 2,
+        fireCadenceTicks: 32,
+        initialDelayTicks: 15,
+      },
+    ],
+    exitPortal: {
+      x: width - 80,
+      y: height / 2,
+      radius: 28,
+    },
+  };
+}
+
+/**
+ * Generates the complete 9-room tactical puzzle progression.
  */
 export function createStandardRoomSequence(
   width = 960,
@@ -285,5 +534,9 @@ export function createStandardRoomSequence(
     createRoom3(width, height),
     createRoom4(width, height),
     createRoom5(width, height),
+    createRoom6(width, height),
+    createRoom7(width, height),
+    createRoom8(width, height),
+    createRoom9(width, height),
   ];
 }

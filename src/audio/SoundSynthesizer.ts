@@ -8,6 +8,8 @@
  * - Bullet impact on obstacle
  * - Crystalline geometric unit shatter upon lethal hit
  * - Triumphant harmonic victory chime upon room clearance
+ * - Triumphant high-energy cyberpunk upgrade chime
+ * - Deep resonant boss defeat rumble, sub-bass sweep, and sparkle
  *
  * Dynamic Pitch Modulation:
  * Directly coupled to TimeGovernor.getTimeScale() [0.05 .. 1.0].
@@ -108,6 +110,13 @@ export class SoundSynthesizer {
         this.context.currentTime
       );
     }
+  }
+
+  /**
+   * Returns current mute state.
+   */
+  public get muted(): boolean {
+    return this.isMuted;
   }
 
   /**
@@ -558,6 +567,128 @@ export class SoundSynthesizer {
 
       osc.start(t0);
       osc.stop(t0 + 0.45 * dur);
+    } catch {
+      // Ignore
+    }
+  }
+
+  /**
+   * Tactical upgrade draft acquisition: triumphant high-energy cyberpunk chord/arpeggio.
+   * Cascading C5, E5, G5, C6 arpeggio with rapid cascading attack and smooth exponential decays.
+   */
+  public playUpgradeChime(timeScale: number = 1.0): void {
+    if (!this.context || !this.masterGain || this.isMuted) return;
+    this.resume();
+
+    const pitch = this.calculatePitch(timeScale);
+    const dur = this.calculateDuration(timeScale);
+    const t0 = this.context.currentTime;
+
+    const chord = [523.25, 659.25, 783.99, 1046.5];
+    const stagger = 0.05 * dur;
+    const noteDuration = 0.35 * dur;
+
+    try {
+      for (let i = 0; i < chord.length; i++) {
+        const noteTime = t0 + i * stagger;
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+
+        osc.type = i % 2 === 0 ? "triangle" : "sine";
+        osc.frequency.setValueAtTime(chord[i] * pitch, noteTime);
+
+        gain.gain.setValueAtTime(0.001, noteTime);
+        gain.gain.linearRampToValueAtTime(0.35, noteTime + 0.012 * dur);
+        gain.gain.exponentialRampToValueAtTime(0.001, noteTime + noteDuration);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc.start(noteTime);
+        osc.stop(noteTime + noteDuration);
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  /**
+   * Milestone boss defeat cue: deep resonant explosion rumble,
+   * descending sub-bass sweep, and high-frequency crystalline sparkle for boss shatter.
+   */
+  public playBossDefeat(timeScale: number = 1.0): void {
+    if (!this.context || !this.masterGain || this.isMuted) return;
+    this.resume();
+
+    const pitch = this.calculatePitch(timeScale);
+    const dur = this.calculateDuration(timeScale);
+    const t0 = this.context.currentTime;
+
+    try {
+      // 1. Deep resonant explosion rumble (filtered noise)
+      if (this.noiseBuffer) {
+        const noiseSource = this.context.createBufferSource();
+        noiseSource.buffer = this.noiseBuffer;
+
+        const filter = this.context.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(260 * pitch, t0);
+        filter.Q.setValueAtTime(3.5, t0);
+
+        const noiseGain = this.context.createGain();
+        noiseGain.gain.setValueAtTime(0.8, t0);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.55 * dur);
+
+        noiseSource.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(this.masterGain);
+
+        noiseSource.start(t0);
+        noiseSource.stop(t0 + 0.55 * dur);
+      }
+
+      // 2. Descending sub-bass sweep
+      const subOsc = this.context.createOscillator();
+      const subGain = this.context.createGain();
+
+      subOsc.type = "triangle";
+      subOsc.frequency.setValueAtTime(160 * pitch, t0);
+      subOsc.frequency.exponentialRampToValueAtTime(
+        Math.max(10, 26 * pitch),
+        t0 + 0.6 * dur
+      );
+
+      subGain.gain.setValueAtTime(0.85, t0);
+      subGain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.6 * dur);
+
+      subOsc.connect(subGain);
+      subGain.connect(this.masterGain);
+
+      subOsc.start(t0);
+      subOsc.stop(t0 + 0.6 * dur);
+
+      // 3. High-frequency sparkle for crystalline boss shatter
+      const sparkleFreqs = [2000, 3200, 4400];
+      for (let i = 0; i < sparkleFreqs.length; i++) {
+        const sparkleTime = t0 + (0.04 + i * 0.04) * dur;
+        const sparkleOsc = this.context.createOscillator();
+        const sparkleGain = this.context.createGain();
+
+        sparkleOsc.type = "sine";
+        sparkleOsc.frequency.setValueAtTime(sparkleFreqs[i] * pitch, sparkleTime);
+
+        sparkleGain.gain.setValueAtTime(0.3, sparkleTime);
+        sparkleGain.gain.exponentialRampToValueAtTime(
+          0.001,
+          sparkleTime + 0.25 * dur
+        );
+
+        sparkleOsc.connect(sparkleGain);
+        sparkleGain.connect(this.masterGain);
+
+        sparkleOsc.start(sparkleTime);
+        sparkleOsc.stop(sparkleTime + 0.25 * dur);
+      }
     } catch {
       // Ignore
     }

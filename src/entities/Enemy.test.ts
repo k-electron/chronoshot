@@ -201,3 +201,174 @@ describe("Enemy Tactical AI & Archetypes", () => {
     expect(Math.abs(enemy.velocity.x) + Math.abs(enemy.velocity.y)).toBeGreaterThan(0);
   });
 });
+
+describe("Enemy - Boss Archetype (Goliath-01)", () => {
+  it("initializes with 4 shields, radius 24, and correct boss name", () => {
+    const boss = new Enemy({
+      id: "boss-goliath",
+      type: "boss",
+      x: 500,
+      y: 300,
+    });
+
+    expect(boss.isBoss).toBe(true);
+    expect(boss.bossName).toBe("GOLIATH-01: AEGIS COLOSSUS");
+    expect(boss.radius).toBe(24);
+    expect(boss.speed).toBe(55);
+    expect(boss.maxShields).toBe(4);
+    expect(boss.shields).toBe(4);
+    expect(boss.fireCadenceTicks).toBe(60);
+    expect(boss.bulletSpeed).toBe(520);
+    expect(boss.stutterTicks).toBe(10);
+    expect(boss.spreadAngle).toBe(0.05);
+    expect(boss.pellets).toBe(1);
+    expect(boss.runAndGun).toBe(false);
+    expect(boss.isEnraged).toBe(false);
+    expect(boss.isAlive).toBe(true);
+  });
+
+  it("absorbs up to 4 hits with takeDamage(), remaining alive with shields decrementing", () => {
+    const boss = new Enemy({
+      id: "boss-durability",
+      type: "boss",
+      x: 500,
+      y: 300,
+    });
+
+    // 4 successive hits are absorbed by the energy shield
+    for (let hit = 1; hit <= 4; hit++) {
+      const result = boss.takeDamage(1);
+      expect(result.absorbed).toBe(true);
+      expect(result.eliminated).toBe(false);
+      expect(result.remainingShields).toBe(4 - hit);
+      expect(boss.shields).toBe(4 - hit);
+      expect(boss.isAlive).toBe(true);
+    }
+  });
+
+  it("triggers isEnraged = true and increased speed when breaking the 4th shield", () => {
+    const boss = new Enemy({
+      id: "boss-enrage",
+      type: "boss",
+      x: 500,
+      y: 300,
+    });
+    const player = new Player({ x: 100, y: 300 });
+
+    // Initial calm state
+    expect(boss.isEnraged).toBe(false);
+    expect(boss.speed).toBe(55);
+
+    // Take 3 hits: still calm
+    for (let i = 0; i < 3; i++) {
+      boss.takeDamage(1);
+      expect(boss.isEnraged).toBe(false);
+      expect(boss.speed).toBe(55);
+    }
+    expect(boss.shields).toBe(1);
+
+    // 4th hit breaks final shield: triggers enrage phase
+    const hit4 = boss.takeDamage(1);
+    expect(hit4.absorbed).toBe(true);
+    expect(hit4.eliminated).toBe(false);
+    expect(hit4.remainingShields).toBe(0);
+    expect(boss.shields).toBe(0);
+    expect(boss.isAlive).toBe(true);
+    expect(boss.isEnraged).toBe(true);
+    expect(boss.speed).toBe(95);
+
+    // Updates with increased movement velocity (95 px/s toward player)
+    boss.update(player, [], 1);
+    expect(Math.abs(boss.velocity.x)).toBeCloseTo(95);
+  });
+
+  it("eliminates the boss on the 5th hit (shields = 0 is lethal)", () => {
+    const boss = new Enemy({
+      id: "boss-elimination",
+      type: "boss",
+      x: 500,
+      y: 300,
+    });
+
+    // Break all 4 shields
+    for (let i = 0; i < 4; i++) {
+      boss.takeDamage(1);
+    }
+    expect(boss.shields).toBe(0);
+    expect(boss.isAlive).toBe(true);
+    expect(boss.isEnraged).toBe(true);
+
+    // 5th hit: shields are depleted, lethal elimination
+    const lethalHit = boss.takeDamage(1);
+    expect(lethalHit.absorbed).toBe(false);
+    expect(lethalHit.eliminated).toBe(true);
+    expect(lethalHit.remainingShields).toBe(0);
+    expect(boss.isAlive).toBe(false);
+  });
+
+  it("discharges 3-way spread when enraged", () => {
+    const boss = new Enemy({
+      id: "boss-discharge",
+      type: "boss",
+      x: 500,
+      y: 300,
+    });
+
+    // Before enraged: single pinpoint projectile
+    const calmProjectiles = boss.discharge();
+    expect(calmProjectiles).toHaveLength(1);
+
+    // Break all 4 shields to trigger enrage phase
+    for (let i = 0; i < 4; i++) {
+      boss.takeDamage(1);
+    }
+    expect(boss.isEnraged).toBe(true);
+
+    // When enraged: 3-way spread
+    const enragedProjectiles = boss.discharge();
+    expect(enragedProjectiles).toHaveLength(3);
+    for (const p of enragedProjectiles) {
+      expect(p.owner).toBe("enemy");
+      const speed = Math.sqrt(p.velocity.x ** 2 + p.velocity.y ** 2);
+      expect(speed).toBeCloseTo(520);
+    }
+
+    // Direct isEnraged setting also triggers 3-way spread
+    const directBoss = new Enemy({
+      id: "boss-direct-enrage",
+      type: "boss",
+      x: 500,
+      y: 300,
+    });
+    directBoss.isEnraged = true;
+    expect(directBoss.discharge()).toHaveLength(3);
+  });
+
+  it("restores boss to 4 shields and non-enraged state on reset()", () => {
+    const boss = new Enemy({
+      id: "boss-reset",
+      type: "boss",
+      x: 500,
+      y: 300,
+    });
+
+    // Enrage boss
+    for (let i = 0; i < 4; i++) {
+      boss.takeDamage(1);
+    }
+    expect(boss.shields).toBe(0);
+    expect(boss.isEnraged).toBe(true);
+    expect(boss.speed).toBe(95);
+
+    // Reset restores to pristine spawn state
+    boss.reset();
+    expect(boss.shields).toBe(4);
+    expect(boss.maxShields).toBe(4);
+    expect(boss.isEnraged).toBe(false);
+    expect(boss.speed).toBe(55);
+    expect(boss.isAlive).toBe(true);
+
+    // Calm discharge after reset
+    expect(boss.discharge()).toHaveLength(1);
+  });
+});

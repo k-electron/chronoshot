@@ -6,6 +6,11 @@ import {
   createRoom3,
   createRoom4,
   createRoom5,
+  createRoom6,
+  createRoom7,
+  createRoom8,
+  createRoom9,
+  createStandardRoomSequence,
 } from "./Room";
 import { RoomManager } from "./RoomManager";
 
@@ -87,20 +92,137 @@ describe("Room Configuration & Sequence Schema", () => {
     expect(room4.exitPortal).toBeDefined();
   });
 
-  it("constructs Room 5 as Tactical Gauntlet with Aegis Warden, Stalker, and Grunt", () => {
+  it("constructs Room 5 as Sector 1 Boss with Goliath Colossus and Grunt escorts", () => {
     const room5 = createRoom5();
+    expect(room5.id).toBe("room-5");
     expect(room5.roomNumber).toBe(5);
+    expect(room5.title).toBe("ROOM 05: SECTOR 1 BOSS");
+    expect(room5.subtitle).toBe("Goliath-01 Aegis Colossus");
+    expect(room5.tacticalTip).toBe(
+      "Eliminate Goliath's 4 energy shields before targeting its exposed core! Watch for flanking grunts."
+    );
     expect(room5.enemies).toHaveLength(3);
 
-    const warden = room5.enemies.find((e) => e.type === "warden");
-    const stalker = room5.enemies.find((e) => e.type === "stalker");
-    const grunt = room5.enemies.find((e) => e.type === "grunt");
+    const boss = room5.enemies.find((e) => e.id === "goliath-boss");
+    expect(boss).toBeDefined();
+    expect(boss?.type).toBe("boss");
+    expect(boss?.maxShields).toBe(4);
+    expect(boss?.fireCadenceTicks).toBe(60);
+    expect(boss?.initialDelayTicks).toBe(25);
 
-    expect(warden).toBeDefined();
-    expect(warden?.maxShields).toBe(2);
-    expect(stalker).toBeDefined();
-    expect(grunt).toBeDefined();
+    const escorts = room5.enemies.filter((e) => e.type === "grunt");
+    expect(escorts).toHaveLength(2);
+    expect(room5.enemies.some((e) => e.id === "grunt-escort-top")).toBe(true);
+    expect(room5.enemies.some((e) => e.id === "grunt-escort-bottom")).toBe(true);
+
+    const leftPillar = room5.obstacles.find((o) => o.id === "pillar-bunker-left");
+    const rightPillar = room5.obstacles.find((o) => o.id === "pillar-bunker-right");
+    const divider = room5.obstacles.find((o) => o.id === "divider-block");
+    expect(leftPillar).toBeDefined();
+    expect(rightPillar).toBeDefined();
+    expect(divider).toBeDefined();
     expect(room5.exitPortal).toBeDefined();
+  });
+
+  it("constructs Room 6 as Breach Protocol with dual Stalkers and Shotgun Guard", () => {
+    const room6 = createRoom6();
+    expect(room6.id).toBe("room-6");
+    expect(room6.roomNumber).toBe(6);
+    expect(room6.title).toBe("ROOM 06: BREACH PROTOCOL");
+    expect(room6.subtitle).toBe("Dual Stalker Pincer");
+    expect(room6.tacticalTip).toContain("Zone 2 hostiles attack without hesitation");
+    expect(room6.enemies).toHaveLength(3);
+
+    const stalkers = room6.enemies.filter((e) => e.type === "stalker");
+    const guards = room6.enemies.filter((e) => e.type === "shotgun");
+    expect(stalkers).toHaveLength(2);
+    expect(guards).toHaveLength(1);
+    expect(room6.enemies.some((e) => e.id === "stalker-north")).toBe(true);
+    expect(room6.enemies.some((e) => e.id === "stalker-south")).toBe(true);
+    expect(room6.enemies.some((e) => e.id === "guard-center")).toBe(true);
+
+    const barriers = room6.obstacles.filter((o) => o.id.includes("barrier"));
+    expect(barriers.length).toBeGreaterThanOrEqual(2);
+    expect(room6.exitPortal).toBeDefined();
+  });
+
+  it("constructs Room 7 as Crossfire Corridor with crisscrossing Snipers and Warden", () => {
+    const room7 = createRoom7();
+    expect(room7.id).toBe("room-7");
+    expect(room7.roomNumber).toBe(7);
+    expect(room7.title).toBe("ROOM 07: CROSSFIRE CORRIDOR");
+    expect(room7.subtitle).toBe("Crisscrossing Sniper Sightlines");
+    expect(room7.enemies).toHaveLength(3);
+
+    const snipers = room7.enemies.filter((e) => e.type === "marksman");
+    const wardens = room7.enemies.filter((e) => e.type === "warden");
+    expect(snipers).toHaveLength(2);
+    expect(wardens).toHaveLength(1);
+    expect(wardens[0].maxShields).toBe(2);
+    expect(room7.enemies.some((e) => e.id === "sniper-top")).toBe(true);
+    expect(room7.enemies.some((e) => e.id === "sniper-bottom")).toBe(true);
+    expect(room7.enemies.some((e) => e.id === "warden-advance")).toBe(true);
+
+    const bunkers = room7.obstacles.filter((o) => o.id.includes("bunker"));
+    expect(bunkers.length).toBeGreaterThanOrEqual(3);
+    expect(room7.exitPortal).toBeDefined();
+  });
+
+  it("constructs Room 8 as Killbox Enclosure with shotgun guards, grunts, and stalker", () => {
+    const room8 = createRoom8();
+    expect(room8.id).toBe("room-8");
+    expect(room8.roomNumber).toBe(8);
+    expect(room8.title).toBe("ROOM 08: KILLBOX ENCLOSURE");
+    expect(room8.subtitle).toBe("Close-Quarters Shotgun Suppression");
+    expect(room8.enemies).toHaveLength(5);
+
+    const guards = room8.enemies.filter((e) => e.type === "shotgun");
+    const grunts = room8.enemies.filter((e) => e.type === "grunt");
+    const stalkers = room8.enemies.filter((e) => e.type === "stalker");
+    expect(guards).toHaveLength(2);
+    expect(guards.every((g) => g.maxShields === 1)).toBe(true);
+    expect(grunts).toHaveLength(2);
+    expect(stalkers).toHaveLength(1);
+
+    const pillars = room8.obstacles.filter((o) => o.id.includes("pillar"));
+    expect(pillars).toHaveLength(4);
+    expect(room8.exitPortal).toBeDefined();
+  });
+
+  it("constructs Room 9 as The Iron Gate with dual Wardens, sniper, and stalker", () => {
+    const room9 = createRoom9();
+    expect(room9.id).toBe("room-9");
+    expect(room9.roomNumber).toBe(9);
+    expect(room9.title).toBe("ROOM 09: THE IRON GATE");
+    expect(room9.subtitle).toBe("Zone 2 Final Defense");
+    expect(room9.tacticalTip).toContain("6 enemy shield hits to break");
+    expect(room9.enemies).toHaveLength(4);
+
+    const wardens = room9.enemies.filter((e) => e.type === "warden");
+    const snipers = room9.enemies.filter((e) => e.type === "marksman");
+    const stalkers = room9.enemies.filter((e) => e.type === "stalker");
+    expect(wardens).toHaveLength(2);
+    expect(wardens.every((w) => w.maxShields === 2)).toBe(true);
+    expect(snipers).toHaveLength(1);
+    expect(stalkers).toHaveLength(1);
+
+    const divider = room9.obstacles.find((o) => o.id.includes("divider"));
+    const pillars = room9.obstacles.filter((o) => o.id.includes("pillar"));
+    expect(divider).toBeDefined();
+    expect(pillars).toHaveLength(2);
+    expect(room9.exitPortal).toBeDefined();
+  });
+
+  it("constructs standard room sequence containing all 9 rooms", () => {
+    const sequence = createStandardRoomSequence();
+    expect(sequence).toHaveLength(9);
+    sequence.forEach((room, index) => {
+      expect(room.roomNumber).toBe(index + 1);
+      expect(room.id).toBe(`room-${index + 1}`);
+      expect(room.obstacles.length).toBeGreaterThan(0);
+      expect(room.enemies.length).toBeGreaterThan(0);
+      expect(room.exitPortal).toBeDefined();
+    });
   });
 });
 
@@ -108,12 +230,58 @@ describe("RoomManager Tactical Puzzle Progression", () => {
   it("initializes at Room 1 with locked exit portal and incomplete game status", () => {
     const manager = new RoomManager();
 
-    expect(manager.getRoomCount()).toBe(5);
+    expect(manager.getRoomCount()).toBe(9);
     expect(manager.getCurrentRoomIndex()).toBe(0);
     expect(manager.getCurrentRoom().roomNumber).toBe(1);
+    expect(manager.isBossRoom()).toBe(false);
     expect(manager.isExitUnlocked()).toBe(false);
     expect(manager.isGameCompleted()).toBe(false);
     expect(manager.hasNextRoom()).toBe(true);
+  });
+
+  it("correctly identifies boss room via isBossRoom()", () => {
+    const manager = new RoomManager();
+
+    // Rooms 1 to 4 are not boss rooms
+    for (let i = 0; i < 4; i++) {
+      expect(manager.isBossRoom()).toBe(false);
+      manager.setExitUnlocked(true);
+      manager.advanceRoom();
+    }
+
+    // Room 5 is the Sector 1 Boss room
+    expect(manager.getCurrentRoom().roomNumber).toBe(5);
+    expect(manager.isBossRoom()).toBe(true);
+
+    // Rooms 6 to 9 are not boss rooms
+    for (let i = 5; i < 9; i++) {
+      manager.setExitUnlocked(true);
+      manager.advanceRoom();
+      expect(manager.isBossRoom()).toBe(false);
+    }
+
+    // Custom room with boss enemy is also detected
+    const customBossManager = new RoomManager([
+      {
+        id: "custom-boss",
+        roomNumber: 1,
+        title: "CUSTOM BOSS",
+        subtitle: "Test Boss",
+        tacticalTip: "Fight the boss",
+        playerSpawn: vec2(100, 100),
+        obstacles: [],
+        enemies: [
+          {
+            id: "test-boss",
+            type: "boss" as unknown as any,
+            x: 200,
+            y: 200,
+          },
+        ],
+        exitPortal: { x: 300, y: 300, radius: 20 },
+      },
+    ]);
+    expect(customBossManager.isBossRoom()).toBe(true);
   });
 
   it("unlocks exit portal only when all active enemies in room are destroyed", () => {
@@ -153,11 +321,11 @@ describe("RoomManager Tactical Puzzle Progression", () => {
     expect(manager.isPlayerInExitPortal(outsidePos, 14)).toBe(false);
   });
 
-  it("advances sequentially across 5 rooms and triggers game completion", () => {
+  it("advances sequentially across 9 rooms and triggers game completion", () => {
     const manager = new RoomManager();
 
-    // Rooms 1 -> 2 -> 3 -> 4 -> 5
-    for (let i = 1; i <= 4; i++) {
+    // Rooms 1 -> 2 -> ... -> 9
+    for (let i = 1; i <= 8; i++) {
       manager.setExitUnlocked(true);
       expect(manager.advanceRoom()).toBe(true);
       expect(manager.getCurrentRoomIndex()).toBe(i);
@@ -175,7 +343,7 @@ describe("RoomManager Tactical Puzzle Progression", () => {
     expect(manager.isGameCompleted()).toBe(true);
   });
 
-  it("supports restarting current room or full game sequence", () => {
+  it("supports restarting current room or full game sequence back to room index 0", () => {
     const manager = new RoomManager();
 
     manager.setExitUnlocked(true);
@@ -188,11 +356,10 @@ describe("RoomManager Tactical Puzzle Progression", () => {
     expect(manager.getCurrentRoomIndex()).toBe(1);
     expect(manager.isExitUnlocked()).toBe(false);
 
-    // Advance to room 5 then complete
-    manager.advanceRoom(); // to room 3
-    manager.advanceRoom(); // to room 4
-    manager.advanceRoom(); // to room 5
-    manager.advanceRoom(); // finish game
+    // Advance to room 9 then complete
+    for (let i = 2; i <= 9; i++) {
+      manager.advanceRoom();
+    }
     expect(manager.isGameCompleted()).toBe(true);
 
     manager.restartGame();
@@ -223,6 +390,11 @@ describe("RoomManager Tactical Puzzle Progression", () => {
       "MISSION ACCOMPLISHED",
       480,
       245
+    );
+    expect(ctx.fillText).toHaveBeenCalledWith(
+      "ALL 9 TACTICAL PROTOCOLS CONQUERED",
+      480,
+      300
     );
   });
 });

@@ -7,26 +7,27 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg)](https://vitejs.dev/)
-[![Tests](https://img.shields.io/badge/Tests-140%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-166%20passing-brightgreen.svg)]()
 
 ---
 
 ```
 +-----------------------------------------------------------------------+
-| 02 // CROSSFIRE               CHRONO // 0.20x [||        ] [ESC] PAUSE|
+| 05 // SECTOR 1 BOSS          CHRONO // 0.05x [||        ] [ESC] PAUSE|
+| [BOSS // GOLIATH-01: AEGIS COLOSSUS]               SHIELDS: [▮▮▮▮]    |
 |                                                                       |
 |        # # # # # # # # # # # # # # # # # # # # # # # # # #            |
 |        #                                                 #            |
-|        #    [▲ Enemy: Pistol]                            #            |
+|        #    [▲ Escort: Grunt]                            #            |
 |        #       *   .   .   . (bullet creeping at 5%)     #            |
 |        #        \                                        #            |
-|        #       +-------+                                 #            |
-|        #       | PILLAR|                                 #            |
-|        #       +-------+                                 #            |
+|        #       +-------+               /-----\           #            |
+|        #       | BUNKER|              | (x)   | <-- BOSS #            |
+|        #       +-------+               \-----/           #            |
 |        #                                                 #            |
 |        #                [● You: Cyan] ----> [· Reticle]  #            |
 |        #                                                 #            |
-|        #                               [▲ Enemy: Shotgun]#            |
+|        #                               [▲ Escort: Grunt] #            |
 |        # # # # # # # # # # # # # [EXIT GATE] # # # # # # #            |
 |                                                                       |
 | (O) 6 / 6 CYLINDER                                                    |
@@ -38,9 +39,11 @@
 
 ## 🎮 Overview
 
-**ChronoShot** translates the spatial puzzle mechanics of *SUPERHOT* into the twitch-and-flank readability of a top-down geometric shooter.
+**ChronoShot** translates the spatial puzzle mechanics of *SUPERHOT* into the twitch-and-flank readability of a top-down geometric roguelike shooter.
 
 Every step you take accelerates global time. When you stop, time slows to a **5% micro-creep**, allowing you to read bullet trajectories, weave through crossfires, and line up precision shots. But choose your moments wisely—reloading costs **30 simulation ticks**, advancing in-flight bullets and enemy patrols while you're vulnerable unless you take cover.
+
+Conquer **Sector 1**, eliminate the colossal **Goliath-01** boss, draft powerful tactical augmentations in freeze-frame triumph, and push through the escalated baseline of **Zone 2** in pure, high-stakes permadeath runs.
 
 ---
 
@@ -57,41 +60,52 @@ Every step you take accelerates global time. When you stop, time slows to a **5%
 
 ### 3. Modular Weapon System & Cylinder HUD
 - Declarative `WeaponConfig` schema supporting magazine capacity, cooldowns, bullet velocity, spread, and action tick costs.
-- Default **6-Round Revolver** featuring individual chamber tracking (`loaded` vs `spent`) and an interactive HUD rendering cylinder rotation, primer alignment, and reload prompts.
+- Default **6-Round Revolver** featuring individual chamber tracking (`loaded` vs `spent`) and an interactive HUD rendering cylinder rotation, primer alignment, and reload prompts. Dynamically expands to **8 chambers** upon installing the Extended Cylinder augmentation.
 
 ### 4. Continuous Collision Detection (CCD) Ballistics
 - High-speed projectiles utilize per-tick segment raycasting against obstacle polygons and circular unit hitboxes, preventing tunneling even across massive tick jumps.
 
-### 5. Differentiated Enemy Catalog & Archetypes
+### 5. Differentiated Enemy Catalog & Boss Encounters
 Hostiles are differentiated across mobility, shields, weapon cadence, ballistic spreads, and firing styles:
 - **Pistol Grunt (Crimson Diamond)**: 120 px/s skirmisher firing single accurate rounds at a 50-tick cadence with a 6-tick discharge stutter.
 - **Shotgun Guard (Crimson Pentagon)**: 90 px/s heavy breacher with a 1-hit energy shield and a 5-pellet lethal buckshot fan at an 80-tick cadence.
 - **Stalker Rusher (Crimson Chevron)**: 210 px/s high-velocity glass cannon with aggressive pursuit and run-and-gun rapid fire (32-tick cadence) that never halts.
 - **Aegis Warden (Heavy Crimson Hexagon)**: 60 px/s frontline tank with 2-hit shield durability (requiring 3 total rounds to eliminate) and heavy suppressive slugs at a 65-tick cadence.
 - **Marksman Sniper (Crimson 4-Point Star)**: 80 px/s long-range sniper that kites players, halts movement to project a charging red targeting laser for 30 ticks, and discharges hyper-velocity rounds (850 px/s) at a 110-tick cadence.
+- **Goliath-01 Aegis Colossus (Sector 1 Boss - Octagonal Titan)**: Heavy command titan with 4-hit multi-layer shields, dual heavy slug cannons, dedicated top-center telemetry HUD, and an enraged phase 2 that surges forward at 95 px/s with a 3-way scatter shot when shields are shattered.
 
-### 6. 40px Grid A* Pathfinding & Intelligent Navigation
+### 6. Roguelike Tactical Augmentations
+Destroying the Sector 1 Boss triggers an immediate freeze-frame draft presenting 3 curated combat augmentations:
+- **[1] Extended Cylinder**: Expands revolver from 6 to 8 chambers, enabling multi-target takedowns without reload exposure. Cylinder HUD dial dynamically scales to 8 radial pips.
+- **[2] Speed Loader**: Slashes reload burst cost from +30 to +15 simulation ticks for rapid recovery behind cover.
+- **[3] Reactive Shield**: Equips the player with 1 kinetic deflection shield per room that absorbs a lethal projectile impact before shattering.
+
+### 7. 40px Grid A* Pathfinding & Intelligent Navigation
 - Discrete $24 \times 16$ tile-grid A* pathfinder with obstacle clearance inflation ($16\text{px}$) navigates complex wall and pillar layouts with zero corner snagging.
 - **Line-of-Sight String Pulling**: When line-of-sight to the player is obstructed, units follow A* waypoints; once line-of-sight is re-established, units transition to smooth direct-vector steering (rushers close distance, kiters retreat).
 - Smooth wall-sliding collision physics prevents units from sticking or clipping into barrier edges.
 
-### 7. Hit-Count Shield Durability System
-- Shield barriers absorb discrete projectile impacts, directly interfacing with the player's 6-round cylinder economy.
-- Concentric radiant electric cyan barrier rings visually communicate active shield charges.
+### 8. Hit-Count Shield Durability System
+- Shield barriers absorb discrete projectile impacts, directly interfacing with the player's cylinder economy.
+- Concentric radiant electric cyan barrier rings visually communicate active shield charges for both enemies and the player's reactive shield.
 - Procedural audio pings on deflection (`playShieldDeflect`) and resonant energy pops on shield depletion (`playShieldBreak`) before units become vulnerable to lethal elimination.
 
-### 8. Procedural Web Audio Synthesis with Pitch Modulation
-- Zero external audio assets required; all sound effects (gunfire, dry-fire clicks, cylinder reload clicks, obstacle impacts, shield deflections, shield breaks, sniper laser charging, and victory fanfare) are synthesized live using the Web Audio API.
+### 9. Procedural Web Audio Synthesis with Pitch Modulation
+- Zero external audio assets required; all sound effects (gunfire, dry-fire clicks, cylinder reload clicks, obstacle impacts, shield deflections, shield breaks, sniper laser charging, upgrade chime arpeggios, boss defeat rumbles, and victory fanfare) are synthesized live using the Web Audio API.
 - **Dynamic Time-Scale Modulation**: Audio playback rates and oscillator frequencies scale dynamically with `timeScale`. Sounds drop to deep sub-bass drones (~0.43x pitch, ~2.4x duration) during 5% micro-creep and pitch up to normal tempo when sprinting.
 
-### 9. 5-Room Tactical Puzzle Progression
-- Handcrafted room sequences teaching each archetype and mechanics progressively:
+### 10. 9-Room Tactical Campaign & Pure Permadeath
+- Handcrafted room sequences teaching each archetype and mechanics progressively across two sectors:
   - **Room 01 (`BASIC COVER`)**: 1v1 duel against a mobile Pistol Grunt teaching micro-creep peeking and leading shots.
   - **Room 02 (`ARMORED BREACH`)**: Shotgun Guard (1 shield) + Grunt teaching shield breaking and buckshot evasion.
-  - **Room 03 (`INFILTRATION`)**: High-speed Stalker rusher + Grunt in a zigzag corridor teaching rapid target acquisition under continuous fire.
+  - **Room 03 (`INFILTRATION`)**: High-speed Stalker rusher + Grunt in a zigzag corridor teaching rapid target acquisition.
   - **Room 04 (`THE LINE OF FIRE`)**: Marksman sniper nest with 30-tick laser telegraph + Shotgun Guard advance teaching sightline evasion.
-  - **Room 05 (`TACTICAL GAUNTLET`)**: Aegis Warden (2 shields) + Stalker + Grunt testing strict 6-round cylinder ammunition budgeting and reload timing.
-- Destroying all enemies in a room unlocks the radiant exit portal to advance to the next floor.
+  - **Room 05 (`SECTOR 1 BOSS`)**: Goliath-01 Aegis Colossus (4 shields) + Grunt escorts testing complete combat mastery, triggering the upgrade draft.
+  - **Room 06 (`BREACH PROTOCOL`)**: Zone 2 baseline launch with dual Stalker pincer sprint + Shotgun Guard suppression.
+  - **Room 07 (`CROSSFIRE CORRIDOR`)**: Dual Marksman Snipers holding crisscrossing sightlines while an Aegis Warden advances.
+  - **Room 08 (`KILLBOX ENCLOSURE`)**: High-density 5-enemy squad in a tight pillbox arena forcing tactical reloading.
+  - **Room 09 (`THE IRON GATE`)**: Climax with dual Aegis Wardens, Marksman sniper, and Stalker rusher requiring 6 total shield breaks.
+- **Pure Permadeath**: There are no lives or checkpoints. Lethal trauma terminates the run, displays sector and upgrade statistics, and resets progress back to Room 1.
 
 ---
 
@@ -101,9 +115,10 @@ Hostiles are differentiated across mobility, shields, weapon cadence, ballistic 
 |---|---|
 | <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> | Move (Smoothly accelerates time to 100%) |
 | <kbd>Mouse</kbd> | 360° Hardware Aim Reticle (Does not advance time) |
-| <kbd>Left Click</kbd> | Fire Revolver (+6 simulation ticks) / Resume from Pause |
-| <kbd>R</kbd> | Reload Revolver (+30 simulation ticks) / Instant Restart on Defeat |
-| <kbd>Shift</kbd> + <kbd>R</kbd> | Quick Restart Current Encounter |
+| <kbd>Left Click</kbd> | Fire Revolver (+6 simulation ticks) / Resume from Pause / Select Upgrade Card |
+| <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> | Select Tactical Augmentation during Post-Boss Draft |
+| <kbd>R</kbd> | Reload Revolver / Initiate New Run on Defeat |
+| <kbd>Shift</kbd> + <kbd>R</kbd> | Quick Restart Run |
 | <kbd>Esc</kbd> / <kbd>P</kbd> | Toggle Tactical Pause & Controls Matrix |
 | <kbd>M</kbd> | Toggle Audio Mute |
 

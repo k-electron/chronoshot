@@ -34,6 +34,7 @@ export interface ArenaInput {
   reload: boolean;
   restart: boolean;
   togglePause?: boolean;
+  upgradeChoice?: 1 | 2 | 3;
 }
 
 export class Arena {
@@ -58,6 +59,7 @@ export class Arena {
 
   public status: ArenaStatus = "playing";
   public isPaused: boolean = false;
+  public isUpgradeDraftActive: boolean = false;
 
   constructor(
     width = 960,
@@ -141,6 +143,7 @@ export class Arena {
   public loadRoom(room: RoomConfig): void {
     this.status = "playing";
     this.isPaused = false;
+    this.isUpgradeDraftActive = false;
     this.obstacles = [...room.obstacles];
     this.enemies = room.enemies.map((cfg) => new Enemy(cfg));
     this.player.reset(room.playerSpawn);
@@ -148,6 +151,27 @@ export class Arena {
     this.particles.clear();
     this.timeGovernor.reset();
     this.simulator.reset();
+  }
+
+  /**
+   * Applies the selected tactical augmentation and advances progression to the next room.
+   */
+  public applyUpgrade(choice: 1 | 2 | 3): void {
+    if (choice === 1) {
+      this.player.setAugmentation("extendedCylinder", true);
+    } else if (choice === 2) {
+      this.player.setAugmentation("speedLoader", true);
+    } else if (choice === 3) {
+      this.player.setAugmentation("reactiveShield", true);
+    }
+
+    this.soundSynth?.playUpgradeChime(this.timeGovernor.getTimeScale());
+    this.isUpgradeDraftActive = false;
+
+    if (this.roomManager && this.roomManager.hasNextRoom()) {
+      this.roomManager.advanceRoom();
+      this.loadRoom(this.roomManager.getCurrentRoom());
+    }
   }
 
   /**
@@ -159,6 +183,32 @@ export class Arena {
     // Instant room restart trigger
     if (input.restart) {
       this.restart();
+      return;
+    }
+
+    // Intercept upgrade draft selection inputs
+    if (this.isUpgradeDraftActive) {
+      if (input.upgradeChoice) {
+        this.applyUpgrade(input.upgradeChoice);
+        return;
+      }
+      if (input.shoot) {
+        const { x, y } = input.mousePos;
+        if (y >= 170 && y <= 460) {
+          if (x >= 60 && x <= 320) {
+            this.applyUpgrade(1);
+            return;
+          }
+          if (x >= 350 && x <= 610) {
+            this.applyUpgrade(2);
+            return;
+          }
+          if (x >= 640 && x <= 900) {
+            this.applyUpgrade(3);
+            return;
+          }
+        }
+      }
       return;
     }
 
@@ -302,13 +352,21 @@ export class Arena {
             }
           } else {
             // Lethal hit crystalline shatter
-            this.soundSynth?.playShatter(this.timeGovernor.getTimeScale());
             if (hit.unit.id === "player") {
+              this.soundSynth?.playShatter(this.timeGovernor.getTimeScale());
               this.particles.emitShatter(this.player.position, 22, "#00f0ff", 240);
               this.status = "defeat";
             } else {
-              this.particles.emitShatter(hit.point, 18, "#ff2a44", 220);
-              this.checkVictoryCondition();
+              const enemy = hit.unit as Enemy;
+              if (enemy.isBoss) {
+                this.soundSynth?.playBossDefeat(this.timeGovernor.getTimeScale());
+                this.particles.emitShatter(hit.point, 36, "#ff2a44", 320);
+                this.isUpgradeDraftActive = true;
+              } else {
+                this.soundSynth?.playShatter(this.timeGovernor.getTimeScale());
+                this.particles.emitShatter(hit.point, 18, "#ff2a44", 220);
+                this.checkVictoryCondition();
+              }
             }
           }
         }
@@ -327,6 +385,7 @@ export class Arena {
     // 5. Check exit portal stepping if room manager is active
     if (
       this.status === "playing" &&
+      !this.isUpgradeDraftActive &&
       this.roomManager &&
       this.roomManager.isExitUnlocked()
     ) {
@@ -349,6 +408,9 @@ export class Arena {
   }
 
   private checkVictoryCondition(): void {
+    if (this.isUpgradeDraftActive) {
+      return;
+    }
     const aliveEnemies = this.enemies.some((e) => e.isAlive);
     if (!aliveEnemies && this.player.isAlive) {
       if (this.roomManager) {
@@ -364,18 +426,19 @@ export class Arena {
 
   /**
    * Instantly restarts the combat room back to pristine initial setup.
+   * In campaign mode, player defeat enforces pure permadeath back to Room 1.
    */
   public restart(): void {
     if (this.roomManager) {
-      if (this.roomManager.isGameCompleted()) {
-        this.roomManager.restartGame();
-      } else {
-        this.roomManager.restartCurrentRoom();
-      }
+      this.roomManager.restartGame();
+      this.player.clearAugmentations();
+      this.isUpgradeDraftActive = false;
       this.loadRoom(this.roomManager.getCurrentRoom());
     } else {
       this.status = "playing";
+      this.isUpgradeDraftActive = false;
       this.player.reset();
+      this.player.clearAugmentations();
       for (const enemy of this.enemies) {
         enemy.reset();
       }
@@ -466,7 +529,38 @@ export class Arena {
       ctx.translate(enemy.position.x, enemy.position.y);
       ctx.rotate(enemy.aimAngle);
 
-      if (enemy.type === "shotgun") {
+      if (enemy.type === "boss") {
+        // Boss: Imposing 8-sided reinforced octagonal titan
+        ctx.beginPath();
+        const sides = 8;
+        for (let s = 0; s < sides; s++) {
+          const a = (s / sides) * Math.PI * 2;
+          const px = Math.cos(a) * enemy.radius;
+          const py = Math.sin(a) * enemy.radius;
+          if (s === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fillStyle = enemy.isEnraged ? "#4a000a" : "#2d0a10";
+        ctx.fill();
+        ctx.strokeStyle = enemy.isEnraged ? "#ff1744" : "#ff4d6d";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Pulsing glowing core
+        ctx.beginPath();
+        ctx.arc(0, 0, enemy.radius * 0.45, 0, Math.PI * 2);
+        ctx.fillStyle = enemy.isEnraged ? "#ff1744" : "#b71c1c";
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Heavy twin-slug cannon barrels
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(enemy.radius - 2, -6, 12, 4);
+        ctx.fillRect(enemy.radius - 2, 2, 12, 4);
+      } else if (enemy.type === "shotgun") {
         // Shotgun Guard: faceted heavy pentagon
         ctx.beginPath();
         const sides = 5;
@@ -608,6 +702,16 @@ export class Arena {
 
     // 5. Player (Cyan directional circle and crosshair sightline)
     if (this.player.isAlive) {
+      if (this.player.shields > 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(this.player.position.x, this.player.position.y, this.player.radius + 6, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(0, 240, 255, 0.85)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+      }
+
       ctx.save();
       ctx.translate(this.player.position.x, this.player.position.y);
       ctx.rotate(this.player.aimAngle);
@@ -641,6 +745,12 @@ export class Arena {
     this.timeHUD.render(ctx, this.timeGovernor, wallDeltaTime);
     this.cylinderHUD.render(ctx, this.player.weapon, wallDeltaTime);
 
+    // Boss Telemetry HUD (when active boss is present)
+    const activeBoss = this.enemies.find((e) => e.isBoss && e.isAlive);
+    if (activeBoss) {
+      this.renderBossTelemetry(ctx, activeBoss);
+    }
+
     // Room Progression Header
     if (this.roomManager) {
       this.roomManager.renderRoomHeader(ctx, this.width);
@@ -665,38 +775,63 @@ export class Arena {
       this.reticle.render(ctx, this.player.aimTarget, this.timeGovernor.getTimeScale());
     }
 
+    // Upgrade Draft Overlay
+    if (this.isUpgradeDraftActive) {
+      this.renderUpgradeDraft(ctx);
+    }
+
     // 9. Modernized Game Over / Victory Overlays
     if (this.status === "defeat") {
       ctx.save();
-      ctx.fillStyle = "rgba(7, 9, 14, 0.85)";
+      ctx.fillStyle = "rgba(7, 9, 14, 0.88)";
       ctx.fillRect(0, 0, this.width, this.height);
 
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
+      const roomNum = this.roomManager ? this.roomManager.getCurrentRoom().roomNumber : 1;
+      const totalRooms = this.roomManager ? this.roomManager.getRoomCount() : 9;
+      const tier = roomNum <= 5 ? "TIER 1" : "TIER 2";
+      const roomTitle = this.roomManager ? this.roomManager.getCurrentRoom().title : "ROOM 01";
+
+      const augs = this.player.getAugmentations();
+      let augText = "NONE";
+      if (augs.extendedCylinder) augText = "EXTENDED CYLINDER (8 CHAMBERS)";
+      else if (augs.speedLoader) augText = "SPEED LOADER (+15 TICKS)";
+      else if (augs.reactiveShield) augText = "REACTIVE SHIELD (1 HIT BUFFER)";
+
       // Subtle hairline border
       ctx.beginPath();
-      ctx.moveTo(this.width / 2 - 160, this.height / 2 - 50);
-      ctx.lineTo(this.width / 2 + 160, this.height / 2 - 50);
+      ctx.moveTo(this.width / 2 - 200, this.height / 2 - 70);
+      ctx.lineTo(this.width / 2 + 200, this.height / 2 - 70);
       ctx.strokeStyle = UITheme.colors.crimsonDim;
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      ctx.font = getUIFont(32, "800");
+      ctx.font = getUIFont(30, "800");
       ctx.fillStyle = UITheme.colors.crimson;
-      ctx.fillText("PROTOCOL FAILED", this.width / 2, this.height / 2 - 16);
+      ctx.fillText("PROTOCOL TERMINATED", this.width / 2, this.height / 2 - 38);
 
       ctx.font = getUIFont(11, "600");
       ctx.fillStyle = UITheme.colors.textMuted;
-      ctx.fillText("CRITICAL LETHAL TRAUMA SUSTAINED", this.width / 2, this.height / 2 + 16);
+      ctx.fillText("CRITICAL LETHAL TRAUMA SUSTAINED // RUN FAILED", this.width / 2, this.height / 2 - 10);
+
+      // Run Statistics
+      ctx.font = getUIFont(11, "bold");
+      ctx.fillStyle = UITheme.colors.cyan;
+      ctx.fillText(`SECTOR: ${tier}  |  ${roomTitle}  [${roomNum}/${totalRooms}]`, this.width / 2, this.height / 2 + 20);
+
+      ctx.font = getUIFont(10, "600");
+      ctx.fillStyle = UITheme.colors.textSecondary;
+      ctx.fillText(`INSTALLED AUGMENTATION: ${augText}`, this.width / 2, this.height / 2 + 42);
 
       ctx.font = getUIFont(12, "bold");
       ctx.fillStyle = UITheme.colors.textPrimary;
-      ctx.fillText("PRESS [R] TO INSTANTLY RESTART", this.width / 2, this.height / 2 + 52);
+      ctx.fillText("PRESS [R] TO INITIATE NEW RUN (LEVEL 1)", this.width / 2, this.height / 2 + 76);
 
       ctx.beginPath();
-      ctx.moveTo(this.width / 2 - 160, this.height / 2 + 80);
-      ctx.lineTo(this.width / 2 + 160, this.height / 2 + 80);
+      ctx.moveTo(this.width / 2 - 200, this.height / 2 + 105);
+      ctx.lineTo(this.width / 2 + 200, this.height / 2 + 105);
       ctx.strokeStyle = UITheme.colors.crimsonDim;
       ctx.lineWidth = 1;
       ctx.stroke();
@@ -849,5 +984,244 @@ export class Arena {
     ctx.fillText("PRESS [ESC] OR CLICK ANYWHERE TO RESUME", this.width / 2, cardY + cardH - 30);
 
     ctx.restore();
+  }
+
+  /**
+   * Renders real-time boss telemetry anchored at top-center during boss combat.
+   */
+  public renderBossTelemetry(ctx: CanvasRenderingContext2D, boss: Enemy): void {
+    ctx.save();
+    const barW = 380;
+    const barH = 34;
+    const barX = (this.width - barW) / 2;
+    const barY = 16;
+
+    // Glass panel backing
+    ctx.fillStyle = "rgba(10, 14, 20, 0.92)";
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = boss.isEnraged ? UITheme.colors.crimson : UITheme.colors.panelBorder;
+    ctx.strokeRect(barX, barY, barW, barH);
+
+    // Corner accent tabs
+    const corner = 6;
+    ctx.strokeStyle = boss.isEnraged ? UITheme.colors.crimson : UITheme.colors.cyan;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(barX, barY + corner);
+    ctx.lineTo(barX, barY);
+    ctx.lineTo(barX + corner, barY);
+    ctx.moveTo(barX + barW - corner, barY);
+    ctx.lineTo(barX + barW, barY);
+    ctx.lineTo(barX + barW, barY + corner);
+    ctx.stroke();
+
+    // Boss Designation
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.font = getUIFont(11, "bold");
+    ctx.fillStyle = boss.isEnraged ? UITheme.colors.crimson : UITheme.colors.cyan;
+    const title = boss.bossName ?? "GOLIATH-01: AEGIS COLOSSUS";
+    ctx.fillText(title, barX + 16, barY + barH / 2);
+
+    // Shield Pips or Enraged Status
+    if (boss.isEnraged) {
+      ctx.textAlign = "right";
+      ctx.font = getUIFont(10, "bold");
+      ctx.fillStyle = UITheme.colors.crimson;
+      ctx.fillText("CORE VULNERABLE // ENRAGED", barX + barW - 16, barY + barH / 2);
+    } else {
+      ctx.textAlign = "right";
+      ctx.font = getUIFont(9, "bold");
+      ctx.fillStyle = UITheme.colors.textMuted;
+      ctx.fillText("SHIELDS", barX + barW - 90, barY + barH / 2);
+
+      const pipSize = 10;
+      const pipGap = 5;
+      const totalPips = boss.maxShields || 4;
+      const pipsStartX = barX + barW - 16 - totalPips * (pipSize + pipGap);
+
+      for (let p = 0; p < totalPips; p++) {
+        const px = pipsStartX + p * (pipSize + pipGap);
+        const py = barY + (barH - pipSize) / 2;
+        if (p < boss.shields) {
+          ctx.fillStyle = UITheme.colors.cyan;
+          ctx.fillRect(px, py, pipSize, pipSize);
+          ctx.strokeStyle = UITheme.colors.white;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(px, py, pipSize, pipSize);
+        } else {
+          ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+          ctx.fillRect(px, py, pipSize, pipSize);
+          ctx.strokeStyle = UITheme.colors.hairline;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(px, py, pipSize, pipSize);
+        }
+      }
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * Renders the immediate freeze-frame upgrade selection overlay offering 3 curated cards.
+   */
+  public renderUpgradeDraft(ctx: CanvasRenderingContext2D): void {
+    ctx.save();
+
+    // 1. Veiled translucent dark backdrop
+    ctx.fillStyle = "rgba(7, 10, 15, 0.94)";
+    ctx.fillRect(0, 0, this.width, this.height);
+
+    // 2. Header
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.font = getUIFont(22, "800");
+    ctx.fillStyle = UITheme.colors.cyan;
+    ctx.fillText("// TACTICAL AUGMENTATION PROTOCOL", this.width / 2, 60);
+
+    ctx.font = getUIFont(12, "600");
+    ctx.fillStyle = UITheme.colors.textSecondary;
+    ctx.fillText("SECTOR 1 BOSS NEUTRALIZED — SELECT 1 COMBAT SYSTEM UPGRADE", this.width / 2, 95);
+
+    // 3. Three Curated Cards
+    const cardY = 145;
+    const cardW = 260;
+    const cardH = 320;
+    const gap = 30;
+    const startX = (this.width - (3 * cardW + 2 * gap)) / 2;
+
+    const cards = [
+      {
+        key: "[1]",
+        archetype: "FIREPOWER // CAPACITY",
+        title: "EXTENDED CYLINDER",
+        stat: "6 → 8 CHAMBERS",
+        desc: "Expands revolver capacity by +2 chambers. Neutralize multiple heavily armored hostiles without mid-combat reload vulnerability.",
+        accent: UITheme.colors.cyan,
+      },
+      {
+        key: "[2]",
+        archetype: "TEMPO // CYCLING",
+        title: "SPEED LOADER",
+        stat: "+15 TICK RELOAD",
+        desc: "Halves ammunition cycle exposure from 30 ticks to 15 ticks. Enables aggressive repositioning and rapid tactical recovery under fire.",
+        accent: "#ffb703",
+      },
+      {
+        key: "[3]",
+        archetype: "DEFENSE // RESILIENCE",
+        title: "REACTIVE SHIELD",
+        stat: "+1 SHIELD HIT BUFFER",
+        desc: "Deploys a kinetic deflection barrier that absorbs 1 lethal projectile impact per room before shattering. Crucial for permadeath runs.",
+        accent: "#06d6a0",
+      },
+    ];
+
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i];
+      const cx = startX + i * (cardW + gap);
+
+      // Card glass background
+      ctx.fillStyle = "rgba(13, 17, 24, 0.96)";
+      ctx.fillRect(cx, cardY, cardW, cardH);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = UITheme.colors.panelBorder;
+      ctx.strokeRect(cx, cardY, cardW, cardH);
+
+      // Card accent top bar
+      ctx.fillStyle = card.accent;
+      ctx.fillRect(cx, cardY, cardW, 3);
+
+      // Key prompt badge
+      ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+      ctx.fillRect(cx + 20, cardY + 20, 44, 24);
+      ctx.strokeStyle = card.accent;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cx + 20, cardY + 20, 44, 24);
+
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = getUIFont(12, "bold");
+      ctx.fillStyle = card.accent;
+      ctx.fillText(card.key, cx + 42, cardY + 32);
+
+      // Archetype
+      ctx.textAlign = "left";
+      ctx.font = getUIFont(9, "bold");
+      ctx.fillStyle = UITheme.colors.textMuted;
+      ctx.fillText(card.archetype, cx + 74, cardY + 32);
+
+      // Title
+      ctx.font = getUIFont(15, "800");
+      ctx.fillStyle = UITheme.colors.textPrimary;
+      ctx.fillText(card.title, cx + 20, cardY + 80);
+
+      // Stat Highlight Box
+      ctx.fillStyle = "rgba(0, 240, 255, 0.06)";
+      ctx.fillRect(cx + 20, cardY + 105, cardW - 40, 36);
+      ctx.strokeStyle = card.accent;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cx + 20, cardY + 105, cardW - 40, 36);
+
+      ctx.textAlign = "center";
+      ctx.font = getUIFont(12, "bold");
+      ctx.fillStyle = card.accent;
+      ctx.fillText(card.stat, cx + cardW / 2, cardY + 123);
+
+      // Description
+      ctx.textAlign = "left";
+      ctx.font = getUIFont(10, "normal");
+      ctx.fillStyle = UITheme.colors.textSecondary;
+      this.wrapText(ctx, card.desc, cx + 20, cardY + 165, cardW - 40, 16);
+
+      // Select button
+      ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+      ctx.fillRect(cx + 20, cardY + cardH - 45, cardW - 40, 28);
+      ctx.strokeStyle = card.accent;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cx + 20, cardY + cardH - 45, cardW - 40, 28);
+
+      ctx.textAlign = "center";
+      ctx.font = getUIFont(11, "bold");
+      ctx.fillStyle = card.accent;
+      ctx.fillText(`INSTALL ${card.key}`, cx + cardW / 2, cardY + cardH - 31);
+    }
+
+    // 4. Footer prompt
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.font = getUIFont(11, "600");
+    ctx.fillStyle = UITheme.colors.textMuted;
+    ctx.fillText("PRESS [1], [2], OR [3] OR CLICK A CARD TO INSTALL AND ADVANCE TO ZONE 2", this.width / 2, cardY + cardH + 20);
+
+    ctx.restore();
+  }
+
+  private wrapText(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    x: number,
+    y: number,
+    maxWidth: number,
+    lineHeight: number
+  ): void {
+    const words = text.split(" ");
+    let line = "";
+    let curY = y;
+
+    for (let n = 0; n < words.length; n++) {
+      const testLine = line + words[n] + " ";
+      const metrics = ctx.measureText(testLine);
+      const testWidth = metrics.width;
+      if (testWidth > maxWidth && n > 0) {
+        ctx.fillText(line, x, curY);
+        line = words[n] + " ";
+        curY += lineHeight;
+      } else {
+        line = testLine;
+      }
+    }
+    ctx.fillText(line, x, curY);
   }
 }
