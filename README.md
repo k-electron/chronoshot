@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg)](https://vitejs.dev/)
-[![Tests](https://img.shields.io/badge/Tests-452%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-474%20passing-brightgreen.svg)]()
 
 ---
 
@@ -73,7 +73,8 @@ Hostiles are differentiated across mobility, shields, weapon cadence, ballistic 
 - **Aegis Warden (Heavy Crimson Hexagon)**: 60 px/s frontline tank with 2-hit shield durability (requiring 3 total rounds to eliminate) and heavy suppressive slugs at a 65-tick cadence.
 - **Marksman Sniper (Crimson 4-Point Star)**: 80 px/s long-range sniper that kites players, halts movement to project a charging red targeting laser for 30 ticks, and discharges hyper-velocity rounds (850 px/s) at a 110-tick cadence.
 - **Goliath-01 Aegis Colossus (Sector 1 Boss - Octagonal Titan)**: Driven by the modular `BossPhaseController` and declarative `BossBlueprint` system. Phase 1 (AEGIS FORTRESS) deploys 4-hit multi-layer shields with pinpoint heavy slugs at 55 px/s; upon shield depletion, emits an expanding radial particle shockwave and triggers Phase 2 (OVERDRIVE RAM) surging forward at 95 px/s with a 3-way scatter shot.
-- **Chrono-Weaver (Milestone Boss Archetype)**: Dual-phase boss combining long-range kiting laser beams in Phase 1 with 12-pellet 360-degree rotating radial novae (`RadialNovaBehavior`) in Phase 2.
+- **Chrono-Weaver (Milestone Boss Archetype - Temporal Anchor)**: Dual-phase boss combining long-range kiting laser beams in Phase 1 with 12-pellet 360-degree rotating radial novae (`RadialNovaBehavior`) and Stalker escort summons in Phase 2.
+- **Vektor-Prime (Milestone Boss Archetype - Phase Sovereign)**: High-tier 3-phase milestone boss encountered at Room 15. Begins in Phase 1 (AEGIS OVERLORD) as a 5-shield fortress with heavy dual-slug suppression at 50-tick cadence; upon reaching 3 shields, triggers a 20-particle cyan shockwave, summons 2 Grunt escorts, and initiates Phase 2 (TEMPORAL DISRUPTOR) kiting at 100 px/s with alternating telegraphed laser beams and 3-pellet fan spreads; at 0 shields, triggers another shockwave and unleashes Phase 3 (OVERDRIVE APEX) charging at 140 px/s with 16-pellet rotating 360-degree radial novae.
 
 ### 6. Roguelike Tactical Augmentations & Upgrade Pipeline
 Powered by a decoupled data-driven architecture (`UpgradePipeline`, `UpgradeRegistry`, and `UpgradeDraftHUD`):
@@ -86,6 +87,7 @@ Powered by a decoupled data-driven architecture (`UpgradePipeline`, `UpgradeRegi
   - **Kinetic Stride**: Boosts player locomotion velocity by +25%, widening evasion margins and positioning agility.
   - **Chrono Burst**: Accelerates projectile muzzle velocity by +30%, compressing travel time and eliminating hostile evasion windows.
   - **Phase Deflector**: Grants +2 hit-count shield buffers per combat room for enduring intense crossfires.
+  - **Overcharge Dash**: Grants a tactical dash impulse (<kbd>Space</kbd> or <kbd>Shift</kbd>) queuing a +12 simulation tick burst, 480 px/s velocity sprint, deflection frames that safely bounce enemy projectiles off kinetic shielding, and a 90-tick cooldown.
 
 ### 7. 40px Grid A* Pathfinding & Intelligent Navigation
 - Discrete $24 \times 16$ tile-grid A* pathfinder with obstacle clearance inflation ($16\text{px}$) navigates complex wall and pillar layouts with zero corner snagging.
@@ -101,8 +103,8 @@ Powered by a decoupled data-driven architecture (`UpgradePipeline`, `UpgradeRegi
 - Zero external audio assets required; all sound effects (gunfire, dry-fire clicks, cylinder reload clicks, obstacle impacts, shield deflections, shield breaks, sniper laser charging, upgrade chime arpeggios, boss defeat rumbles, and victory fanfare) are synthesized live using the Web Audio API.
 - **Dynamic Time-Scale Modulation**: Audio playback rates and oscillator frequencies scale dynamically with `timeScale`. Sounds drop to deep sub-bass drones (~0.43x pitch, ~2.4x duration) during 5% micro-creep and pitch up to normal tempo when sprinting.
 
-### 10. 14-Room Tactical Campaign & Pure Permadeath
-- Handcrafted room sequences teaching each archetype and mechanics progressively across three sectors:
+### 10. 19-Room Tactical Campaign & Pure Permadeath
+- Handcrafted room sequences teaching each archetype and mechanics progressively across four sectors:
   - **Room 01 (`BASIC COVER`)**: 1v1 duel against a mobile Pistol Grunt teaching micro-creep peeking and leading shots.
   - **Room 02 (`ARMORED BREACH`)**: Shotgun Guard (1 shield) + Grunt teaching shield breaking and buckshot evasion.
   - **Room 03 (`INFILTRATION`)**: High-speed Stalker rusher + Grunt in a zigzag corridor teaching rapid target acquisition.
@@ -117,13 +119,18 @@ Powered by a decoupled data-driven architecture (`UpgradePipeline`, `UpgradeRegi
   - **Room 12 (`TWIN BUNKER CROSSFIRE`)**: Multi-shield siege featuring dual advancing Wardens pinned by perimeter snipers.
   - **Room 13 (`SPLIT FLANK MATRIX`)**: Corridor containment preventing dual high-speed Stalker pincer rushes.
   - **Room 14 (`THE CRUCIBLE`)**: Peak pre-boss gauntlet testing full mastery across Wardens, Snipers, Shotguns, and Stalkers.
+  - **Room 15 (`VEKTOR-PRIME`)**: Milestone Boss 3 (Phase Sovereign) deploying 5 energy shields, alternating laser/fan kiting, escort summons, and 16-pellet radial novae, triggering Upgrade Draft 3.
+  - **Room 16 (`ZENITH ENTRY`)**: Sector 4 vanguard entry testing 3-upgrade synergies against mixed Warden, Shotgun, and Stalker forces.
+  - **Room 17 (`TWIN BASTIONS`)**: Fortified bunker siege requiring disciplined cover peeking against dual snipers and wardens.
+  - **Room 18 (`CHRONO CHOKE`)**: Relentless close-quarters containment testing rapid target prioritization against triple stalkers and wardens.
+  - **Room 19 (`PROTOCOL ZENITH`)**: Ultimate campaign climax featuring a coordinated quadrant matrix of Wardens, Snipers, and Stalkers.
 - **Pure Permadeath**: There are no lives or checkpoints. Lethal trauma terminates the run, displays sector and upgrade statistics, and resets progress back to Room 1.
 
 ### 11. Modular Level Director & Procedural Generation
 - **Composable Tactical Layouts**: 5 geometry templates (`CenterPillarsTemplate`, `TwinBunkersTemplate`, `SplitCorridorTemplate`, `KillboxLanesTemplate`, `ArenaQuadrantTemplate`) providing varied obstacle geometries, tactical sightlines, and verified spawn separation ($\ge 280\text{px}$ from player).
 - **Threat-Budget Encounter Spawner (`EncounterDirector`)**: Scales difficulty by assigning numerical threat budgets across hostiles while enforcing squad composition constraints (maximum 2 Marksman snipers per room, mandatory frontline escorts) and non-overlapping safe spawn sampling ($\ge 48\text{px}$ unit separation).
-- **Deterministic Seeded PRNG (`LevelDirector`)**: High-performance Mulberry32 pseudo-random number generator enabling 100% reproducible room seeds, daily challenges, and milestone boss synthesis on every 5th room (Sector 1: Goliath-01, Sector 2+: Chrono-Weaver).
-- **Dynamic Endless Mode**: `RoomManager` seamlessly toggles between the classic handcrafted 14-room campaign and infinite on-demand procedural generation.
+- **Deterministic Seeded PRNG (`LevelDirector`)**: High-performance Mulberry32 pseudo-random number generator enabling 100% reproducible room seeds, daily challenges, and milestone boss synthesis on every 5th room (Sector 1: Goliath-01, Sector 2: Chrono-Weaver, Sector 3+: Vektor-Prime).
+- **Dynamic Endless Mode**: `RoomManager` seamlessly toggles between the classic handcrafted 19-room campaign and infinite on-demand procedural generation.
 
 ---
 
@@ -134,6 +141,7 @@ Powered by a decoupled data-driven architecture (`UpgradePipeline`, `UpgradeRegi
 | <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> | Move (Smoothly accelerates time to 100%) |
 | <kbd>Mouse</kbd> | 360° Hardware Aim Reticle (Does not advance time) |
 | <kbd>Left Click</kbd> | Fire Revolver (+6 simulation ticks) / Resume from Pause / Select Upgrade Card |
+| <kbd>Space</kbd> / <kbd>Shift</kbd> | Overcharge Dash (+12 tick burst, 480 px/s sprint, deflection frames) |
 | <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> | Select Tactical Augmentation during Post-Boss Draft |
 | <kbd>R</kbd> | Reload Revolver / Initiate New Run on Defeat |
 | <kbd>Shift</kbd> + <kbd>R</kbd> | Quick Restart Run |

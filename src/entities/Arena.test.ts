@@ -690,5 +690,35 @@ describe("Combat Arena & Room Loop", () => {
     expect(arena.player.upgradePipeline.has("custom-kinetic")).toBe(true);
     expect(arena.player.maxSpeed).toBe(300); // 240 * 1.25
   });
+
+  it("triggers overcharge dash and deflects hostile projectiles during dash frames", () => {
+    const arena = new Arena();
+    arena.player.acquireUpgrade("overcharge-dash");
+
+    // Spawn an enemy bullet heading straight at player
+    const enemyBullet = createProjectile(
+      "enemy-shot-at-dash",
+      vec2(arena.player.position.x + 20, arena.player.position.y),
+      Math.PI,
+      600,
+      "enemy"
+    );
+    arena.projectiles.push(enemyBullet);
+
+    // Player presses dash
+    arena.step(0.016, {
+      moveDir: vec2(1, 0),
+      mousePos: vec2(500, 320),
+      shoot: false,
+      reload: false,
+      dash: true,
+      restart: false,
+    });
+
+    // Player survived through dash deflection!
+    expect(arena.player.isAlive).toBe(true);
+    expect(arena.status).toBe("playing");
+    expect(arena.player.dashCooldownTicks).toBeGreaterThan(0);
+  });
 });
 

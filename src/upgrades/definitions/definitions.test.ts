@@ -5,6 +5,7 @@ import {
   chronoBurst,
   extendedCylinder,
   kineticStride,
+  overchargeDash,
   phaseDeflector,
   reactiveShield,
   registerDefaultUpgrades,
@@ -84,19 +85,31 @@ describe("Baseline & Tactical Upgrade Definitions", () => {
     });
   });
 
+  describe("overchargeDash", () => {
+    it("has correct configuration and modifiers", () => {
+      expect(overchargeDash.id).toBe("overcharge-dash");
+      expect(overchargeDash.name).toBe("OVERCHARGE DASH");
+      expect(overchargeDash.archetype).toBe("TACTICAL // BURST LOCOMOTION");
+      expect(overchargeDash.statHighlight).toBe("BURST PHASE DASH");
+      expect(overchargeDash.accentColor).toBe("#00f0ff");
+      expect(overchargeDash.tier).toBe("overclock");
+      expect(overchargeDash.maxStacks).toBe(1);
+    });
+  });
+
   describe("Registry integration", () => {
-    it("contains all 6 definitions in ALL_UPGRADE_DEFINITIONS with unique IDs", () => {
-      expect(ALL_UPGRADE_DEFINITIONS).toHaveLength(6);
+    it("contains all 7 definitions in ALL_UPGRADE_DEFINITIONS with unique IDs", () => {
+      expect(ALL_UPGRADE_DEFINITIONS).toHaveLength(7);
       const ids = ALL_UPGRADE_DEFINITIONS.map((u) => u.id);
       const uniqueIds = new Set(ids);
-      expect(uniqueIds.size).toBe(6);
+      expect(uniqueIds.size).toBe(7);
     });
 
     it("automatically registers all definitions in DEFAULT_UPGRADE_REGISTRY", () => {
       for (const upgrade of ALL_UPGRADE_DEFINITIONS) {
         expect(DEFAULT_UPGRADE_REGISTRY.get(upgrade.id)).toBe(upgrade);
       }
-      expect(DEFAULT_UPGRADE_REGISTRY.getAll().length).toBeGreaterThanOrEqual(6);
+      expect(DEFAULT_UPGRADE_REGISTRY.getAll().length).toBeGreaterThanOrEqual(7);
     });
 
     it("registers definitions into a custom registry via registerDefaultUpgrades", () => {
@@ -104,8 +117,9 @@ describe("Baseline & Tactical Upgrade Definitions", () => {
       expect(customRegistry.getAll()).toHaveLength(0);
 
       registerDefaultUpgrades(customRegistry);
-      expect(customRegistry.getAll()).toHaveLength(6);
+      expect(customRegistry.getAll()).toHaveLength(7);
       expect(customRegistry.get("kinetic-stride")).toBe(kineticStride);
+      expect(customRegistry.get("overcharge-dash")).toBe(overchargeDash);
     });
 
     it("samples 3 distinct draft choices from DEFAULT_UPGRADE_REGISTRY", () => {
@@ -120,7 +134,7 @@ describe("Baseline & Tactical Upgrade Definitions", () => {
         "extended-cylinder",
         "speed-loader",
       ]);
-      expect(draft.length).toBeLessThanOrEqual(4);
+      expect(draft.length).toBeLessThanOrEqual(5);
       const draftIds = draft.map((u) => u.id);
       expect(draftIds).not.toContain("extended-cylinder");
       expect(draftIds).not.toContain("speed-loader");

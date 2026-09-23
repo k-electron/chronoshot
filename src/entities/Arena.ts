@@ -14,7 +14,7 @@ import { FixedStepSimulator } from "../engine/FixedStepSimulator";
 import { TimeGovernor } from "../engine/TimeGovernor";
 import { RoomConfig } from "../levels/Room";
 import { RoomManager } from "../levels/RoomManager";
-import { vecLength, Vector2D } from "../math/vector";
+import { vec2, vecLength, vecNormalize, Vector2D } from "../math/vector";
 import { CylinderHUD } from "../ui/CylinderHUD";
 import { Reticle } from "../ui/Reticle";
 import { getUIFont, UITheme } from "../ui/theme";
@@ -41,6 +41,7 @@ export interface ArenaInput {
   shoot: boolean;
   reload: boolean;
   restart: boolean;
+  dash?: boolean;
   togglePause?: boolean;
   upgradeChoice?: 1 | 2 | 3;
 }
@@ -313,6 +314,17 @@ export class Arena {
           this.soundSynth?.playReload(this.timeGovernor.getTimeScale());
         }
       }
+
+      // Tactical dash command
+      if (input.dash) {
+        const dashed = this.player.triggerDash(this.timeGovernor, input.moveDir);
+        if (dashed) {
+          this.timeHUD.notifyBurst(this.player.dashDurationTicks, "dash");
+          const dashNormal = vecLength(input.moveDir) > 0 ? vecNormalize(input.moveDir) : vec2(0, -1);
+          this.particles.emitShieldSparks(this.player.position, dashNormal, 16);
+          this.soundSynth?.playShieldDeflect(this.timeGovernor.getTimeScale());
+        }
+      }
     }
 
     const inputSpeed = vecLength(input.moveDir) * this.player.maxSpeed;
@@ -364,6 +376,10 @@ export class Arena {
       width: this.width,
       height: this.height,
     });
+
+    if (this.player.dashActiveTicks > 0) {
+      this.particles.emitShatter(this.player.position, 2, "#00f0ff", 60);
+    }
 
     // 2. Update Enemies AI
     for (const enemy of this.enemies) {

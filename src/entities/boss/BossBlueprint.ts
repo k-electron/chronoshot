@@ -7,6 +7,7 @@
 
 import { Vector2D } from "../../math/vector";
 import { EnemyChassisType } from "../../ui/EnemyRenderer";
+import { AlternatingAttackBehavior } from "../behaviors/attack/AlternatingAttackBehavior";
 import { FanSpreadBehavior } from "../behaviors/attack/FanSpreadBehavior";
 import { RadialNovaBehavior } from "../behaviors/attack/RadialNovaBehavior";
 import { SingleSlugBehavior } from "../behaviors/attack/SingleSlugBehavior";
@@ -139,9 +140,129 @@ export const CHRONO_WEAVER_BLUEPRINT: BossBlueprint = {
   ],
 };
 
+/**
+ * Milestone Boss 3: Vektor-Prime Phase Sovereign (Room 15 Step Function)
+ * Phase 1: Fortress Aegis with 5-hit shield durability and pinpoint heavy slugs.
+ * Phase 2: Standoff kiter with 3-hit shield durability alternating sniper beam and fan spread.
+ * Phase 3: Aggressive Singularity Nova Overdrive core discharging 16-pellet rotating novae.
+ */
+export const VEKTOR_PRIME_BLUEPRINT: BossBlueprint = {
+  id: "vektor-prime",
+  name: "VEKTOR-PRIME: PHASE SOVEREIGN",
+  radius: 26,
+  chassis: "star",
+  phases: [
+    {
+      phaseIndex: 0,
+      phaseTitle: "FORTRESS AEGIS",
+      maxShields: 5,
+      speed: 50,
+      movement: () => new DirectAdvanceBehavior(),
+      attack: () =>
+        new SingleSlugBehavior({
+          fireCadenceTicks: 50,
+          bulletSpeed: 550,
+          spreadAngle: 0.03,
+          stutterTicks: 8,
+        }),
+      transitionTrigger: (ctx) => ctx.shields <= 0,
+      onPhaseExit: (ctx) => {
+        const action = combineTransitionActions(
+          createShockwavePulse(36, 320, "#a855f7"),
+          createMinionEscortSpawn([
+            {
+              type: "shotgun",
+              offsetX: -100,
+              offsetY: -80,
+              maxShields: 1,
+              fireCadenceTicks: 75,
+              initialDelayTicks: 25,
+            },
+            {
+              type: "stalker",
+              offsetX: -100,
+              offsetY: 80,
+              fireCadenceTicks: 32,
+              initialDelayTicks: 20,
+            },
+          ]),
+          createAudioCue("shieldBreak")
+        );
+        action(ctx);
+      },
+    },
+    {
+      phaseIndex: 1,
+      phaseTitle: "PHASE WARP",
+      maxShields: 3,
+      speed: 85,
+      movement: () => new KiterBehavior({ minDist: 280, maxDist: 460 }),
+      attack: () =>
+        new AlternatingAttackBehavior({
+          behaviors: [
+            new TelegraphedBeamBehavior({
+              fireCadenceTicks: 70,
+              bulletSpeed: 820,
+              spreadAngle: 0.01,
+              laserChargeTicks: 25,
+            }),
+            new FanSpreadBehavior({
+              fireCadenceTicks: 70,
+              bulletSpeed: 500,
+              spreadAngle: 0.3,
+              pellets: 3,
+              stutterTicks: 6,
+            }),
+          ],
+        }),
+      transitionTrigger: (ctx) => ctx.shields <= 0,
+      onPhaseExit: (ctx) => {
+        const action = combineTransitionActions(
+          createShockwavePulse(48, 380, "#ff1744"),
+          createMinionEscortSpawn([
+            {
+              type: "stalker",
+              offsetX: -120,
+              offsetY: -60,
+              fireCadenceTicks: 32,
+              initialDelayTicks: 15,
+            },
+            {
+              type: "stalker",
+              offsetX: -120,
+              offsetY: 60,
+              fireCadenceTicks: 32,
+              initialDelayTicks: 20,
+            },
+          ]),
+          createAudioCue("shieldBreak")
+        );
+        action(ctx);
+      },
+    },
+    {
+      phaseIndex: 2,
+      phaseTitle: "SINGULARITY NOVA",
+      maxShields: 0,
+      speed: 115,
+      movement: () => new DirectAdvanceBehavior(),
+      attack: () =>
+        new RadialNovaBehavior({
+          fireCadenceTicks: 65,
+          bulletSpeed: 420,
+          pellets: 16,
+          stutterTicks: 8,
+          angularOffsetStep: 0.12,
+        }),
+      transitionTrigger: () => false,
+    },
+  ],
+};
+
 export const BOSS_BLUEPRINTS: Record<string, BossBlueprint> = {
   "goliath-01": GOLIATH_01_BLUEPRINT,
   "chrono-weaver": CHRONO_WEAVER_BLUEPRINT,
+  "vektor-prime": VEKTOR_PRIME_BLUEPRINT,
 };
 
 /**

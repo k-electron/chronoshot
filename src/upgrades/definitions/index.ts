@@ -3,6 +3,7 @@ import { DEFAULT_UPGRADE_REGISTRY, UpgradeRegistry } from "../UpgradeRegistry";
 import { chronoBurst } from "./chronoBurst";
 import { extendedCylinder } from "./extendedCylinder";
 import { kineticStride } from "./kineticStride";
+import { overchargeDash } from "./overchargeDash";
 import { phaseDeflector } from "./phaseDeflector";
 import { reactiveShield } from "./reactiveShield";
 import { speedLoader } from "./speedLoader";
@@ -11,6 +12,7 @@ export {
   chronoBurst,
   extendedCylinder,
   kineticStride,
+  overchargeDash,
   phaseDeflector,
   reactiveShield,
   speedLoader,
@@ -23,6 +25,7 @@ export const ALL_UPGRADE_DEFINITIONS: readonly UpgradeDefinition[] = [
   kineticStride,
   chronoBurst,
   phaseDeflector,
+  overchargeDash,
 ];
 
 /**
