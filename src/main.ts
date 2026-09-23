@@ -6,6 +6,7 @@
 
 import { SoundSynthesizer } from "./audio/SoundSynthesizer";
 import { Arena, ArenaInput } from "./entities/Arena";
+import { LevelDirector } from "./levels/LevelDirector";
 import { RoomManager } from "./levels/RoomManager";
 import { vec2 } from "./math/vector";
 
@@ -22,7 +23,13 @@ window.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
-  const roomManager = new RoomManager();
+  const urlParams = new URLSearchParams(window.location.search);
+  const isEndless = urlParams.get("mode") === "endless";
+  const seed = urlParams.get("seed") ?? undefined;
+
+  const roomManager = isEndless
+    ? new RoomManager(new LevelDirector({ seed }))
+    : new RoomManager();
   const soundSynth = new SoundSynthesizer();
   const arena = new Arena(canvas.width, canvas.height, roomManager, soundSynth);
 
