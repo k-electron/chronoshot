@@ -622,7 +622,7 @@ describe("Combat Arena & Room Loop", () => {
     expect(arena.player.getAugmentations().speedLoader).toBe(true);
   });
 
-  it("enforces pure permadeath run reset back to Room 1 on defeat and clears augmentations", async () => {
+  it("enforces cascading rollback on defeat via [R] and full reset via [Shift+R]", async () => {
     const { RoomManager } = await import("../levels/RoomManager");
     const roomManager = new RoomManager();
     const arena = new Arena(960, 640, roomManager);
@@ -640,7 +640,7 @@ describe("Combat Arena & Room Loop", () => {
     arena.player.kill();
     arena.status = "defeat";
 
-    // Player presses [R] to restart
+    // Player presses [R] (restart: true) to rollback to previous boss (Room 5)
     arena.step(0.016, {
       moveDir: vec2(0, 0),
       mousePos: vec2(500, 320),
@@ -649,12 +649,29 @@ describe("Combat Arena & Room Loop", () => {
       restart: true,
     });
 
-    // Permadeath: back to Room 1, augmentations wiped!
+    // Rollback to Room 5: Goliath-01
+    expect(arena.roomManager.getCurrentRoomIndex()).toBe(4);
+    expect(arena.roomManager.getCurrentRoom().roomNumber).toBe(5);
+    expect(arena.status).toBe("playing");
+    expect(arena.player.isAlive).toBe(true);
+
+    // If player dies again in Room 5 and triggers fullReset (Shift+R)
+    arena.player.kill();
+    arena.status = "defeat";
+    arena.step(0.016, {
+      moveDir: vec2(0, 0),
+      mousePos: vec2(500, 320),
+      shoot: false,
+      reload: false,
+      restart: false,
+      fullReset: true,
+    });
+
+    // Full Reset: back to Room 1
     expect(arena.roomManager.getCurrentRoomIndex()).toBe(0);
     expect(arena.roomManager.getCurrentRoom().roomNumber).toBe(1);
     expect(arena.player.getAugmentations().speedLoader).toBeUndefined();
     expect(arena.status).toBe("playing");
-    expect(arena.player.isAlive).toBe(true);
   });
 
   it("supports dynamic upgrade draft with custom cards via openUpgradeDraft()", async () => {
@@ -979,6 +996,286 @@ describe("Combat Arena & Room Loop", () => {
       expect(arena.isUpgradeDraftActive).toBe(false);
       expect(arena.hoveredUpgradeCardIndex).toBeNull();
       expect(arena.player.upgradePipeline.getActiveIds().length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Boss Checkpoint Loadout Snapshotting & Rollback", () => {
+    it("captures augmentations snapshot upon entering boss rooms and restores upon rollback", () => {
+      const roomManager = new RoomManager();
+      const arena = new Arena(960, 640, roomManager);
+
+      // Advance to Room 5 (Sector 1 Boss)
+      for (let i = 0; i < 4; i++) {
+        roomManager.advanceRoom();
+      }
+      arena.loadRoom(roomManager.getCurrentRoom());
+      expect(roomManager.getCurrentRoom().roomNumber).toBe(5);
+      expect(arena.checkpointLoadouts.has(5)).toBe(true);
+      expect(arena.checkpointLoadouts.get(5)).toEqual([]);
+
+      // Acquire an upgrade after defeating Goliath
+      arena.player.acquireUpgrade("extended-cylinder");
+      expect(arena.player.upgradePipeline.getActiveIds()).toContain("extended-cylinder");
+
+      // Advance through Sector 2 to Room 10 (Chrono-Weaver)
+      for (let i = 0; i < 5; i++) {
+        roomManager.advanceRoom();
+      }
+      arena.loadRoom(roomManager.getCurrentRoom());
+      expect(roomManager.getCurrentRoom().roomNumber).toBe(10);
+      expect(arena.checkpointLoadouts.has(10)).toBe(true);
+      expect(arena.checkpointLoadouts.get(10)).toEqual(["extended-cylinder"]);
+
+      // Acquire second upgrade
+      arena.player.acquireUpgrade("speed-loader");
+      expect(arena.player.upgradePipeline.getActiveIds()).toHaveLength(2);
+
+      // Advance to Room 12 and simulate defeat
+      roomManager.advanceRoom(); // R11
+      roomManager.advanceRoom(); // R12
+      arena.loadRoom(roomManager.getCurrentRoom());
+      expect(roomManager.getCurrentRoom().roomNumber).toBe(12);
+
+      // Rollback to checkpoint: should target Room 10 and restore 1 upgrade
+      arena.rollbackToCheckpoint();
+      expect(roomManager.getCurrentRoom().roomNumber).toBe(10);
+      expect(arena.player.upgradePipeline.getActiveIds()).toEqual(["extended-cylinder"]);
+      expect(arena.player.weapon.config.magSize).toBe(8); // extended cylinder active
+
+      // Now simulate dying again in Room 10: cascading rollback to Room 5 with 0 upgrades
+      arena.rollbackToCheckpoint();
+      expect(roomManager.getCurrentRoom().roomNumber).toBe(5);
+      expect(arena.player.upgradePipeline.getActiveIds()).toEqual([]);
+      expect(arena.player.weapon.config.magSize).toBe(6);
+
+      // Dying in Room 5: rollback to Room 1
+      arena.rollbackToCheckpoint();
+      expect(roomManager.getCurrentRoom().roomNumber).toBe(1);
+      expect(arena.player.upgradePipeline.getActiveIds()).toEqual([]);
+    });
+
+    it("clears checkpoint snapshots upon full restart()", () => {
+      const roomManager = new RoomManager();
+      const arena = new Arena(960, 640, roomManager);
+
+      for (let i = 0; i < 4; i++) roomManager.advanceRoom();
+      arena.loadRoom(roomManager.getCurrentRoom());
+      expect(arena.checkpointLoadouts.size).toBeGreaterThan(0);
+
+      arena.restart();
+      expect(arena.checkpointLoadouts.size).toBe(0);
+      expect(roomManager.getCurrentRoom().roomNumber).toBe(1);
+    });
+
+    it("evaluates cursor and mouse click routing on defeat cards", () => {
+      const roomManager = new RoomManager();
+      const arena = new Arena(960, 640, roomManager);
+
+      // Advance to Room 8
+      for (let i = 0; i < 7; i++) roomManager.advanceRoom();
+      arena.loadRoom(roomManager.getCurrentRoom());
+      expect(roomManager.getCurrentRoom().roomNumber).toBe(8);
+
+      // Set to defeat
+      arena.status = "defeat";
+
+      // Mouse over Card 0 (Rollback, e.g. x: 250, y: 350)
+      expect(arena.getDesiredCursor(vec2(250, 350))).toBe("pointer");
+
+      // Mouse over Card 1 (Reset, e.g. x: 600, y: 350)
+      expect(arena.getDesiredCursor(vec2(600, 350))).toBe("pointer");
+
+      // Mouse outside cards
+      expect(arena.getDesiredCursor(vec2(100, 100))).toBe("default");
+      expect(arena.getDesiredCursor(vec2(480, 350))).toBe("default");
+
+      // Mouse click on Card 0 triggers rollback to Room 5
+      arena.step(0.016, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(250, 350),
+        shoot: true,
+        reload: false,
+        restart: false,
+      });
+
+      expect(roomManager.getCurrentRoom().roomNumber).toBe(5);
+      expect(arena.status).toBe("playing");
+
+      // Die again in Room 5
+      arena.status = "defeat";
+
+      // Mouse click on Card 1 triggers full reset to Room 1
+      arena.step(0.016, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(600, 350),
+        shoot: true,
+        reload: false,
+        restart: false,
+      });
+
+      expect(roomManager.getCurrentRoom().roomNumber).toBe(1);
+      expect(arena.status).toBe("playing");
+    });
+
+    it("handles Endless Mode defeat and rolling back to Room 20", () => {
+      const roomManager = new RoomManager();
+      const arena = new Arena(960, 640, roomManager);
+
+      // Start endless mode
+      arena.startEndlessMode();
+      expect(arena.endlessDirector).toBeDefined();
+      expect(arena.roomManager?.isEndlessMode()).toBe(true);
+
+      // Simulate kill and ticks in endless
+      arena.endlessDirector?.recordKill();
+      arena.endlessDirector?.recordKill();
+
+      // Mock canvas context for render check
+      const mockCtx = {
+        save: vi.fn(),
+        restore: vi.fn(),
+        beginPath: vi.fn(),
+        closePath: vi.fn(),
+        arc: vi.fn(),
+        fill: vi.fn(),
+        stroke: vi.fn(),
+        fillRect: vi.fn(),
+        strokeRect: vi.fn(),
+        fillText: vi.fn(),
+        translate: vi.fn(),
+        rotate: vi.fn(),
+        moveTo: vi.fn(),
+        lineTo: vi.fn(),
+        setLineDash: vi.fn(),
+        createLinearGradient: vi.fn().mockReturnValue({
+          addColorStop: vi.fn(),
+        }),
+        createRadialGradient: vi.fn().mockReturnValue({
+          addColorStop: vi.fn(),
+        }),
+      } as unknown as CanvasRenderingContext2D;
+
+      // Player dies in endless
+      arena.player.kill();
+      arena.status = "defeat";
+
+      // Verify rendering defeat in endless mode executes without errors and renders Endless text
+      expect(() => arena.render(mockCtx, 0.016)).not.toThrow();
+      expect(mockCtx.fillText).toHaveBeenCalledWith(
+        "ENDLESS PROTOCOL TERMINATED",
+        expect.any(Number),
+        expect.any(Number)
+      );
+
+      // Press [R] to rollback: should navigate to Room 20
+      arena.step(0.016, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(250, 350),
+        shoot: false,
+        reload: false,
+        restart: true,
+      });
+
+      expect(roomManager.getCurrentRoom().roomNumber).toBe(20);
+      expect(arena.endlessDirector).toBeUndefined();
+      expect(arena.status).toBe("playing");
+      expect(arena.player.upgradePipeline.getActiveIds().length).toBe(3);
+    });
+
+    it("executes the full cascading drop-down sequence from Sector 4 down to Room 1 upon repeated failures", () => {
+      const roomManager = new RoomManager();
+      const arena = new Arena(960, 640, roomManager);
+
+      // Advance to Room 5, capture snapshot (0 upgrades), acquire upgrade 1
+      for (let i = 0; i < 4; i++) roomManager.advanceRoom();
+      arena.loadRoom(roomManager.getCurrentRoom());
+      arena.player.acquireUpgrade("extended-cylinder");
+
+      // Advance to Room 10, capture snapshot (1 upgrade), acquire upgrade 2
+      for (let i = 0; i < 5; i++) roomManager.advanceRoom();
+      arena.loadRoom(roomManager.getCurrentRoom());
+      arena.player.acquireUpgrade("speed-loader");
+
+      // Advance to Room 15, capture snapshot (2 upgrades), acquire upgrade 3
+      for (let i = 0; i < 5; i++) roomManager.advanceRoom();
+      arena.loadRoom(roomManager.getCurrentRoom());
+      arena.player.acquireUpgrade("reactive-shield");
+
+      // Advance to Room 18 in Sector 4
+      for (let i = 0; i < 3; i++) roomManager.advanceRoom();
+      arena.loadRoom(roomManager.getCurrentRoom());
+      expect(roomManager.getCurrentRoom().roomNumber).toBe(18);
+      expect(arena.player.upgradePipeline.getActiveIds()).toHaveLength(3);
+
+      // 1. Die in Room 18 -> Drop to Room 15 (Vektor-Prime) with 2 upgrades
+      arena.player.kill();
+      arena.status = "defeat";
+      arena.step(0.016, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(0, 0),
+        shoot: false,
+        reload: false,
+        restart: true,
+      });
+      expect(roomManager.getCurrentRoom().roomNumber).toBe(15);
+      expect(arena.player.upgradePipeline.getActiveIds()).toEqual([
+        "extended-cylinder",
+        "speed-loader",
+      ]);
+
+      // 2. Die in Room 15 -> Drop to Room 10 (Chrono-Weaver) with 1 upgrade
+      arena.player.kill();
+      arena.status = "defeat";
+      arena.step(0.016, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(0, 0),
+        shoot: false,
+        reload: false,
+        restart: true,
+      });
+      expect(roomManager.getCurrentRoom().roomNumber).toBe(10);
+      expect(arena.player.upgradePipeline.getActiveIds()).toEqual([
+        "extended-cylinder",
+      ]);
+
+      // 3. Die in Room 10 -> Drop to Room 5 (Goliath-01) with 0 upgrades
+      arena.player.kill();
+      arena.status = "defeat";
+      arena.step(0.016, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(0, 0),
+        shoot: false,
+        reload: false,
+        restart: true,
+      });
+      expect(roomManager.getCurrentRoom().roomNumber).toBe(5);
+      expect(arena.player.upgradePipeline.getActiveIds()).toEqual([]);
+
+      // 4. Die in Room 5 -> Drop to Room 1 (Sector 1 start) with 0 upgrades
+      arena.player.kill();
+      arena.status = "defeat";
+      arena.step(0.016, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(0, 0),
+        shoot: false,
+        reload: false,
+        restart: true,
+      });
+      expect(roomManager.getCurrentRoom().roomNumber).toBe(1);
+      expect(arena.player.upgradePipeline.getActiveIds()).toEqual([]);
+
+      // 5. Die in Room 1 -> Stays at Room 1 with 0 upgrades
+      arena.player.kill();
+      arena.status = "defeat";
+      arena.step(0.016, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(0, 0),
+        shoot: false,
+        reload: false,
+        restart: true,
+      });
+      expect(roomManager.getCurrentRoom().roomNumber).toBe(1);
+      expect(arena.player.upgradePipeline.getActiveIds()).toEqual([]);
     });
   });
 });

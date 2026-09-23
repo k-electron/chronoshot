@@ -48,11 +48,11 @@ The arena SHALL support distinct enemy archetypes including Pistol Grunt, Shotgu
 - **THEN** it halts movement, projects a charging red sightline laser for 30 ticks, and discharges a high-velocity precision bullet at a 110-tick cadence
 
 ### Requirement: One-Hit Lethality and Instant Room Reset
-The arena SHALL enforce instant lethal elimination for unshielded combat units upon projectile impact, enforce hit-count shield durability for shielded units before exposing them to lethal damage, and enforce pure permadeath run reset to Room 1 upon player elimination.
+The arena SHALL enforce instant lethal elimination for unshielded combat units upon projectile impact, enforce hit-count shield durability for shielded units before exposing them to lethal damage, and present an interactive dual-card defeat screen upon player elimination that supports cascading boss checkpoint rollbacks or full run resets.
 
 #### Scenario: Player struck by projectile
 - **WHEN** an enemy projectile impacts the player hitbox with zero remaining shields
-- **THEN** the player entity shatters, a defeat state is triggered displaying run statistics, and pressing restart resets progression back to Room 1 with all augmentations cleared
+- **THEN** the player entity shatters, a defeat state is triggered displaying run statistics and dual interactive defeat cards, suppressing in-canvas reticle, and restoring pointer cursor interaction
 
 #### Scenario: Player struck by projectile with reactive shield online
 - **WHEN** an enemy projectile impacts a player possessing an active reactive shield
@@ -65,6 +65,34 @@ The arena SHALL enforce instant lethal elimination for unshielded combat units u
 #### Scenario: Projectile strikes enemy shield barrier
 - **WHEN** a player projectile impacts an enemy unit possessing remaining shield hits
 - **THEN** the projectile is absorbed, one shield hit is consumed, radiant shield impact sparks are produced, and the unit remains alive
+
+#### Scenario: Player eliminated in Sector 1
+- **WHEN** the player suffers lethal damage in Rooms 1 through 5 (including during the Goliath-01 boss encounter)
+- **THEN** the player shatters, the arena enters defeat state displaying dual interactive cards, and triggering Rollback (via [R] or clicking Card 1) respawns the player at Room 1 with 0 augmentations
+
+#### Scenario: Player eliminated in Sector 2
+- **WHEN** the player suffers lethal damage in Rooms 6 through 10 (including during the Chrono-Weaver boss encounter)
+- **THEN** triggering Rollback respawns the player at the beginning of Room 5 (Goliath-01) with their Room 5 entry loadout (0 augmentations)
+
+#### Scenario: Player eliminated in Sector 3
+- **WHEN** the player suffers lethal damage in Rooms 11 through 15 (including during the Vektor-Prime boss encounter)
+- **THEN** triggering Rollback respawns the player at the beginning of Room 10 (Chrono-Weaver) with their Room 10 entry loadout (1 augmentation)
+
+#### Scenario: Player eliminated in Sector 4
+- **WHEN** the player suffers lethal damage in Rooms 16 through 20 (including during the Chrono-Zenith boss encounter)
+- **THEN** triggering Rollback respawns the player at the beginning of Room 15 (Vektor-Prime) with their Room 15 entry loadout (2 augmentations)
+
+#### Scenario: Cascading drop-down on repeated defeat
+- **WHEN** a player who rolled back to a previous boss dies again in that boss room or subsequent rooms
+- **THEN** rollback recalculates from the newly failed room, demoting the player down the checkpoint ladder tier-by-tier until Room 1
+
+#### Scenario: Full run reset from defeat screen
+- **WHEN** the player triggers Full Reset (via [Shift+R] or clicking Card 2) on the defeat screen
+- **THEN** the run is abandoned, all augmentations and checkpoint snapshots are cleared, and the game resets to pristine Room 1
+
+#### Scenario: Endless Mode defeat score screen and Apex rollback
+- **WHEN** the player is eliminated in Endless Survival Mode
+- **THEN** the defeat screen displays the survival performance score (survival time, max threat increment reached, and hostiles eliminated count), Card 1 targets rollback to Room 20 (Chrono-Zenith), and Card 2 targets Full Reset to Room 1
 
 ### Requirement: Puzzle Room Clearance and Transition
 The arena SHALL track room completion state across a 9-room progression sequence, trigger a boss encounter in Room 5, advance through an escalated Zone 2 baseline across Rooms 6 through 9, and unlock the exit portal once all active enemies in the current room are eliminated.

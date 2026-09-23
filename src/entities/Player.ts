@@ -451,6 +451,16 @@ export class Player implements CombatUnit {
   }
 
   /**
+   * Clears existing augmentations and equips the specified upgrade IDs.
+   */
+  public setLoadoutFromIds(upgradeIds: readonly string[]): void {
+    this.clearAugmentations();
+    for (const id of upgradeIds) {
+      this.acquireUpgrade(id);
+    }
+  }
+
+  /**
    * Equips all 7 baseline and advanced combat augmentations for Endless Survival Mode,
    * replenishes shields to maximum capacity, and reloads weapon to full capacity (8 rounds).
    */

@@ -17,6 +17,7 @@ import { createStandardRoomSequence, RoomConfig } from "./Room";
 import { LevelDirector } from "./LevelDirector";
 import { EndlessDirector } from "./EndlessDirector";
 import { ApexColosseumTemplate } from "./templates/ApexColosseumTemplate";
+import { computeRollbackTarget, RollbackTarget } from "./RollbackCalculator";
 
 /**
  * Creates the dynamic Apex Colosseum room for Endless Survival Mode.
@@ -215,6 +216,40 @@ export class RoomManager {
    */
   public restartCurrentRoom(): void {
     this.exitUnlocked = false;
+  }
+
+  /**
+   * Computes the rollback target for the currently active room.
+   */
+  public getRollbackTarget(): RollbackTarget {
+    const isEndless = this.endlessDirector !== undefined;
+    const currentRoom = this.getCurrentRoom();
+    return computeRollbackTarget(currentRoom.roomNumber, isEndless);
+  }
+
+  /**
+   * Rolls back the mission progression to the computed boss checkpoint.
+   */
+  public rollbackToCheckpoint(): RollbackTarget {
+    const target = this.getRollbackTarget();
+
+    if (this.endlessDirector) {
+      this.endlessDirector = undefined;
+      if (this.rooms.length > 20) {
+        this.rooms = this.rooms.slice(0, 20);
+      }
+    }
+
+    if (this.levelDirector) {
+      while (this.rooms.length <= target.roomIndex) {
+        this.rooms.push(this.levelDirector.generateRoom(this.rooms.length + 1));
+      }
+    }
+
+    this.currentRoomIndex = target.roomIndex;
+    this.exitUnlocked = false;
+    this.gameCompleted = false;
+    return target;
   }
 
   /**
