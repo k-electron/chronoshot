@@ -20,6 +20,7 @@
  *   - Room 9 (The Iron Gate): Final defensive line with dual Aegis Wardens + Marksman + Stalker.
  */
 
+import { CHRONO_WEAVER_BLUEPRINT } from "../entities/boss/BossBlueprint";
 import { EnemyConfig } from "../entities/Enemy";
 import { createObstacle, createPillar, Obstacle } from "../entities/Obstacle";
 import { vec2, Vector2D } from "../math/vector";
@@ -522,7 +523,405 @@ export function createRoom9(width = 960, height = 640): RoomConfig {
 }
 
 /**
- * Generates the complete 9-room tactical puzzle progression.
+ * Room 10: Milestone Boss 2 (Chrono-Weaver: Temporal Anchor [3 shields] + Warden escort).
+ * Demands standoff laser evasion in Phase 1, followed by needle-eye micro-creep weaving
+ * through 360-degree radial novae while managing Stalker reinforcements in Phase 2.
+ */
+export function createRoom10(width = 960, height = 640): RoomConfig {
+  return {
+    id: "room-10",
+    roomNumber: 10,
+    title: "ROOM 10: CHRONO-WEAVER",
+    subtitle: "Milestone Boss 2: Temporal Anchor",
+    tacticalTip:
+      "Chrono-Weaver kites at range with precision laser beams. Destroy its 3 shields, then freeze in micro-creep to weave through radial novae!",
+    playerSpawn: vec2(140, height / 2),
+    obstacles: [
+      ...createPerimeterWalls(width, height),
+      createPillar("pillar-nw", 340, 180, 48),
+      createPillar("pillar-sw", 340, height - 180, 48),
+      createPillar("pillar-ne", 620, 180, 48),
+      createPillar("pillar-se", 620, height - 180, 48),
+    ],
+    enemies: [
+      {
+        id: "chrono-weaver-boss",
+        type: "boss",
+        x: width - 200,
+        y: height / 2,
+        maxShields: 3,
+        blueprint: CHRONO_WEAVER_BLUEPRINT,
+        bossName: CHRONO_WEAVER_BLUEPRINT.name,
+        fireCadenceTicks: 80,
+        initialDelayTicks: 25,
+      },
+      {
+        id: "warden-screen",
+        type: "warden",
+        x: width - 340,
+        y: height / 2,
+        maxShields: 2,
+        fireCadenceTicks: 65,
+        initialDelayTicks: 30,
+      },
+    ],
+    exitPortal: {
+      x: width - 80,
+      y: height / 2,
+      radius: 28,
+    },
+  };
+}
+
+/**
+ * Room 11: Vanguard Breach (Sector 3 Entry: 1 Warden + 2 Shotgun Guards + 1 Stalker + 2 Grunts).
+ * Calibrates fire tempo and allows the player to test compounded upgrade synergies.
+ */
+export function createRoom11(width = 960, height = 640): RoomConfig {
+  return {
+    id: "room-11",
+    roomNumber: 11,
+    title: "ROOM 11: VANGUARD BREACH",
+    subtitle: "Sector 3 Entry Skirmish",
+    tacticalTip:
+      "Test your upgraded weapon systems against combined vanguard forces. Clear the charging stalker before breaking heavy shields.",
+    playerSpawn: vec2(140, height / 2),
+    obstacles: [
+      ...createPerimeterWalls(width, height),
+      createPillar("pillar-center-top", width / 2, height / 2 - 130, 60),
+      createPillar("pillar-center-bottom", width / 2, height / 2 + 130, 60),
+    ],
+    enemies: [
+      {
+        id: "warden-center",
+        type: "warden",
+        x: width - 260,
+        y: height / 2,
+        maxShields: 2,
+        fireCadenceTicks: 65,
+        initialDelayTicks: 25,
+      },
+      {
+        id: "guard-top",
+        type: "shotgun",
+        x: width - 220,
+        y: height / 2 - 150,
+        maxShields: 1,
+        fireCadenceTicks: 75,
+        initialDelayTicks: 30,
+      },
+      {
+        id: "guard-bottom",
+        type: "shotgun",
+        x: width - 220,
+        y: height / 2 + 150,
+        maxShields: 1,
+        fireCadenceTicks: 75,
+        initialDelayTicks: 35,
+      },
+      {
+        id: "stalker-vanguard",
+        type: "stalker",
+        x: width - 340,
+        y: height / 2,
+        fireCadenceTicks: 32,
+        initialDelayTicks: 15,
+      },
+      {
+        id: "grunt-support-1",
+        type: "grunt",
+        x: width - 160,
+        y: height / 2 - 80,
+        fireCadenceTicks: 50,
+        initialDelayTicks: 40,
+      },
+      {
+        id: "grunt-support-2",
+        type: "grunt",
+        x: width - 160,
+        y: height / 2 + 80,
+        fireCadenceTicks: 50,
+        initialDelayTicks: 45,
+      },
+    ],
+    exitPortal: {
+      x: width - 80,
+      y: height / 2,
+      radius: 28,
+    },
+  };
+}
+
+/**
+ * Room 12: Twin Bunker Crossfire (2 Wardens + 2 Marksman Snipers + 1 Shotgun Guard + 1 Grunt).
+ * Multi-shield siege requiring disciplined bunker cover peeking under crossfire.
+ */
+export function createRoom12(width = 960, height = 640): RoomConfig {
+  return {
+    id: "room-12",
+    roomNumber: 12,
+    title: "ROOM 12: TWIN BUNKER CROSSFIRE",
+    subtitle: "Armored Line & Precision Snipers",
+    tacticalTip:
+      "Dual snipers lock crossfire angles from bunker cover while twin wardens advance. Displace and flank.",
+    playerSpawn: vec2(140, height / 2),
+    obstacles: [
+      ...createPerimeterWalls(width, height),
+      createObstacle("bunker-left-top", 340, 110, 40, 130),
+      createObstacle("bunker-left-bottom", 340, height - 240, 40, 130),
+      createObstacle("bunker-right-top", 580, 110, 40, 130),
+      createObstacle("bunker-right-bottom", 580, height - 240, 40, 130),
+    ],
+    enemies: [
+      {
+        id: "warden-alpha",
+        type: "warden",
+        x: width - 260,
+        y: height / 2 - 80,
+        maxShields: 2,
+        fireCadenceTicks: 65,
+        initialDelayTicks: 25,
+      },
+      {
+        id: "warden-beta",
+        type: "warden",
+        x: width - 260,
+        y: height / 2 + 80,
+        maxShields: 2,
+        fireCadenceTicks: 65,
+        initialDelayTicks: 35,
+      },
+      {
+        id: "sniper-high",
+        type: "marksman",
+        x: width - 160,
+        y: 120,
+        fireCadenceTicks: 100,
+        initialDelayTicks: 40,
+      },
+      {
+        id: "sniper-low",
+        type: "marksman",
+        x: width - 160,
+        y: height - 120,
+        fireCadenceTicks: 100,
+        initialDelayTicks: 50,
+      },
+      {
+        id: "guard-center",
+        type: "shotgun",
+        x: width - 360,
+        y: height / 2,
+        maxShields: 1,
+        fireCadenceTicks: 75,
+        initialDelayTicks: 20,
+      },
+      {
+        id: "grunt-anchor",
+        type: "grunt",
+        x: width - 200,
+        y: height / 2,
+        fireCadenceTicks: 50,
+        initialDelayTicks: 30,
+      },
+    ],
+    exitPortal: {
+      x: width - 80,
+      y: height / 2,
+      radius: 28,
+    },
+  };
+}
+
+/**
+ * Room 13: Split Flank Matrix (2 Stalkers + 2 Shotgun Guards + 1 Warden + 3 Grunts).
+ * High-velocity corridor containment preventing dual pincer rushes.
+ */
+export function createRoom13(width = 960, height = 640): RoomConfig {
+  return {
+    id: "room-13",
+    roomNumber: 13,
+    title: "ROOM 13: SPLIT FLANK MATRIX",
+    subtitle: "Dual Pincer & Choke Defense",
+    tacticalTip:
+      "Corridor dividers separate the arena into high-speed rush lanes. Do not allow stalkers to pincer you into the center choke.",
+    playerSpawn: vec2(140, height / 2),
+    obstacles: [
+      ...createPerimeterWalls(width, height),
+      createObstacle("corridor-divider-top", 280, 190, width - 480, 24),
+      createObstacle("corridor-divider-bottom", 280, height - 214, width - 480, 24),
+      createPillar("choke-pillar", width / 2 + 60, height / 2, 45),
+    ],
+    enemies: [
+      {
+        id: "stalker-north",
+        type: "stalker",
+        x: width - 180,
+        y: 110,
+        fireCadenceTicks: 32,
+        initialDelayTicks: 15,
+      },
+      {
+        id: "stalker-south",
+        type: "stalker",
+        x: width - 180,
+        y: height - 110,
+        fireCadenceTicks: 32,
+        initialDelayTicks: 20,
+      },
+      {
+        id: "guard-choke-top",
+        type: "shotgun",
+        x: width - 260,
+        y: height / 2 - 80,
+        maxShields: 1,
+        fireCadenceTicks: 70,
+        initialDelayTicks: 25,
+      },
+      {
+        id: "guard-choke-bottom",
+        type: "shotgun",
+        x: width - 260,
+        y: height / 2 + 80,
+        maxShields: 1,
+        fireCadenceTicks: 70,
+        initialDelayTicks: 30,
+      },
+      {
+        id: "warden-anchor",
+        type: "warden",
+        x: width - 180,
+        y: height / 2,
+        maxShields: 2,
+        fireCadenceTicks: 65,
+        initialDelayTicks: 35,
+      },
+      {
+        id: "grunt-north",
+        type: "grunt",
+        x: width - 300,
+        y: 110,
+        fireCadenceTicks: 50,
+        initialDelayTicks: 30,
+      },
+      {
+        id: "grunt-south",
+        type: "grunt",
+        x: width - 300,
+        y: height - 110,
+        fireCadenceTicks: 50,
+        initialDelayTicks: 35,
+      },
+      {
+        id: "grunt-center",
+        type: "grunt",
+        x: width - 340,
+        y: height / 2,
+        fireCadenceTicks: 50,
+        initialDelayTicks: 40,
+      },
+    ],
+    exitPortal: {
+      x: width - 80,
+      y: height / 2,
+      radius: 28,
+    },
+  };
+}
+
+/**
+ * Room 14: The Crucible (Sector 3 Peak Gauntlet: 2 Wardens + 2 Marksmen + 1 Stalker + 1 Shotgun + 1 Grunt).
+ * The ultimate tactical gauntlet demanding complete combat and ammunition mastery.
+ */
+export function createRoom14(width = 960, height = 640): RoomConfig {
+  return {
+    id: "room-14",
+    roomNumber: 14,
+    title: "ROOM 14: THE CRUCIBLE",
+    subtitle: "Sector 3 Peak Gauntlet",
+    tacticalTip:
+      "All 4 tactical archetypes coordinate in a quadrant killbox. Prioritize fast threats, track sniper lasers, and crack wardens last.",
+    playerSpawn: vec2(140, height / 2),
+    obstacles: [
+      ...createPerimeterWalls(width, height),
+      createObstacle("quad-nw", 340, 100, 24, 120),
+      createObstacle("quad-sw", 340, height - 220, 24, 120),
+      createObstacle("quad-ne", 580, 100, 24, 120),
+      createObstacle("quad-se", 580, height - 220, 24, 120),
+      createPillar("pillar-core-top", width / 2, height / 2 - 110, 46),
+      createPillar("pillar-core-bottom", width / 2, height / 2 + 110, 46),
+    ],
+    enemies: [
+      {
+        id: "warden-core-1",
+        type: "warden",
+        x: width - 220,
+        y: height / 2 - 100,
+        maxShields: 2,
+        fireCadenceTicks: 65,
+        initialDelayTicks: 25,
+      },
+      {
+        id: "warden-core-2",
+        type: "warden",
+        x: width - 220,
+        y: height / 2 + 100,
+        maxShields: 2,
+        fireCadenceTicks: 65,
+        initialDelayTicks: 35,
+      },
+      {
+        id: "sniper-upper-nest",
+        type: "marksman",
+        x: width - 150,
+        y: 110,
+        fireCadenceTicks: 95,
+        initialDelayTicks: 30,
+      },
+      {
+        id: "sniper-lower-nest",
+        type: "marksman",
+        x: width - 150,
+        y: height - 110,
+        fireCadenceTicks: 95,
+        initialDelayTicks: 45,
+      },
+      {
+        id: "stalker-infiltrator",
+        type: "stalker",
+        x: width - 360,
+        y: height / 2,
+        fireCadenceTicks: 32,
+        initialDelayTicks: 15,
+      },
+      {
+        id: "guard-forward",
+        type: "shotgun",
+        x: width - 280,
+        y: height / 2,
+        maxShields: 1,
+        fireCadenceTicks: 70,
+        initialDelayTicks: 20,
+      },
+      {
+        id: "grunt-support",
+        type: "grunt",
+        x: width - 140,
+        y: height / 2,
+        fireCadenceTicks: 50,
+        initialDelayTicks: 30,
+      },
+    ],
+    exitPortal: {
+      x: width - 80,
+      y: height / 2,
+      radius: 28,
+    },
+  };
+}
+
+/**
+ * Generates the complete 14-room tactical puzzle progression.
  */
 export function createStandardRoomSequence(
   width = 960,
@@ -538,5 +937,10 @@ export function createStandardRoomSequence(
     createRoom7(width, height),
     createRoom8(width, height),
     createRoom9(width, height),
+    createRoom10(width, height),
+    createRoom11(width, height),
+    createRoom12(width, height),
+    createRoom13(width, height),
+    createRoom14(width, height),
   ];
 }

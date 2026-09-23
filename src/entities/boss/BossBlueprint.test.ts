@@ -57,6 +57,54 @@ describe("BossBlueprint & Multi-Phase Archetypes", () => {
     expect(p2.attack()).toBeInstanceOf(RadialNovaBehavior);
   });
 
+  it("Chrono-Weaver phase 1 exit triggers combined shockwave, minion escort, and audio cues", () => {
+    const bp = CHRONO_WEAVER_BLUEPRINT;
+    const p1 = bp.phases[0];
+    expect(p1.onPhaseExit).toBeDefined();
+
+    const spawnedMinions: any[] = [];
+    const emittedShatters: any[] = [];
+    let playedShieldBreak = false;
+
+    const mockCtx = {
+      previousPhaseIndex: 0,
+      newPhaseIndex: 1,
+      bossPosition: vec2(600, 320),
+      shields: 0,
+      maxShields: 3,
+      speed: 70,
+      particles: {
+        emitShatter: (pos: any, count: number, color: string, speed: number) => {
+          emittedShatters.push({ pos, count, color, speed });
+        },
+      },
+      soundSynth: {
+        playShieldBreak: () => {
+          playedShieldBreak = true;
+        },
+      },
+      spawnMinion: (minion: any) => {
+        spawnedMinions.push(minion);
+      },
+    };
+
+    p1.onPhaseExit!(mockCtx as any);
+
+    // Verify shockwave particles
+    expect(emittedShatters).toHaveLength(1);
+    expect(emittedShatters[0].count).toBe(32);
+    expect(emittedShatters[0].color).toBe("#00f0ff");
+
+    // Verify minion escort spawn
+    expect(spawnedMinions).toHaveLength(1);
+    expect(spawnedMinions[0].type).toBe("stalker");
+    expect(spawnedMinions[0].x).toBe(600 - 120);
+    expect(spawnedMinions[0].y).toBe(320);
+
+    // Verify audio cue
+    expect(playedShieldBreak).toBe(true);
+  });
+
   it("createBossPhaseController initializes and transitions through blueprint phases", () => {
     const controller = createBossPhaseController(GOLIATH_01_BLUEPRINT, vec2(500, 300));
     expect(controller.currentPhaseIndex).toBe(0);

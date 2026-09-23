@@ -5,9 +5,9 @@
  * room transitions, boss encounter detection, and overall mission victory state:
  * - Locks exit portal until all active enemies in the current room are eliminated
  * - Detects player entrance into the exit portal to trigger room progression
- * - Manages sequential transition across 9 rooms spanning Sector 1 and Zone 2
- * - Identifies milestone boss rooms (Room 5: Goliath-01 Aegis Colossus)
- * - Displays the final Mission Accomplished victory screen upon room 9 completion
+ * - Manages sequential transition across 14 rooms spanning Sector 1, Zone 2, and Sector 3
+ * - Identifies milestone boss rooms (Room 5: Goliath-01, Room 10: Chrono-Weaver)
+ * - Displays the final Mission Accomplished victory screen upon room 14 completion
  * - Renders dynamic portal animations (locked hazard ring vs. radiant cyan vortex)
  */
 
@@ -351,13 +351,13 @@ export class RoomManager {
     // Subtitle
     ctx.font = getUIFont(13, "600");
     ctx.fillStyle = UITheme.colors.textPrimary;
-    ctx.fillText("ALL 9 TACTICAL PROTOCOLS CONQUERED", width / 2, height / 2 - 20);
+    ctx.fillText("ALL 14 TACTICAL PROTOCOLS CONQUERED", width / 2, height / 2 - 20);
 
     // Protocol checkmarks
     ctx.font = getUIFont(11, "600");
     ctx.fillStyle = UITheme.colors.green;
     ctx.fillText(
-      "✓ Sector 1 Protocols  |  ✓ Goliath-01 Defeated  |  ✓ Zone 2 Protocols",
+      "✓ Goliath-01 Defeated  |  ✓ Chrono-Weaver Neutralized  |  ✓ Sector 3 Conquered",
       width / 2,
       height / 2 + 30
     );

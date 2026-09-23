@@ -4,6 +4,7 @@ import {
   hashString,
   LevelDirector,
 } from "./LevelDirector";
+import { GOLIATH_01_BLUEPRINT } from "../entities/boss/BossBlueprint";
 
 describe("LevelDirector & PRNG", () => {
   describe("Mulberry32 PRNG", () => {
@@ -82,19 +83,26 @@ describe("LevelDirector & PRNG", () => {
       expect(boss?.blueprint).toBeDefined();
     });
 
-    it("automatically generates a milestone boss encounter on Room 10 (Sector 2 Boss)", () => {
+    it("automatically generates a milestone boss encounter on Room 10 (Sector 2 Boss: Chrono-Weaver)", () => {
       const director = new LevelDirector({ seed: 456 });
       const room10 = director.generateRoom(10);
 
       expect(room10.roomNumber).toBe(10);
-      expect(room10.title).toContain("GOLIATH-01: AEGIS COLOSSUS");
+      expect(room10.title).toContain("CHRONO-WEAVER: TEMPORAL ANCHOR");
       expect(room10.subtitle).toContain("Sector 2 Milestone Boss");
 
       const boss = room10.enemies.find((e) => e.type === "boss");
       expect(boss).toBeDefined();
+      expect(boss?.maxShields).toBe(3);
       const escorts = room10.enemies.filter((e) => e.type !== "boss");
       expect(escorts.length).toBeGreaterThanOrEqual(2);
       expect(escorts.some((e) => e.type === "stalker")).toBe(true);
+    });
+
+    it("respects explicit custom boss blueprint in constructor config", () => {
+      const director = new LevelDirector({ bossBlueprint: GOLIATH_01_BLUEPRINT });
+      const room10 = director.generateRoom(10);
+      expect(room10.title).toContain("GOLIATH-01: AEGIS COLOSSUS");
     });
 
     it("generates 100% reproducible rooms from identical seeds", () => {
