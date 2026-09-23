@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg)](https://vitejs.dev/)
-[![Tests](https://img.shields.io/badge/Tests-313%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-374%20passing-brightgreen.svg)]()
 
 ---
 
@@ -75,11 +75,17 @@ Hostiles are differentiated across mobility, shields, weapon cadence, ballistic 
 - **Goliath-01 Aegis Colossus (Sector 1 Boss - Octagonal Titan)**: Driven by the modular `BossPhaseController` and declarative `BossBlueprint` system. Phase 1 (AEGIS FORTRESS) deploys 4-hit multi-layer shields with pinpoint heavy slugs at 55 px/s; upon shield depletion, emits an expanding radial particle shockwave and triggers Phase 2 (OVERDRIVE RAM) surging forward at 95 px/s with a 3-way scatter shot.
 - **Chrono-Weaver (Milestone Boss Archetype)**: Dual-phase boss combining long-range kiting laser beams in Phase 1 with 12-pellet 360-degree rotating radial novae (`RadialNovaBehavior`) in Phase 2.
 
-### 6. Roguelike Tactical Augmentations
-Destroying the Sector 1 Boss triggers an immediate freeze-frame draft presenting 3 curated combat augmentations:
-- **[1] Extended Cylinder**: Expands revolver from 6 to 8 chambers, enabling multi-target takedowns without reload exposure. Cylinder HUD dial dynamically scales to 8 radial pips.
-- **[2] Speed Loader**: Slashes reload burst cost from +30 to +15 simulation ticks for rapid recovery behind cover.
-- **[3] Reactive Shield**: Equips the player with 1 kinetic deflection shield per room that absorbs a lethal projectile impact before shattering.
+### 6. Roguelike Tactical Augmentations & Upgrade Pipeline
+Powered by a decoupled data-driven architecture (`UpgradePipeline`, `UpgradeRegistry`, and `UpgradeDraftHUD`):
+- **Dynamic Draft Engine**: Milestone boss elimination triggers an immediate freeze-frame overlay rendering dynamic $N$-card draft pools with responsive click hit-testing.
+- **Compounding Stat Modifiers**: The upgrade pipeline aggregates weapon magazine capacity, reload duration, movement speed, projectile speed, and shield charges seamlessly into player mechanics.
+- **Catalog of Tactical Perks**:
+  - **Extended Cylinder**: Expands revolver from 6 to 8 chambers, enabling multi-target takedowns without reload exposure. Cylinder HUD dial dynamically scales to 8 radial pips.
+  - **Speed Loader**: Slashes reload burst cost from +30 to +15 simulation ticks for rapid recovery behind cover.
+  - **Reactive Shield**: Equips the player with 1 kinetic deflection shield per room that absorbs a lethal projectile impact before shattering.
+  - **Kinetic Stride**: Boosts player locomotion velocity by +25%, widening evasion margins and positioning agility.
+  - **Chrono Burst**: Accelerates projectile muzzle velocity by +30%, compressing travel time and eliminating hostile evasion windows.
+  - **Phase Deflector**: Grants +2 hit-count shield buffers per combat room for enduring intense crossfires.
 
 ### 7. 40px Grid A* Pathfinding & Intelligent Navigation
 - Discrete $24 \times 16$ tile-grid A* pathfinder with obstacle clearance inflation ($16\text{px}$) navigates complex wall and pillar layouts with zero corner snagging.

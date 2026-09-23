@@ -23,6 +23,10 @@ import {
   Vector2D,
 } from "../math/vector";
 import { Revolver } from "../weapons/Revolver";
+import { UpgradeDefinition } from "../upgrades/UpgradeDefinition";
+import { UpgradePipeline } from "../upgrades/UpgradePipeline";
+import { DEFAULT_UPGRADE_REGISTRY } from "../upgrades/UpgradeRegistry";
+import "../upgrades/definitions";
 import { Obstacle } from "./Obstacle";
 import {
   CombatUnit,
@@ -60,9 +64,11 @@ export class Player implements CombatUnit {
   public isAlive: boolean;
   public weapon: Revolver;
   public augmentations: PlayerAugmentations = {};
+  public upgradePipeline: UpgradePipeline;
   public shields: number = 0;
   public maxShields: number = 0;
 
+  public readonly baseMaxSpeed: number;
   private spawnPosition: Vector2D;
 
   constructor(config: PlayerConfig = {}) {
@@ -74,13 +80,15 @@ export class Player implements CombatUnit {
     this.velocity = vec2(0, 0);
     this.aimTarget = vec2(x + 50, y);
     this.radius = config.radius ?? 14;
-    this.maxSpeed = config.maxSpeed ?? 240;
+    this.baseMaxSpeed = config.maxSpeed ?? 240;
+    this.maxSpeed = this.baseMaxSpeed;
     this.acceleration = config.acceleration ?? 2000;
     this.friction = config.friction ?? 1800;
     this.aimAngle = 0;
     this.isAlive = true;
     this.weapon = new Revolver();
     this.augmentations = {};
+    this.upgradePipeline = new UpgradePipeline();
     this.shields = 0;
     this.maxShields = 0;
   }
@@ -122,8 +130,9 @@ export class Player implements CombatUnit {
       return;
     }
 
-    // 1. Advance weapon cooldown ticks
+    // 1. Advance weapon cooldown ticks and active upgrade ticks
     this.weapon.update(1);
+    this.upgradePipeline.onTick(this, 1);
 
     // 2. Velocity Integration
     const inputLenSq = vecLengthSq(inputDir);
@@ -246,43 +255,102 @@ export class Player implements CombatUnit {
     const spawnX = this.position.x + Math.cos(this.aimAngle) * spawnOffset;
     const spawnY = this.position.y + Math.sin(this.aimAngle) * spawnOffset;
 
+    const bulletSpeedMultiplier = this.upgradePipeline.computeModifiers().bulletSpeedMultiplier;
+    const finalBulletSpeed = fireResult.bulletSpeed * bulletSpeedMultiplier;
+
     const bullet = createProjectile(
       `bullet-player-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       vec2(spawnX, spawnY),
       this.aimAngle,
-      fireResult.bulletSpeed,
+      finalBulletSpeed,
       "player"
     );
+
+    for (const entry of this.upgradePipeline.getAll()) {
+      entry.definition.onDischarge?.(this);
+    }
 
     return [bullet];
   }
 
   /**
-   * Sets or updates a tactical augmentation modifier on the player.
+   * Installs an upgrade onto the player via definition or registered ID,
+   * recalculating compounded modifiers and updating backward-compatible flags.
    */
-  public setAugmentation(key: keyof PlayerAugmentations, value: boolean): void {
-    this.augmentations[key] = value;
+  public acquireUpgrade(upgrade: UpgradeDefinition | string): boolean {
+    const def =
+      typeof upgrade === "string"
+        ? DEFAULT_UPGRADE_REGISTRY.get(upgrade)
+        : upgrade;
+    if (!def) return false;
 
-    if (key === "extendedCylinder") {
-      const magSize = value ? 8 : 6;
-      const reloadTickBurst = this.augmentations.speedLoader ? 15 : 30;
+    const res = this.upgradePipeline.acquire(def, this);
+    if (res.installed) {
+      this.recalculateModifiers();
+    }
+    return res.installed;
+  }
+
+  /**
+   * Recalculates compounded modifiers from active upgrades and applies them
+   * to weapon magazine size, reload duration, movement speed, and shield charges.
+   */
+  public recalculateModifiers(): void {
+    const mods = this.upgradePipeline.computeModifiers();
+
+    // 1. Ammunition & Reload Burst
+    const netMagSize = 6 + mods.magSizeBonus;
+    const netReloadTicks = Math.max(1, 30 - mods.reloadTickReduction);
+
+    if (this.weapon.getMagSize() !== netMagSize) {
       this.weapon = new Revolver({
-        magSize,
-        reloadTickBurst,
+        magSize: netMagSize,
+        reloadTickBurst: netReloadTicks,
       });
       this.weapon.reset();
-    } else if (key === "speedLoader") {
-      const reloadTicks = value ? 15 : 30;
-      this.weapon.setReloadTickBurst(reloadTicks);
-    } else if (key === "reactiveShield") {
-      if (value) {
-        this.maxShields = 1;
-        this.shields = 1;
-      } else {
-        this.maxShields = 0;
-        this.shields = 0;
-      }
+    } else {
+      this.weapon.setReloadTickBurst(netReloadTicks);
     }
+
+    // 2. Movement speed
+    this.maxSpeed = this.baseMaxSpeed * mods.speedMultiplier;
+
+    // 3. Shield durability
+    this.maxShields = mods.shieldChargesBonus;
+    if (this.shields === 0 && this.maxShields > 0) {
+      this.shields = this.maxShields;
+    } else if (this.shields > this.maxShields) {
+      this.shields = this.maxShields;
+    }
+
+    // 4. Backward-compatible augmentations flags
+    this.augmentations.extendedCylinder = this.upgradePipeline.has("extended-cylinder");
+    this.augmentations.speedLoader = this.upgradePipeline.has("speed-loader");
+    this.augmentations.reactiveShield = this.upgradePipeline.has("reactive-shield");
+  }
+
+  /**
+   * Sets or updates a tactical augmentation modifier on the player.
+   * Kept for 100% backward compatibility with existing tests and scripts.
+   */
+  public setAugmentation(key: keyof PlayerAugmentations, value: boolean): void {
+    const idMap: Record<keyof PlayerAugmentations, string> = {
+      extendedCylinder: "extended-cylinder",
+      speedLoader: "speed-loader",
+      reactiveShield: "reactive-shield",
+    };
+
+    const id = idMap[key];
+    if (value) {
+      const def = DEFAULT_UPGRADE_REGISTRY.get(id);
+      if (def && !this.upgradePipeline.has(id)) {
+        this.upgradePipeline.acquire(def, this);
+      }
+    } else {
+      this.upgradePipeline.remove(id);
+    }
+
+    this.recalculateModifiers();
   }
 
   /**
@@ -296,9 +364,11 @@ export class Player implements CombatUnit {
    * Clears all tactical augmentations, restores default 6-chamber weapon, and clears shields.
    */
   public clearAugmentations(): void {
+    this.upgradePipeline.reset();
     this.augmentations = {};
     this.shields = 0;
     this.maxShields = 0;
+    this.maxSpeed = this.baseMaxSpeed;
     this.weapon = new Revolver();
   }
 
@@ -309,7 +379,7 @@ export class Player implements CombatUnit {
     if (!this.isAlive) {
       return false;
     }
-    const reloadTicks = this.augmentations.speedLoader ? 15 : 30;
+    const reloadTicks = this.weapon.getReloadTickBurst();
     return this.weapon.reload(governor, reloadTicks);
   }
 
@@ -353,9 +423,14 @@ export class Player implements CombatUnit {
     this.previousPosition = { ...this.spawnPosition };
     this.velocity = vec2(0, 0);
     this.isAlive = true;
-    if (this.augmentations.reactiveShield) {
-      this.shields = 1;
-      this.maxShields = 1;
+
+    // Dispatch room start to active upgrades
+    this.upgradePipeline.onRoomStart(this);
+
+    // Refresh shields to maximum configured
+    if (this.maxShields > 0 || this.augmentations.reactiveShield) {
+      this.shields = Math.max(1, this.maxShields);
+      this.maxShields = this.shields;
     } else {
       this.shields = 0;
       this.maxShields = 0;

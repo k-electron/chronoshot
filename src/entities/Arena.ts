@@ -26,6 +26,12 @@ import { createObstacle, createPillar, Obstacle } from "./Obstacle";
 import { ParticleSystem } from "./ParticleSystem";
 import { Player } from "./Player";
 import { Projectile } from "./Projectile";
+import { UpgradeDefinition } from "../upgrades/UpgradeDefinition";
+import { DEFAULT_UPGRADE_REGISTRY } from "../upgrades/UpgradeRegistry";
+import { extendedCylinder } from "../upgrades/definitions/extendedCylinder";
+import { reactiveShield } from "../upgrades/definitions/reactiveShield";
+import { speedLoader } from "../upgrades/definitions/speedLoader";
+import { UpgradeDraftHUD } from "../ui/UpgradeDraftHUD";
 
 export type ArenaStatus = "playing" | "victory" | "defeat";
 
@@ -62,6 +68,7 @@ export class Arena {
   public status: ArenaStatus = "playing";
   public isPaused: boolean = false;
   public isUpgradeDraftActive: boolean = false;
+  public activeUpgradeDraft: UpgradeDefinition[] = [];
 
   constructor(
     width = 960,
@@ -166,19 +173,65 @@ export class Arena {
   }
 
   /**
+   * Returns current active draft options, falling back to curated Sector 1 baseline.
+   */
+  public getDraftOptions(): UpgradeDefinition[] {
+    if (this.activeUpgradeDraft.length > 0) {
+      return this.activeUpgradeDraft;
+    }
+    return [
+      DEFAULT_UPGRADE_REGISTRY.get("extended-cylinder") ?? extendedCylinder,
+      DEFAULT_UPGRADE_REGISTRY.get("speed-loader") ?? speedLoader,
+      DEFAULT_UPGRADE_REGISTRY.get("reactive-shield") ?? reactiveShield,
+    ];
+  }
+
+  /**
+   * Activates upgrade draft overlay, sampling from UpgradeRegistry or using curated options.
+   */
+  public openUpgradeDraft(options?: UpgradeDefinition[]): void {
+    this.isUpgradeDraftActive = true;
+    if (options && options.length > 0) {
+      this.activeUpgradeDraft = [...options];
+    } else {
+      const roomNum = this.roomManager?.getCurrentRoom().roomNumber;
+      if (roomNum === 5) {
+        this.activeUpgradeDraft = [
+          DEFAULT_UPGRADE_REGISTRY.get("extended-cylinder") ?? extendedCylinder,
+          DEFAULT_UPGRADE_REGISTRY.get("speed-loader") ?? speedLoader,
+          DEFAULT_UPGRADE_REGISTRY.get("reactive-shield") ?? reactiveShield,
+        ];
+      } else {
+        const sampled = DEFAULT_UPGRADE_REGISTRY.sampleDraft(
+          3,
+          this.player.upgradePipeline.getActiveIds()
+        );
+        this.activeUpgradeDraft = sampled.length > 0 ? sampled : this.getDraftOptions();
+      }
+    }
+  }
+
+  /**
    * Applies the selected tactical augmentation and advances progression to the next room.
    */
-  public applyUpgrade(choice: 1 | 2 | 3): void {
-    if (choice === 1) {
-      this.player.setAugmentation("extendedCylinder", true);
-    } else if (choice === 2) {
-      this.player.setAugmentation("speedLoader", true);
-    } else if (choice === 3) {
-      this.player.setAugmentation("reactiveShield", true);
+  public applyUpgrade(choice: 1 | 2 | 3 | number): void {
+    const draftCards = this.getDraftOptions();
+    const upgrade = draftCards[choice - 1];
+    if (upgrade) {
+      this.player.acquireUpgrade(upgrade);
+    } else {
+      if (choice === 1) {
+        this.player.setAugmentation("extendedCylinder", true);
+      } else if (choice === 2) {
+        this.player.setAugmentation("speedLoader", true);
+      } else if (choice === 3) {
+        this.player.setAugmentation("reactiveShield", true);
+      }
     }
 
     this.soundSynth?.playUpgradeChime(this.timeGovernor.getTimeScale());
     this.isUpgradeDraftActive = false;
+    this.activeUpgradeDraft = [];
 
     if (this.roomManager && this.roomManager.hasNextRoom()) {
       this.roomManager.advanceRoom();
@@ -205,20 +258,17 @@ export class Arena {
         return;
       }
       if (input.shoot) {
-        const { x, y } = input.mousePos;
-        if (y >= 170 && y <= 460) {
-          if (x >= 60 && x <= 320) {
-            this.applyUpgrade(1);
-            return;
-          }
-          if (x >= 350 && x <= 610) {
-            this.applyUpgrade(2);
-            return;
-          }
-          if (x >= 640 && x <= 900) {
-            this.applyUpgrade(3);
-            return;
-          }
+        const draftCards = this.getDraftOptions();
+        const cardIndex = UpgradeDraftHUD.getCardAt(
+          input.mousePos.x,
+          input.mousePos.y,
+          draftCards.length,
+          this.width,
+          this.height
+        );
+        if (cardIndex !== null) {
+          this.applyUpgrade((cardIndex + 1) as 1 | 2 | 3);
+          return;
         }
       }
       return;
@@ -373,7 +423,7 @@ export class Arena {
               if (enemy.isBoss) {
                 this.soundSynth?.playBossDefeat(this.timeGovernor.getTimeScale());
                 this.particles.emitShatter(hit.point, 36, "#ff2a44", 320);
-                this.isUpgradeDraftActive = true;
+                this.openUpgradeDraft();
               } else {
                 this.soundSynth?.playShatter(this.timeGovernor.getTimeScale());
                 this.particles.emitShatter(hit.point, 18, "#ff2a44", 220);
@@ -445,10 +495,12 @@ export class Arena {
       this.roomManager.restartGame();
       this.player.clearAugmentations();
       this.isUpgradeDraftActive = false;
+      this.activeUpgradeDraft = [];
       this.loadRoom(this.roomManager.getCurrentRoom());
     } else {
       this.status = "playing";
       this.isUpgradeDraftActive = false;
+      this.activeUpgradeDraft = [];
       this.player.reset();
       this.player.clearAugmentations();
       for (const enemy of this.enemies) {
@@ -839,164 +891,10 @@ export class Arena {
   }
 
   /**
-   * Renders the immediate freeze-frame upgrade selection overlay offering 3 curated cards.
+   * Renders the immediate freeze-frame upgrade selection overlay offering curated or sampled cards.
    */
   public renderUpgradeDraft(ctx: CanvasRenderingContext2D): void {
-    ctx.save();
-
-    // 1. Veiled translucent dark backdrop
-    ctx.fillStyle = "rgba(7, 10, 15, 0.94)";
-    ctx.fillRect(0, 0, this.width, this.height);
-
-    // 2. Header
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    ctx.font = getUIFont(22, "800");
-    ctx.fillStyle = UITheme.colors.cyan;
-    ctx.fillText("// TACTICAL AUGMENTATION PROTOCOL", this.width / 2, 60);
-
-    ctx.font = getUIFont(12, "600");
-    ctx.fillStyle = UITheme.colors.textSecondary;
-    ctx.fillText("SECTOR 1 BOSS NEUTRALIZED — SELECT 1 COMBAT SYSTEM UPGRADE", this.width / 2, 95);
-
-    // 3. Three Curated Cards
-    const cardY = 145;
-    const cardW = 260;
-    const cardH = 320;
-    const gap = 30;
-    const startX = (this.width - (3 * cardW + 2 * gap)) / 2;
-
-    const cards = [
-      {
-        key: "[1]",
-        archetype: "FIREPOWER // CAPACITY",
-        title: "EXTENDED CYLINDER",
-        stat: "6 → 8 CHAMBERS",
-        desc: "Expands revolver capacity by +2 chambers. Neutralize multiple heavily armored hostiles without mid-combat reload vulnerability.",
-        accent: UITheme.colors.cyan,
-      },
-      {
-        key: "[2]",
-        archetype: "TEMPO // CYCLING",
-        title: "SPEED LOADER",
-        stat: "+15 TICK RELOAD",
-        desc: "Halves ammunition cycle exposure from 30 ticks to 15 ticks. Enables aggressive repositioning and rapid tactical recovery under fire.",
-        accent: "#ffb703",
-      },
-      {
-        key: "[3]",
-        archetype: "DEFENSE // RESILIENCE",
-        title: "REACTIVE SHIELD",
-        stat: "+1 SHIELD HIT BUFFER",
-        desc: "Deploys a kinetic deflection barrier that absorbs 1 lethal projectile impact per room before shattering. Crucial for permadeath runs.",
-        accent: "#06d6a0",
-      },
-    ];
-
-    for (let i = 0; i < cards.length; i++) {
-      const card = cards[i];
-      const cx = startX + i * (cardW + gap);
-
-      // Card glass background
-      ctx.fillStyle = "rgba(13, 17, 24, 0.96)";
-      ctx.fillRect(cx, cardY, cardW, cardH);
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = UITheme.colors.panelBorder;
-      ctx.strokeRect(cx, cardY, cardW, cardH);
-
-      // Card accent top bar
-      ctx.fillStyle = card.accent;
-      ctx.fillRect(cx, cardY, cardW, 3);
-
-      // Key prompt badge
-      ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
-      ctx.fillRect(cx + 20, cardY + 20, 44, 24);
-      ctx.strokeStyle = card.accent;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(cx + 20, cardY + 20, 44, 24);
-
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.font = getUIFont(12, "bold");
-      ctx.fillStyle = card.accent;
-      ctx.fillText(card.key, cx + 42, cardY + 32);
-
-      // Archetype
-      ctx.textAlign = "left";
-      ctx.font = getUIFont(9, "bold");
-      ctx.fillStyle = UITheme.colors.textMuted;
-      ctx.fillText(card.archetype, cx + 74, cardY + 32);
-
-      // Title
-      ctx.font = getUIFont(15, "800");
-      ctx.fillStyle = UITheme.colors.textPrimary;
-      ctx.fillText(card.title, cx + 20, cardY + 80);
-
-      // Stat Highlight Box
-      ctx.fillStyle = "rgba(0, 240, 255, 0.06)";
-      ctx.fillRect(cx + 20, cardY + 105, cardW - 40, 36);
-      ctx.strokeStyle = card.accent;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(cx + 20, cardY + 105, cardW - 40, 36);
-
-      ctx.textAlign = "center";
-      ctx.font = getUIFont(12, "bold");
-      ctx.fillStyle = card.accent;
-      ctx.fillText(card.stat, cx + cardW / 2, cardY + 123);
-
-      // Description
-      ctx.textAlign = "left";
-      ctx.font = getUIFont(10, "normal");
-      ctx.fillStyle = UITheme.colors.textSecondary;
-      this.wrapText(ctx, card.desc, cx + 20, cardY + 165, cardW - 40, 16);
-
-      // Select button
-      ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
-      ctx.fillRect(cx + 20, cardY + cardH - 45, cardW - 40, 28);
-      ctx.strokeStyle = card.accent;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(cx + 20, cardY + cardH - 45, cardW - 40, 28);
-
-      ctx.textAlign = "center";
-      ctx.font = getUIFont(11, "bold");
-      ctx.fillStyle = card.accent;
-      ctx.fillText(`INSTALL ${card.key}`, cx + cardW / 2, cardY + cardH - 31);
-    }
-
-    // 4. Footer prompt
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    ctx.font = getUIFont(11, "600");
-    ctx.fillStyle = UITheme.colors.textMuted;
-    ctx.fillText("PRESS [1], [2], OR [3] OR CLICK A CARD TO INSTALL AND ADVANCE TO ZONE 2", this.width / 2, cardY + cardH + 20);
-
-    ctx.restore();
-  }
-
-  private wrapText(
-    ctx: CanvasRenderingContext2D,
-    text: string,
-    x: number,
-    y: number,
-    maxWidth: number,
-    lineHeight: number
-  ): void {
-    const words = text.split(" ");
-    let line = "";
-    let curY = y;
-
-    for (let n = 0; n < words.length; n++) {
-      const testLine = line + words[n] + " ";
-      const metrics = ctx.measureText(testLine);
-      const testWidth = metrics.width;
-      if (testWidth > maxWidth && n > 0) {
-        ctx.fillText(line, x, curY);
-        line = words[n] + " ";
-        curY += lineHeight;
-      } else {
-        line = testLine;
-      }
-    }
-    ctx.fillText(line, x, curY);
+    const draftCards = this.getDraftOptions();
+    UpgradeDraftHUD.render(ctx, draftCards, this.width, this.height);
   }
 }
