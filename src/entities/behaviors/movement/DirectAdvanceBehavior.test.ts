@@ -211,4 +211,53 @@ describe("DirectAdvanceBehavior", () => {
     expect(behavior.currentPath.length).toBeGreaterThan(0);
     expect(vecLength(vel)).toBeCloseTo(120);
   });
+
+  it("generates a valid escape path and non-zero velocity when starting in an impassable clearance cell", () => {
+    const behavior = new DirectAdvanceBehavior();
+    const pillar = createObstacle("pillar", 200, 200, 80, 80);
+    const pathfinder = new GridPathfinder(960, 640, 40);
+    pathfinder.updateObstacles([pillar], 16);
+
+    // Position (185, 220) is in cell (4, 5) which is marked impassable due to 16px clearance inflation
+    const ctx = createMockContext({
+      position: vec2(185, 220),
+      radius: 16,
+      speed: 120,
+      hasLineOfSight: false,
+    });
+    const target = createMockTarget(500, 220);
+
+    const vel = behavior.update(ctx, target, [pillar], 1, 1 / 60, pathfinder);
+
+    expect(behavior.currentPath.length).toBeGreaterThan(0);
+    expect(vecLength(vel)).toBeCloseTo(120);
+  });
+
+  it("remains on A* waypoints when optical line-of-sight is true but physical clearance around corner is obstructed", () => {
+    const behavior = new DirectAdvanceBehavior();
+    const pillar = createObstacle("pillar", 200, 200, 80, 80);
+
+    const waypoint1 = vec2(160, 160);
+    const waypoint2 = vec2(240, 160);
+    behavior.currentPath = [waypoint1, waypoint2];
+    behavior.currentWaypointIndex = 0;
+    behavior.repathCooldownTicks = 15;
+
+    // Optical ray from (180, 195) to (320, 195) has y=195 < 200 (clears pillar optically)
+    // But with radius 16, y + radius = 211 > 200 (intersects pillar corner physically)
+    const ctx = createMockContext({
+      position: vec2(180, 195),
+      radius: 16,
+      speed: 120,
+      hasLineOfSight: true,
+    });
+    const target = createMockTarget(320, 195);
+
+    const vel = behavior.update(ctx, target, [pillar], 1);
+
+    // Because physical clearance is blocked, path should NOT be aborted
+    expect(behavior.currentPath.length).toBe(2);
+    expect(behavior.currentWaypointIndex).toBe(0);
+    expect(vecLength(vel)).toBeCloseTo(120);
+  });
 });

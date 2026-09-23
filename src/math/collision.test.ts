@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   circleIntersectsSegment,
   closestPointOnSegment,
+  hasNavigationClearance,
   rayIntersectsAABB,
   rayIntersectsCircle,
   rayIntersectsSegment,
@@ -118,6 +119,59 @@ describe("Collision Mathematics", () => {
 
       expect(circleIntersectsSegment(point, 25, segStart, segEnd)).toBe(true);
       expect(circleIntersectsSegment(point, 15, segStart, segEnd)).toBe(false);
+    });
+  });
+
+  describe("hasNavigationClearance", () => {
+    const obstacle = {
+      bounds: {
+        min: vec2(100, 100),
+        max: vec2(200, 200),
+      },
+    };
+
+    it("returns true when corridor is completely clear with ample margin", () => {
+      const from = vec2(50, 50);
+      const to = vec2(250, 50);
+      // Corridor y=50 is 50px away from obstacle y=100..200
+      expect(hasNavigationClearance(from, to, 16, [obstacle])).toBe(true);
+    });
+
+    it("returns false when optical sightline clears corner but unit radius collides with obstacle edge", () => {
+      // Ray from (50, 95) to (250, 95) has y=95, which is outside [100, 200]
+      // Optical 0-width raycast would NOT hit the obstacle
+      const from = vec2(50, 95);
+      const to = vec2(250, 95);
+
+      // With radius 16, bottom of unit reaches 95 + 16 = 111 > 100 (collides!)
+      expect(hasNavigationClearance(from, to, 16, [obstacle])).toBe(false);
+
+      // With radius 2, bottom of unit reaches 95 + 2 = 97 < 100 (clears!)
+      expect(hasNavigationClearance(from, to, 2, [obstacle])).toBe(true);
+    });
+
+    it("returns false when diagonal trajectory cuts across an obstacle corner", () => {
+      // Trajectory passing near top-left corner (100, 100)
+      // Line from (80, 120) to (120, 80) passes right over (100, 100)
+      const from = vec2(70, 130);
+      const to = vec2(130, 70);
+
+      expect(hasNavigationClearance(from, to, 16, [obstacle])).toBe(false);
+    });
+
+    it("returns false when start position is already intersecting obstacle boundary", () => {
+      // Unit center at (90, 150) with radius 16 overlaps wall at x=100 (overlap 6px)
+      const from = vec2(90, 150);
+      const to = vec2(50, 150);
+
+      expect(hasNavigationClearance(from, to, 16, [obstacle])).toBe(false);
+    });
+
+    it("returns true when distance to target is negligible", () => {
+      const from = vec2(50, 50);
+      const to = vec2(50, 50);
+
+      expect(hasNavigationClearance(from, to, 16, [obstacle])).toBe(true);
     });
   });
 });

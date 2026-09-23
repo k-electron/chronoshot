@@ -43,8 +43,8 @@ ChronoShot is deliberately engineered without heavy third-party game engines (no
 - Audio pitch and duration scale dynamically with `TimeGovernor.getTimeScale()` (e.g. deep sub-bass pitch drop during micro-creep).
 
 ### 4. 40px Grid A* Pathfinding & Modular Boss Phase Engine
-- **`GridPathfinder`**: Discrete $24 \times 16$ tile-grid A* with entity radius obstacle inflation ($16\text{px}$) navigates around walls and pillars when line-of-sight is blocked.
-- **Line-of-Sight String Pulling**: When sightlines are clear, AI switches to direct-vector steering (rushers close in, kiters retreat).
+- **`GridPathfinder`**: Discrete $24 \times 16$ tile-grid A* with entity radius obstacle inflation ($16\text{px}$) navigates around walls and pillars when line-of-sight is blocked, featuring dual-sided endpoint snapping (`findNearestWalkable`) to prevent deadlocks when starting adjacent to obstacles.
+- **Physical Clearance Decoupling & Line-of-Sight String Pulling**: When optical sightlines are clear, AI evaluates continuous swept-circle navigation clearance (`hasNavigationClearance`) before switching to direct-vector steering (rushers close in, kiters retreat), preventing corner-cutting clipping while preserving instant weapon targeting.
 - **Archetypes & Bosses**: Pistol Grunt, Shotgun Guard, Stalker Rusher, Aegis Warden, Marksman Sniper, alongside multi-phase milestone bosses Goliath-01 Aegis Colossus, Chrono-Weaver Temporal Anchor, Vektor-Prime Phase Sovereign, and the Room 20 final milestone boss Chrono-Zenith Zero Sovereign.
 - **`BossPhaseController` & `BossBlueprint`**: Declarative $N$-phase state machines governing boss progression with dynamic movement/attack swaps, transition triggers, and lifecycle actions (`BossTransitionAction`: radial particle shockwaves, dynamic audio cues, escort minion summons, and Cataclysm Overload telegraphed invulnerability channels with line-of-sight obstacle raycast cover checks). Includes `RadialNovaBehavior` for 360-degree projectile novae.
 
