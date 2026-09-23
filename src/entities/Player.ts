@@ -432,6 +432,33 @@ export class Player implements CombatUnit {
   }
 
   /**
+   * Equips all 7 baseline and advanced combat augmentations for Endless Survival Mode,
+   * replenishes shields to maximum capacity, and reloads weapon to full capacity (8 rounds).
+   */
+  public equipFullEndlessLoadout(): void {
+    const upgradeIds = [
+      "extended-cylinder",
+      "speed-loader",
+      "reactive-shield",
+      "kinetic-stride",
+      "chrono-burst",
+      "phase-deflector",
+      "overcharge-dash",
+    ];
+    for (const id of upgradeIds) {
+      if (!this.upgradePipeline.has(id)) {
+        this.acquireUpgrade(id);
+      }
+    }
+    // Replenish shields to full capacity
+    if (this.maxShields > 0) {
+      this.shields = this.maxShields;
+    }
+    // Refill ammunition to 8 rounds (max magazine size)
+    this.weapon.reset();
+  }
+
+  /**
    * Reloads revolver cylinder back to full capacity and queues reload burst onto TimeGovernor.
    */
   public reload(governor?: TimeGovernor): boolean {

@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg)](https://vitejs.dev/)
-[![Tests](https://img.shields.io/badge/Tests-474%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-511%20passing-brightgreen.svg)]()
 
 ---
 
@@ -75,6 +75,7 @@ Hostiles are differentiated across mobility, shields, weapon cadence, ballistic 
 - **Goliath-01 Aegis Colossus (Sector 1 Boss - Octagonal Titan)**: Driven by the modular `BossPhaseController` and declarative `BossBlueprint` system. Phase 1 (AEGIS FORTRESS) deploys 4-hit multi-layer shields with pinpoint heavy slugs at 55 px/s; upon shield depletion, emits an expanding radial particle shockwave and triggers Phase 2 (OVERDRIVE RAM) surging forward at 95 px/s with a 3-way scatter shot.
 - **Chrono-Weaver (Milestone Boss Archetype - Temporal Anchor)**: Dual-phase boss combining long-range kiting laser beams in Phase 1 with 12-pellet 360-degree rotating radial novae (`RadialNovaBehavior`) and Stalker escort summons in Phase 2.
 - **Vektor-Prime (Milestone Boss Archetype - Phase Sovereign)**: High-tier 3-phase milestone boss encountered at Room 15. Begins in Phase 1 (AEGIS OVERLORD) as a 5-shield fortress with heavy dual-slug suppression at 50-tick cadence; upon reaching 3 shields, triggers a 20-particle cyan shockwave, summons 2 Grunt escorts, and initiates Phase 2 (TEMPORAL DISRUPTOR) kiting at 100 px/s with alternating telegraphed laser beams and 3-pellet fan spreads; at 0 shields, triggers another shockwave and unleashes Phase 3 (OVERDRIVE APEX) charging at 140 px/s with 16-pellet rotating 360-degree radial novae.
+- **Chrono-Zenith (Room 20 Final Milestone Boss - Zero Sovereign)**: The supreme 4-phase encounter awaiting at Room 20 inside the fortified `ApexRedoubtTemplate`. Features a 6-shield health pool and escalating combat forms: Phase 1 (AEGIS CITADEL: alternating heavy slugs and marksman beams), Phase 2 (TEMPORAL ANCHOR: 16-pellet radial novae with kiting movement), Phase 3 (DISRUPTION MATRIX: alternating marksman beams and 5-pellet fan spreads), and Phase 4 (CATACLYSM SOVEREIGN: hyper-speed 150 px/s pursuit with 20-pellet 360-degree rotating novae). Each phase transition triggers a 45-tick **Cataclysm Overload** invulnerability channel culminating in a lethal arena-wide Cataclysm Pulse that can only be survived by breaking line-of-sight behind tactical bunker pillars. Skilled operatives can pre-fire ballistic rounds during the channel and sprint behind cover so their shots land the moment the boss becomes vulnerable.
 
 ### 6. Roguelike Tactical Augmentations & Upgrade Pipeline
 Powered by a decoupled data-driven architecture (`UpgradePipeline`, `UpgradeRegistry`, and `UpgradeDraftHUD`):
@@ -103,7 +104,7 @@ Powered by a decoupled data-driven architecture (`UpgradePipeline`, `UpgradeRegi
 - Zero external audio assets required; all sound effects (gunfire, dry-fire clicks, cylinder reload clicks, obstacle impacts, shield deflections, shield breaks, sniper laser charging, upgrade chime arpeggios, boss defeat rumbles, and victory fanfare) are synthesized live using the Web Audio API.
 - **Dynamic Time-Scale Modulation**: Audio playback rates and oscillator frequencies scale dynamically with `timeScale`. Sounds drop to deep sub-bass drones (~0.43x pitch, ~2.4x duration) during 5% micro-creep and pitch up to normal tempo when sprinting.
 
-### 10. 19-Room Tactical Campaign & Pure Permadeath
+### 10. 20-Room Tactical Campaign & Pure Permadeath
 - Handcrafted room sequences teaching each archetype and mechanics progressively across four sectors:
   - **Room 01 (`BASIC COVER`)**: 1v1 duel against a mobile Pistol Grunt teaching micro-creep peeking and leading shots.
   - **Room 02 (`ARMORED BREACH`)**: Shotgun Guard (1 shield) + Grunt teaching shield breaking and buckshot evasion.
@@ -123,14 +124,20 @@ Powered by a decoupled data-driven architecture (`UpgradePipeline`, `UpgradeRegi
   - **Room 16 (`ZENITH ENTRY`)**: Sector 4 vanguard entry testing 3-upgrade synergies against mixed Warden, Shotgun, and Stalker forces.
   - **Room 17 (`TWIN BASTIONS`)**: Fortified bunker siege requiring disciplined cover peeking against dual snipers and wardens.
   - **Room 18 (`CHRONO CHOKE`)**: Relentless close-quarters containment testing rapid target prioritization against triple stalkers and wardens.
-  - **Room 19 (`PROTOCOL ZENITH`)**: Ultimate campaign climax featuring a coordinated quadrant matrix of Wardens, Snipers, and Stalkers.
+  - **Room 19 (`PROTOCOL ZENITH`)**: Ultimate campaign gauntlet featuring a coordinated quadrant matrix of Wardens, Snipers, and Stalkers.
+  - **Room 20 (`PROTOCOL OMEGA`)**: Supreme campaign climax against Chrono-Zenith: Zero Sovereign inside the fortified Apex Redoubt. Overcoming its 4 escalating phases and Cataclysm Pulses unlocks the golden exit gate to Endless Survival Mode.
 - **Pure Permadeath**: There are no lives or checkpoints. Lethal trauma terminates the run, displays sector and upgrade statistics, and resets progress back to Room 1.
 
-### 11. Modular Level Director & Procedural Generation
-- **Composable Tactical Layouts**: 5 geometry templates (`CenterPillarsTemplate`, `TwinBunkersTemplate`, `SplitCorridorTemplate`, `KillboxLanesTemplate`, `ArenaQuadrantTemplate`) providing varied obstacle geometries, tactical sightlines, and verified spawn separation ($\ge 280\text{px}$ from player).
+### 11. Modular Level Director & Endless Survival Mode
+- **Composable Tactical Layouts**: 7 geometry templates (`CenterPillarsTemplate`, `TwinBunkersTemplate`, `SplitCorridorTemplate`, `KillboxLanesTemplate`, `ArenaQuadrantTemplate`, `ApexRedoubtTemplate`, `ApexColosseumTemplate`) providing varied obstacle geometries, tactical sightlines, and verified spawn safety ($\ge 280\text{px}$ from player).
 - **Threat-Budget Encounter Spawner (`EncounterDirector`)**: Scales difficulty by assigning numerical threat budgets across hostiles while enforcing squad composition constraints (maximum 2 Marksman snipers per room, mandatory frontline escorts) and non-overlapping safe spawn sampling ($\ge 48\text{px}$ unit separation).
-- **Deterministic Seeded PRNG (`LevelDirector`)**: High-performance Mulberry32 pseudo-random number generator enabling 100% reproducible room seeds, daily challenges, and milestone boss synthesis on every 5th room (Sector 1: Goliath-01, Sector 2: Chrono-Weaver, Sector 3+: Vektor-Prime).
-- **Dynamic Endless Mode**: `RoomManager` seamlessly toggles between the classic handcrafted 19-room campaign and infinite on-demand procedural generation.
+- **Deterministic Seeded PRNG (`LevelDirector`)**: High-performance Mulberry32 pseudo-random number generator enabling 100% reproducible room seeds, daily challenges, and milestone boss synthesis on every 5th room (Sector 1: Goliath-01, Sector 2: Chrono-Weaver, Sector 3: Vektor-Prime, Sector 4: Chrono-Zenith).
+- **Endless Survival Mode (`EndlessDirector` & `ApexColosseumTemplate`)**: Upon defeating Chrono-Zenith in Room 20, a golden exit gate opens (`"ENDLESS GATE"`). Stepping into the gate seamlessly warps the operative into an infinite tactical arena:
+  - **Full Augmentation Loadout**: Automatically installs all 7 upgrades (`extended-cylinder`, `speed-loader`, `reactive-shield`, `kinetic-stride`, `chrono-burst`, `phase-deflector`, `overcharge-dash`), tops shields off to maximum capacity (3 shields), and loads cylinder to 8 rounds.
+  - **Climbing Threat Budget**: Threat budget steadily scales upward ($50 + \lfloor \text{ticks}/120 \rfloor \times 5$), spawning mixed hostile squads according to dynamic threat costs.
+  - **Fair Distant Spatial Sampling**: Enemies only spawn at distant coordinates ($\ge 350\text{px}$ from player, $\ge 48\text{px}$ from other units, completely outside obstacle collision boundaries) to eliminate cheap, unavoidable deaths.
+  - **Materialization Reticles**: Queued hostiles display 30-tick expanding geometric telegraph rings before materializing into active combatants.
+  - **In-Canvas Endless Telemetry HUD**: Persistent real-time status HUD displaying current active threat budget, survival duration (MM:SS), and total kill counter.
 
 ---
 
@@ -226,7 +233,7 @@ npm run preview
 
 ### Continuous Integration & Cloudflare Pages Hosting
 
-- **GitHub Actions**: Automated CI (`.github/workflows/ci.yml`) runs on all pull requests and pushes to `main`. It validates dependencies, TypeScript compilation, Vite production build, and all 97 Vitest unit tests under Node 26.
+- **GitHub Actions**: Automated CI (`.github/workflows/ci.yml`) runs on all pull requests and pushes to `main`. It validates dependencies, TypeScript compilation, Vite production build, and all 511 Vitest unit & integration tests under Node 26.
 - **Cloudflare Pages Hosting**:
   1. In the [Cloudflare Dashboard](https://dash.cloudflare.com/), go to **Workers & Pages** > **Create application** > **Pages** > **Connect to Git**.
   2. Select the `k-electron/chronoshot` repository.
@@ -281,7 +288,10 @@ chronoshot/
 │   │   └── Projectile.ts
 │   ├── levels/                   # Procedural level director & tactical templates
 │   │   ├── templates/            # Composable cover & geometry layout templates
+│   │   │   ├── ApexColosseumTemplate.ts
+│   │   │   └── ApexRedoubtTemplate.ts
 │   │   ├── EncounterDirector.ts
+│   │   ├── EndlessDirector.ts
 │   │   ├── LevelDirector.ts
 │   │   ├── Room.ts
 │   │   └── RoomManager.ts
@@ -291,6 +301,7 @@ chronoshot/
 │   ├── ui/                       # Minimalist HUD, tactical reticle, boss & enemy renderers
 │   │   ├── BossTelemetryHUD.ts
 │   │   ├── CylinderHUD.ts
+│   │   ├── EndlessTelemetryHUD.ts
 │   │   ├── EnemyRenderer.ts
 │   │   ├── Reticle.ts
 │   │   ├── theme.ts

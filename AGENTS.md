@@ -45,22 +45,23 @@ ChronoShot is deliberately engineered without heavy third-party game engines (no
 ### 4. 40px Grid A* Pathfinding & Modular Boss Phase Engine
 - **`GridPathfinder`**: Discrete $24 \times 16$ tile-grid A* with entity radius obstacle inflation ($16\text{px}$) navigates around walls and pillars when line-of-sight is blocked.
 - **Line-of-Sight String Pulling**: When sightlines are clear, AI switches to direct-vector steering (rushers close in, kiters retreat).
-- **Archetypes & Bosses**: Pistol Grunt, Shotgun Guard, Stalker Rusher, Aegis Warden, Marksman Sniper, alongside multi-phase milestone bosses Goliath-01 Aegis Colossus, Chrono-Weaver Temporal Anchor, and Vektor-Prime Phase Sovereign.
-- **`BossPhaseController` & `BossBlueprint`**: Declarative $N$-phase state machines governing boss progression with dynamic movement/attack swaps, transition triggers, and lifecycle actions (`BossTransitionAction`: radial particle shockwaves, dynamic audio cues, escort minion summons). Includes `RadialNovaBehavior` for 360-degree projectile novae.
+- **Archetypes & Bosses**: Pistol Grunt, Shotgun Guard, Stalker Rusher, Aegis Warden, Marksman Sniper, alongside multi-phase milestone bosses Goliath-01 Aegis Colossus, Chrono-Weaver Temporal Anchor, Vektor-Prime Phase Sovereign, and the Room 20 final milestone boss Chrono-Zenith Zero Sovereign.
+- **`BossPhaseController` & `BossBlueprint`**: Declarative $N$-phase state machines governing boss progression with dynamic movement/attack swaps, transition triggers, and lifecycle actions (`BossTransitionAction`: radial particle shockwaves, dynamic audio cues, escort minion summons, and Cataclysm Overload telegraphed invulnerability channels with line-of-sight obstacle raycast cover checks). Includes `RadialNovaBehavior` for 360-degree projectile novae.
 
 ### 5. Minimalist HUD & Tactical UI
 - **In-Canvas Reticle (`src/ui/Reticle.ts`)**: Canvas cursor is set to `cursor: none`. An in-canvas precision hardware crosshair tracks mouse coordinates, dynamically expanding with movement velocity and flashing crimson on dry-fire.
 - **Hairline Revolver Dial (`src/ui/CylinderHUD.ts`)**: Minimalist 6-chamber dial (dynamically expandable to 8 chambers with Extended Cylinder) with active chamber alignment notch and smooth rotational transition.
 - **Hairline Chrono-Telemetry (`src/ui/TimeHUD.ts`)**: Top-right gauge displaying numeric multiplier (`CHRONO // 0.05x`) and transient action burst pills.
-- **Phase-Aware Boss Telemetry (`src/ui/BossTelemetryHUD.ts`)**: Decoupled top-center telemetry rendering boss designation, active phase badges (e.g. `PHASE 2/2 // OVERDRIVE`), and shield charge pips.
+- **Phase-Aware Boss Telemetry (`src/ui/BossTelemetryHUD.ts`) & Endless Telemetry (`src/ui/EndlessTelemetryHUD.ts`)**: Decoupled top-center boss telemetry rendering boss designation, active phase badges (e.g. `PHASE 2/2 // OVERDRIVE`), and shield charge pips. In Endless Mode, in-canvas telemetry displays real-time threat budget, elapsed survival time (MM:SS), and kill counter.
 - **Tactical Upgrade Draft & Pipeline (`src/upgrades/` & `src/ui/UpgradeDraftHUD.ts`)**: Data-driven roguelike upgrade pipeline (`UpgradePipeline`) with centralized registry (`UpgradeRegistry`), dynamic $N$-card draft UI (`UpgradeDraftHUD`), stack control, and compounded modifiers. Baseline augmentations (Extended Cylinder, Speed Loader, Reactive Shield) and advanced perks (Kinetic Stride, Chrono Burst, Phase Deflector, Overcharge Dash).
 - **Pause Lifecycle**: Toggleable with <kbd>Esc</kbd> or <kbd>P</kbd>. Halts simulation ticks and displays a frosted Swiss-style control matrix card.
 
-### 6. Modular Level Director & Procedural Encounter Generation
-- **`RoomLayoutTemplate` & `DEFAULT_LAYOUT_REGISTRY`**: Composable tactical geometry layouts (`CenterPillarsTemplate`, `TwinBunkersTemplate`, `SplitCorridorTemplate`, `KillboxLanesTemplate`, `ArenaQuadrantTemplate`) with verified spawn safety ($\ge 280\text{px}$ from player spawn).
+### 6. Modular Level Director, Endless Director & Procedural Generation
+- **`RoomLayoutTemplate` & `DEFAULT_LAYOUT_REGISTRY`**: Composable tactical geometry layouts (`CenterPillarsTemplate`, `TwinBunkersTemplate`, `SplitCorridorTemplate`, `KillboxLanesTemplate`, `ArenaQuadrantTemplate`, `ApexRedoubtTemplate`, `ApexColosseumTemplate`) with verified spawn safety ($\ge 280\text{px}$ from player spawn).
 - **`EncounterDirector`**: Threat-budget encounter synthesizer selecting hostile archetypes dynamically based on difficulty tier while enforcing composition constraints (max 2 snipers, frontliner escort rules) and geometric separation ($\ge 48\text{px}$ between units, outside obstacle collision boxes).
-- **`LevelDirector`**: Deterministic Mulberry32 PRNG engine producing reproducible room configurations from numeric or string seeds, with automated milestone boss injection every 5th room (Sector 1: Goliath-01, Sector 2: Chrono-Weaver, Sector 3+: Vektor-Prime).
-- **`RoomManager` Dynamic Mode**: Seamlessly switches between classic fixed campaign sequences (19 rooms) and endless procedural room streams upon portal entry.
+- **`EndlessDirector`**: Survival mode wave coordinator dynamically tracking active threat load against a climbing simulation threat budget ($50 + \lfloor \text{ticks}/120 \rfloor \times 5$), safely filtering spatial candidates ($\ge 350\text{px}$ from player, $\ge 48\text{px}$ unit clearance), and queuing 30-tick visual telegraph rings before unit materialization.
+- **`LevelDirector`**: Deterministic Mulberry32 PRNG engine producing reproducible room configurations from numeric or string seeds, with automated milestone boss injection every 5th room (Sector 1: Goliath-01, Sector 2: Chrono-Weaver, Sector 3: Vektor-Prime, Sector 4: Chrono-Zenith).
+- **`RoomManager` Dynamic Mode**: Seamlessly switches between classic fixed campaign sequences (20 rooms) and endless procedural room streams upon portal entry. Completing Room 20 unlocks a golden exit gate directly transitioning into Endless Survival Mode with full loadout injection (all 7 upgrades equipped, 3 shields, 8 rounds).
 
 ---
 
@@ -97,7 +98,7 @@ npm run dev
    - Use mock Canvas 2D contexts (`createMockContext()`) with `vi.fn()` for rendering tests.
    - Use mock audio contexts to verify audio trigger calls without requiring real audio devices.
 3. **Keep Tests Fast & Deterministic**:
-   - The entire suite (474+ tests) runs in under 700ms. Avoid arbitrary `setTimeout` or wall-clock waits in tests.
+   - The entire suite (511+ tests) runs in under 700ms. Avoid arbitrary `setTimeout` or wall-clock waits in tests.
 
 ---
 

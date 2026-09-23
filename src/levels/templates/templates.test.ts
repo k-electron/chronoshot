@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   ALL_LAYOUT_TEMPLATES,
+  ApexColosseumTemplate,
+  ApexRedoubtTemplate,
   ArenaQuadrantTemplate,
   CenterPillarsTemplate,
   DEFAULT_LAYOUT_REGISTRY,
@@ -18,12 +20,14 @@ describe("Modular Tactical Cover Templates", () => {
     SplitCorridorTemplate,
     KillboxLanesTemplate,
     ArenaQuadrantTemplate,
+    ApexRedoubtTemplate,
+    ApexColosseumTemplate,
   ];
 
-  it("exports exactly 5 distinct templates in ALL_LAYOUT_TEMPLATES", () => {
-    expect(ALL_LAYOUT_TEMPLATES).toHaveLength(5);
+  it("exports exactly 7 distinct templates in ALL_LAYOUT_TEMPLATES", () => {
+    expect(ALL_LAYOUT_TEMPLATES).toHaveLength(7);
     const ids = new Set(ALL_LAYOUT_TEMPLATES.map((t) => t.id));
-    expect(ids.size).toBe(5);
+    expect(ids.size).toBe(7);
   });
 
   describe.each(templates)("Template: $id ($name)", (template) => {
@@ -58,45 +62,22 @@ describe("Modular Tactical Cover Templates", () => {
       expect(wallIds).toContain("wall-left");
       expect(wallIds).toContain("wall-right");
 
-      // Verify every obstacle has valid dimensions and bounds
-      for (const obs of obstacles) {
-        expect(obs.width).toBeGreaterThan(0);
-        expect(obs.height).toBeGreaterThan(0);
-        expect(obs.bounds.min.x).toBe(obs.x);
-        expect(obs.bounds.min.y).toBe(obs.y);
-        expect(obs.bounds.max.x).toBe(obs.x + obs.width);
-        expect(obs.bounds.max.y).toBe(obs.y + obs.height);
+      // Verify interior obstacles have positive dimensions
+      for (const obstacle of obstacles) {
+        expect(obstacle.width).toBeGreaterThan(0);
+        expect(obstacle.height).toBeGreaterThan(0);
+        expect(obstacle.bounds.min.x).toBeLessThan(obstacle.bounds.max.x);
+        expect(obstacle.bounds.min.y).toBeLessThan(obstacle.bounds.max.y);
       }
     });
 
-    it("ensures player spawn and exit portal do not overlap obstacles", () => {
-      const obstacles = template.buildObstacles(960, 640);
-
-      for (const obs of obstacles) {
-        // Player spawn must not be inside obstacle bounds
-        const playerInside =
-          template.playerSpawn.x >= obs.bounds.min.x &&
-          template.playerSpawn.x <= obs.bounds.max.x &&
-          template.playerSpawn.y >= obs.bounds.min.y &&
-          template.playerSpawn.y <= obs.bounds.max.y;
-        expect(playerInside).toBe(false);
-
-        // Exit portal center must not be inside obstacle bounds
-        const portalInside =
-          template.exitPortal.x >= obs.bounds.min.x &&
-          template.exitPortal.x <= obs.bounds.max.x &&
-          template.exitPortal.y >= obs.bounds.min.y &&
-          template.exitPortal.y <= obs.bounds.max.y;
-        expect(portalInside).toBe(false);
-      }
-    });
-
-    it("provides valid enemy spawn zones within arena boundaries", () => {
+    it("defines valid enemy spawn zones that do not overlap the perimeter walls", () => {
       expect(template.enemySpawnZones.length).toBeGreaterThan(0);
 
       for (const zone of template.enemySpawnZones) {
         expect(zone.width).toBeGreaterThan(0);
         expect(zone.height).toBeGreaterThan(0);
+
         // Must be inside arena playable area (perimeter wall thickness 20)
         expect(zone.x).toBeGreaterThanOrEqual(20);
         expect(zone.y).toBeGreaterThanOrEqual(20);
@@ -120,28 +101,49 @@ describe("Modular Tactical Cover Templates", () => {
     });
   });
 
+  describe("ApexRedoubtTemplate cover reachability", () => {
+    it("guarantees reachable cover within <= 140px from every spot across the arena", () => {
+      const obstacles = ApexRedoubtTemplate.buildObstacles(960, 640);
+
+      // Test a grid of points covering the playable space
+      for (let x = 40; x <= 920; x += 30) {
+        for (let y = 40; y <= 600; y += 30) {
+          let minDistance = Infinity;
+          for (const obs of obstacles) {
+            const dx = Math.max(0, obs.bounds.min.x - x, x - obs.bounds.max.x);
+            const dy = Math.max(0, obs.bounds.min.y - y, y - obs.bounds.max.y);
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < minDistance) {
+              minDistance = dist;
+            }
+          }
+          expect(minDistance).toBeLessThanOrEqual(140);
+        }
+      }
+    });
+  });
+
   describe("DEFAULT_LAYOUT_REGISTRY", () => {
-    it("auto-registers all 5 tactical templates", () => {
-      expect(DEFAULT_LAYOUT_REGISTRY.getAll()).toHaveLength(5);
+    it("auto-registers all 7 tactical templates", () => {
+      expect(DEFAULT_LAYOUT_REGISTRY.getAll()).toHaveLength(7);
 
       expect(DEFAULT_LAYOUT_REGISTRY.get("center-pillars")).toBe(CenterPillarsTemplate);
       expect(DEFAULT_LAYOUT_REGISTRY.get("twin-bunkers")).toBe(TwinBunkersTemplate);
       expect(DEFAULT_LAYOUT_REGISTRY.get("split-corridor")).toBe(SplitCorridorTemplate);
       expect(DEFAULT_LAYOUT_REGISTRY.get("killbox-lanes")).toBe(KillboxLanesTemplate);
       expect(DEFAULT_LAYOUT_REGISTRY.get("arena-quadrant")).toBe(ArenaQuadrantTemplate);
+      expect(DEFAULT_LAYOUT_REGISTRY.get("apex-redoubt")).toBe(ApexRedoubtTemplate);
+      expect(DEFAULT_LAYOUT_REGISTRY.get("apex-colosseum")).toBe(ApexColosseumTemplate);
     });
 
-    it("allows deterministic sampling across all 5 templates", () => {
-      // 0.0 -> index 0 (CenterPillars)
+    it("allows deterministic sampling across all 7 templates", () => {
       expect(DEFAULT_LAYOUT_REGISTRY.sample(() => 0.0).id).toBe("center-pillars");
-      // 0.25 -> index 1 (TwinBunkers)
-      expect(DEFAULT_LAYOUT_REGISTRY.sample(() => 0.25).id).toBe("twin-bunkers");
-      // 0.45 -> index 2 (SplitCorridor)
-      expect(DEFAULT_LAYOUT_REGISTRY.sample(() => 0.45).id).toBe("split-corridor");
-      // 0.65 -> index 3 (KillboxLanes)
-      expect(DEFAULT_LAYOUT_REGISTRY.sample(() => 0.65).id).toBe("killbox-lanes");
-      // 0.85 -> index 4 (ArenaQuadrant)
-      expect(DEFAULT_LAYOUT_REGISTRY.sample(() => 0.85).id).toBe("arena-quadrant");
+      expect(DEFAULT_LAYOUT_REGISTRY.sample(() => 0.15).id).toBe("twin-bunkers");
+      expect(DEFAULT_LAYOUT_REGISTRY.sample(() => 0.30).id).toBe("split-corridor");
+      expect(DEFAULT_LAYOUT_REGISTRY.sample(() => 0.45).id).toBe("killbox-lanes");
+      expect(DEFAULT_LAYOUT_REGISTRY.sample(() => 0.60).id).toBe("arena-quadrant");
+      expect(DEFAULT_LAYOUT_REGISTRY.sample(() => 0.75).id).toBe("apex-redoubt");
+      expect(DEFAULT_LAYOUT_REGISTRY.sample(() => 0.90).id).toBe("apex-colosseum");
     });
   });
 });

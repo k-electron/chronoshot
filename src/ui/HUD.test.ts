@@ -93,4 +93,33 @@ describe("HUD Rendering", () => {
     reticle.render(ctx, { x: 200, y: 150 }, 0.05);
     expect(ctx.arc).toHaveBeenCalledWith(200, 150, 12, 0, Math.PI * 2);
   });
+
+  it("renders EndlessTelemetryHUD with active threat, survival time, and kill counter", async () => {
+    const { EndlessTelemetryHUD } = await import("./EndlessTelemetryHUD");
+    const ctx = createMockContext();
+
+    EndlessTelemetryHUD.render(
+      ctx,
+      {
+        threatBudget: 85,
+        survivalTime: "02:40",
+        kills: 14,
+      },
+      960
+    );
+
+    expect(ctx.fillRect).toHaveBeenCalled();
+    expect(ctx.strokeRect).toHaveBeenCalled();
+    expect(ctx.fillText).toHaveBeenCalledWith(
+      expect.stringContaining("ENDLESS PROTOCOL // SURVIVAL TELEMETRY"),
+      480,
+      20
+    );
+    expect(ctx.fillText).toHaveBeenCalledWith(
+      expect.stringContaining("THREAT: 85    |    SURVIVED: 02:40    |    KILLS: 14"),
+      480,
+      36
+    );
+  });
 });
+

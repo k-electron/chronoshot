@@ -127,6 +127,18 @@ export class Enemy implements CombatUnit {
     this._speed = val;
   }
 
+  public get isOverloading(): boolean {
+    return this.phaseController?.isOverloading ?? false;
+  }
+
+  public get isInvulnerable(): boolean {
+    return this.phaseController?.isInvulnerable ?? false;
+  }
+
+  public get overloadTicksRemaining(): number {
+    return this.phaseController?.overloadTicksRemaining ?? 0;
+  }
+
   public readonly fireCadenceTicks: number;
   public readonly bulletSpeed: number;
   public readonly spreadAngle: number;
@@ -364,14 +376,18 @@ export class Enemy implements CombatUnit {
       aimAngle: this.aimAngle,
       radius: this.radius,
     };
-    const firedProjectiles = this.attack.update(
-      attackCtx,
-      this.hasLineOfSight,
-      deltaTicks
-    );
+    const firedProjectiles = this.isOverloading
+      ? []
+      : this.attack.update(
+          attackCtx,
+          this.hasLineOfSight,
+          deltaTicks
+        );
 
     // 5. Movement AI delegated to movement behavior
-    if (this.stutterTimerTicks > 0 && !this.runAndGun) {
+    if (this.isOverloading) {
+      this.velocity = vec2(0, 0);
+    } else if (this.stutterTimerTicks > 0 && !this.runAndGun) {
       this.velocity = vec2(0, 0);
     } else if (this.isChargingLaser) {
       this.velocity = vec2(0, 0);
@@ -432,6 +448,15 @@ export class Enemy implements CombatUnit {
    * Applies damage to shields first before lethal elimination.
    */
   public takeDamage(damage: number = 1): DamageResult {
+    if (this.isInvulnerable) {
+      return {
+        absorbed: true,
+        eliminated: false,
+        remainingShields: this.shields,
+        deflected: true,
+      };
+    }
+
     if (this.phaseController) {
       const res = this.phaseController.takeDamage(damage, this.shields, this.position);
       if (res.eliminated) {
@@ -453,6 +478,7 @@ export class Enemy implements CombatUnit {
         absorbed: res.absorbed,
         eliminated: false,
         remainingShields: this.shields,
+        deflected: res.deflected,
       };
     }
 

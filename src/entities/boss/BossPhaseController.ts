@@ -44,6 +44,7 @@ export interface BossPhaseConfig {
   transitionTrigger: (ctx: BossContext) => boolean;
   onPhaseEnter?: (ctx: BossTransitionContext) => void;
   onPhaseExit?: (ctx: BossTransitionContext) => void;
+  overloadChannelTicks?: number;
 }
 
 /**
@@ -54,6 +55,7 @@ export interface BossDamageResult {
   absorbed: boolean;
   eliminated: boolean;
   transitioned: boolean;
+  deflected?: boolean;
 }
 
 /**
@@ -64,6 +66,7 @@ export class BossPhaseController {
   public currentPhaseIndex: number = 0;
   public phaseElapsedTicks: number = 0;
   public shields: number = 0;
+  public overloadTicksRemaining: number = 0;
 
   private _movement!: MovementBehavior;
   private _attack!: AttackBehavior;
@@ -84,8 +87,17 @@ export class BossPhaseController {
     this.currentPhaseIndex = 0;
     this.phaseElapsedTicks = 0;
     this.shields = this.phases[0].maxShields;
+    this.overloadTicksRemaining = this.phases[0].overloadChannelTicks ?? 0;
     this._movement = this.phases[0].movement();
     this._attack = this.phases[0].attack();
+  }
+
+  public get isOverloading(): boolean {
+    return this.overloadTicksRemaining > 0;
+  }
+
+  public get isInvulnerable(): boolean {
+    return this.isOverloading;
   }
 
   /**
@@ -118,10 +130,10 @@ export class BossPhaseController {
   }
 
   /**
-   * Movement speed of the active phase.
+   * Movement speed of the active phase (0 during overload channeling).
    */
   public get speed(): number {
-    return this.currentPhase.speed;
+    return this.isOverloading ? 0 : this.currentPhase.speed;
   }
 
   /**
@@ -171,6 +183,10 @@ export class BossPhaseController {
     this.lastBossPosition.y = bossPos.y;
     this.phaseElapsedTicks += deltaTicks;
 
+    if (this.overloadTicksRemaining > 0) {
+      this.overloadTicksRemaining = Math.max(0, this.overloadTicksRemaining - deltaTicks);
+    }
+
     if (!this.hasNextPhase) {
       return false;
     }
@@ -205,6 +221,16 @@ export class BossPhaseController {
     if (bossPos) {
       this.lastBossPosition.x = bossPos.x;
       this.lastBossPosition.y = bossPos.y;
+    }
+
+    if (this.isInvulnerable) {
+      return {
+        remainingShields: this.shields,
+        absorbed: true,
+        eliminated: false,
+        transitioned: false,
+        deflected: true,
+      };
     }
 
     if (currentShields > 0) {
@@ -305,6 +331,7 @@ export class BossPhaseController {
 
     this.currentPhaseIndex = nextPhaseIndex;
     this.phaseElapsedTicks = 0;
+    this.overloadTicksRemaining = this.currentPhase.overloadChannelTicks ?? 0;
     this._movement = this.currentPhase.movement();
     this._attack = this.currentPhase.attack();
     this.shields = this.currentPhase.maxShields;
@@ -320,6 +347,7 @@ export class BossPhaseController {
   public reset(): void {
     this.currentPhaseIndex = 0;
     this.phaseElapsedTicks = 0;
+    this.overloadTicksRemaining = this.phases[0].overloadChannelTicks ?? 0;
     this.shields = this.phases[0].maxShields;
     this._movement = this.phases[0].movement();
     this._attack = this.phases[0].attack();

@@ -22,11 +22,13 @@
 
 import {
   CHRONO_WEAVER_BLUEPRINT,
+  CHRONO_ZENITH_BLUEPRINT,
   VEKTOR_PRIME_BLUEPRINT,
 } from "../entities/boss/BossBlueprint";
 import { EnemyConfig } from "../entities/Enemy";
 import { createObstacle, createPillar, Obstacle } from "../entities/Obstacle";
 import { vec2, Vector2D } from "../math/vector";
+import { ApexRedoubtTemplate } from "./templates/ApexRedoubtTemplate";
 
 export interface ExitPortal {
   readonly x: number;
@@ -1352,7 +1354,61 @@ export function createRoom19(width = 960, height = 640): RoomConfig {
 }
 
 /**
- * Generates the complete 19-room tactical puzzle progression.
+ * Room 20: Protocol Omega (Sector 4 Climax: Chrono-Zenith Zero Sovereign).
+ * The ultimate campaign milestone encounter featuring 4 escalating phases,
+ * telegraphed Cataclysm Overload shockwaves, and tactical cover dueling inside The Apex Redoubt.
+ */
+export function createRoom20(width = 960, height = 640): RoomConfig {
+  const obstacles = ApexRedoubtTemplate.buildObstacles(width, height);
+
+  return {
+    id: "room-20",
+    roomNumber: 20,
+    title: "ROOM 20: PROTOCOL OMEGA",
+    subtitle: "Sector 4 Climax // Milestone Final Boss",
+    tacticalTip:
+      "Chrono-Zenith channels invulnerable Cataclysm Overload upon shield breaks. Seek cover behind bastions to survive the blast, or pre-fire shots to land post-channel!",
+    playerSpawn: vec2(140, height / 2),
+    obstacles,
+    enemies: [
+      {
+        id: "boss-chrono-zenith",
+        type: "boss",
+        x: width - 220,
+        y: height / 2,
+        maxShields: 5,
+        fireCadenceTicks: 45,
+        initialDelayTicks: 25,
+        blueprint: CHRONO_ZENITH_BLUEPRINT,
+        bossName: CHRONO_ZENITH_BLUEPRINT.name,
+      },
+      {
+        id: "escort-grunt-top",
+        type: "grunt",
+        x: width - 280,
+        y: height / 2 - 120,
+        fireCadenceTicks: 50,
+        initialDelayTicks: 30,
+      },
+      {
+        id: "escort-grunt-bottom",
+        type: "grunt",
+        x: width - 280,
+        y: height / 2 + 120,
+        fireCadenceTicks: 50,
+        initialDelayTicks: 35,
+      },
+    ],
+    exitPortal: {
+      x: width - 80,
+      y: height / 2,
+      radius: 28,
+    },
+  };
+}
+
+/**
+ * Generates the complete 20-room tactical puzzle progression.
  */
 export function createStandardRoomSequence(
   width = 960,
@@ -1378,5 +1434,6 @@ export function createStandardRoomSequence(
     createRoom17(width, height),
     createRoom18(width, height),
     createRoom19(width, height),
+    createRoom20(width, height),
   ];
 }

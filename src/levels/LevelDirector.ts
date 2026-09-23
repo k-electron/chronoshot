@@ -13,12 +13,14 @@ import {
   GOLIATH_01_BLUEPRINT,
   CHRONO_WEAVER_BLUEPRINT,
   VEKTOR_PRIME_BLUEPRINT,
+  CHRONO_ZENITH_BLUEPRINT,
   BossBlueprint,
 } from "../entities/boss/BossBlueprint";
 import { EnemyConfig } from "../entities/Enemy";
 import { RoomConfig } from "./Room";
 import { EncounterDirector } from "./EncounterDirector";
 import {
+  ApexRedoubtTemplate,
   DEFAULT_LAYOUT_REGISTRY,
   LayoutTemplateRegistry,
 } from "./templates";
@@ -132,7 +134,10 @@ export class LevelDirector {
    * Generates a milestone boss room with structured boss cover and escorts.
    */
   private generateBossRoom(roomNumber: number, rng: () => number): RoomConfig {
-    const template = this.templateRegistry.sample(rng);
+    const template =
+      roomNumber === 20
+        ? (this.templateRegistry.get("apex-redoubt") ?? ApexRedoubtTemplate)
+        : this.templateRegistry.sample(rng);
     const padNumber = String(roomNumber).padStart(2, "0");
     const sectorNumber = Math.floor(roomNumber / 5);
 
@@ -142,7 +147,9 @@ export class LevelDirector {
         ? GOLIATH_01_BLUEPRINT
         : sectorNumber === 2
         ? CHRONO_WEAVER_BLUEPRINT
-        : VEKTOR_PRIME_BLUEPRINT);
+        : sectorNumber === 3
+        ? VEKTOR_PRIME_BLUEPRINT
+        : CHRONO_ZENITH_BLUEPRINT);
 
     const bossId = `boss-sector-${sectorNumber}-${roomNumber}`;
     const bossConfig: EnemyConfig = {

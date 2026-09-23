@@ -20,6 +20,7 @@ export interface DamageResult {
   readonly absorbed: boolean;
   readonly eliminated: boolean;
   readonly remainingShields: number;
+  readonly deflected?: boolean;
 }
 
 export interface CombatUnit {

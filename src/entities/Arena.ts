@@ -13,7 +13,8 @@ import { SoundSynthesizer } from "../audio/SoundSynthesizer";
 import { FixedStepSimulator } from "../engine/FixedStepSimulator";
 import { TimeGovernor } from "../engine/TimeGovernor";
 import { RoomConfig } from "../levels/Room";
-import { RoomManager } from "../levels/RoomManager";
+import { createEndlessSurvivalRoom, RoomManager } from "../levels/RoomManager";
+import { EndlessDirector, MaterializingUnit } from "../levels/EndlessDirector";
 import { vec2, vecLength, vecNormalize, Vector2D } from "../math/vector";
 import { CylinderHUD } from "../ui/CylinderHUD";
 import { Reticle } from "../ui/Reticle";
@@ -22,6 +23,7 @@ import { TimeHUD } from "../ui/TimeHUD";
 import { Enemy } from "./Enemy";
 import { EnemyRenderer } from "../ui/EnemyRenderer";
 import { BossTelemetryHUD } from "../ui/BossTelemetryHUD";
+import { EndlessTelemetryHUD } from "../ui/EndlessTelemetryHUD";
 import { createObstacle, createPillar, Obstacle } from "./Obstacle";
 import { ParticleSystem } from "./ParticleSystem";
 import { Player } from "./Player";
@@ -65,6 +67,7 @@ export class Arena {
 
   public roomManager?: RoomManager;
   public soundSynth?: SoundSynthesizer;
+  public endlessDirector?: EndlessDirector;
 
   public status: ArenaStatus = "playing";
   public isPaused: boolean = false;
@@ -86,6 +89,7 @@ export class Arena {
     this.reticle = new Reticle();
     this.roomManager = roomManager;
     this.soundSynth = soundSynth ?? new SoundSynthesizer();
+    this.endlessDirector = this.roomManager?.endlessDirector;
 
     this.player = new Player({ x: 140, y: height / 2 });
     this.cylinderHUD = new CylinderHUD({ x: 60, y: height - 55, radius: 26, chamberRadius: 5 });
@@ -171,6 +175,30 @@ export class Arena {
     this.particles.clear();
     this.timeGovernor.reset();
     this.simulator.reset();
+
+    if (this.roomManager && !this.roomManager.isEndlessMode()) {
+      this.endlessDirector = undefined;
+    }
+  }
+
+  /**
+   * Starts Endless Survival Mode:
+   * - Transitions RoomManager to Apex Colosseum room with EndlessDirector
+   * - Equips player with all 7 combat augmentations and full shields
+   * - Clears existing projectiles and initializes dynamic spawner
+   */
+  public startEndlessMode(): void {
+    if (this.roomManager) {
+      const endlessRoom = this.roomManager.startEndlessMode();
+      this.endlessDirector = this.roomManager.endlessDirector;
+      this.loadRoom(endlessRoom);
+    } else {
+      this.endlessDirector = new EndlessDirector();
+      this.endlessDirector.reset();
+      const endlessRoom = createEndlessSurvivalRoom(this.width, this.height);
+      this.loadRoom(endlessRoom);
+    }
+    this.player.equipFullEndlessLoadout();
   }
 
   /**
@@ -356,7 +384,10 @@ export class Arena {
         )
       ) {
         this.soundSynth?.playVictory(this.timeGovernor.getTimeScale());
-        if (this.roomManager.hasNextRoom()) {
+        if (this.roomManager.getCurrentRoom().roomNumber === 20) {
+          // Room 20 completion: golden portal warps into Endless Mode!
+          this.startEndlessMode();
+        } else if (this.roomManager.hasNextRoom()) {
           this.roomManager.advanceRoom();
           this.loadRoom(this.roomManager.getCurrentRoom());
         } else {
@@ -381,7 +412,20 @@ export class Arena {
       this.particles.emitShatter(this.player.position, 2, "#00f0ff", 60);
     }
 
-    // 2. Update Enemies AI
+    // 2. Endless dynamic reinforcements
+    if (this.endlessDirector) {
+      const readyConfigs = this.endlessDirector.update(
+        this.player.position,
+        this.enemies,
+        this.obstacles,
+        1
+      );
+      for (const cfg of readyConfigs) {
+        this.enemies.push(new Enemy(cfg));
+      }
+    }
+
+    // 3. Update Enemies AI
     for (const enemy of this.enemies) {
       if (enemy.isAlive) {
         const wasCharging = enemy.isChargingLaser;
@@ -396,7 +440,7 @@ export class Arena {
       }
     }
 
-    // 3. Update Projectiles with Continuous Collision Detection
+    // 4. Update Projectiles with Continuous Collision Detection
     for (const bullet of this.projectiles) {
       if (!bullet.isAlive) {
         continue;
@@ -419,7 +463,10 @@ export class Arena {
         } else if (hit.type === "unit" && hit.unit) {
           if (hit.damageResult?.absorbed) {
             // Shield absorbed hit!
-            if (hit.damageResult.remainingShields === 0) {
+            if (hit.damageResult.deflected) {
+              this.particles.emitShieldSparks(hit.point, hit.normal, 8);
+              this.soundSynth?.playShieldDeflect(this.timeGovernor.getTimeScale());
+            } else if (hit.damageResult.remainingShields === 0) {
               // Shield break burst & audio
               this.particles.emitShieldBreak(hit.point, 16);
               this.soundSynth?.playShieldBreak(this.timeGovernor.getTimeScale());
@@ -436,6 +483,9 @@ export class Arena {
               this.status = "defeat";
             } else {
               const enemy = hit.unit as Enemy;
+              if (this.endlessDirector) {
+                this.endlessDirector.recordKill();
+              }
               if (enemy.isBoss) {
                 this.soundSynth?.playBossDefeat(this.timeGovernor.getTimeScale());
                 this.particles.emitShatter(hit.point, 36, "#ff2a44", 320);
@@ -454,13 +504,13 @@ export class Arena {
     // Cull destroyed / terminated projectiles
     this.projectiles = this.projectiles.filter((b) => b.isAlive);
 
-    // 4. Update Particle System shards
+    // 5. Update Particle System shards
     this.particles.update(fixedDt);
 
     // Check enemy elimination status
     this.checkVictoryCondition();
 
-    // 5. Check exit portal stepping if room manager is active
+    // 6. Check exit portal stepping if room manager is active
     if (
       this.status === "playing" &&
       !this.isUpgradeDraftActive &&
@@ -474,7 +524,10 @@ export class Arena {
         )
       ) {
         this.soundSynth?.playVictory(this.timeGovernor.getTimeScale());
-        if (this.roomManager.hasNextRoom()) {
+        if (this.roomManager.getCurrentRoom().roomNumber === 20) {
+          // Room 20 completion: golden portal warps into Endless Mode!
+          this.startEndlessMode();
+        } else if (this.roomManager.hasNextRoom()) {
           this.roomManager.advanceRoom();
           this.loadRoom(this.roomManager.getCurrentRoom());
         } else {
@@ -486,7 +539,7 @@ export class Arena {
   }
 
   private checkVictoryCondition(): void {
-    if (this.isUpgradeDraftActive) {
+    if (this.isUpgradeDraftActive || this.endlessDirector) {
       return;
     }
     const aliveEnemies = this.enemies.some((e) => e.isAlive);
@@ -507,6 +560,7 @@ export class Arena {
    * In campaign mode, player defeat enforces pure permadeath back to Room 1.
    */
   public restart(): void {
+    this.endlessDirector = undefined;
     if (this.roomManager) {
       this.roomManager.restartGame();
       this.player.clearAugmentations();
@@ -585,7 +639,21 @@ export class Arena {
       ctx.fill();
     }
 
-    // 4. Enemies (Crimson geometric polygons rendered via decoupled EnemyRenderer)
+    // 4. Cataclysm Hazard Warning Auras (for overloading bosses)
+    for (const enemy of this.enemies) {
+      if (enemy.isAlive && enemy.isOverloading) {
+        this.renderCataclysmAura(ctx, enemy);
+      }
+    }
+
+    // Materialization telegraph rings (in Endless Mode)
+    if (this.endlessDirector) {
+      for (const unit of this.endlessDirector.getMaterializationQueue()) {
+        this.renderMaterializationTelegraph(ctx, unit);
+      }
+    }
+
+    // Enemies (Crimson geometric polygons rendered via decoupled EnemyRenderer)
     for (const enemy of this.enemies) {
       if (enemy.isAlive) {
         EnemyRenderer.render(ctx, enemy, this.player.position);
@@ -641,6 +709,20 @@ export class Arena {
     const activeBoss = this.enemies.find((e) => e.isBoss && e.isAlive);
     if (activeBoss) {
       this.renderBossTelemetry(ctx, activeBoss);
+    }
+
+    // Endless Telemetry HUD (when endless mode is active)
+    if (this.endlessDirector) {
+      EndlessTelemetryHUD.render(
+        ctx,
+        {
+          threatBudget: this.endlessDirector.getThreatBudget(),
+          survivalTime: this.endlessDirector.getSurvivalTimeFormatted(),
+          kills: this.endlessDirector.getKills(),
+          activeThreat: this.endlessDirector.calculateActiveThreat(this.enemies),
+        },
+        this.width
+      );
     }
 
     // Room Progression Header
@@ -912,5 +994,94 @@ export class Arena {
   public renderUpgradeDraft(ctx: CanvasRenderingContext2D): void {
     const draftCards = this.getDraftOptions();
     UpgradeDraftHUD.render(ctx, draftCards, this.width, this.height);
+  }
+
+  /**
+   * Renders pulsating hazard aura around boss during Cataclysm Overload channel.
+   */
+  public renderCataclysmAura(ctx: CanvasRenderingContext2D, enemy: Enemy): void {
+    ctx.save();
+    const pos = enemy.position;
+    const pulse = Math.sin(enemy.overloadTicksRemaining * 0.3) * 6;
+    const auraRadius = Math.max(1, enemy.radius * 3.5 + pulse);
+
+    // Radial hazard aura
+    const grad = ctx.createRadialGradient(pos.x, pos.y, enemy.radius, pos.x, pos.y, auraRadius);
+    grad.addColorStop(0, "rgba(255, 42, 68, 0.45)");
+    grad.addColorStop(0.6, "rgba(255, 100, 0, 0.25)");
+    grad.addColorStop(1, "rgba(255, 42, 68, 0)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, auraRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Dashed warning perimeter
+    ctx.strokeStyle = "#ff2a44";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 6]);
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, auraRadius * 0.9, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Warning text
+    ctx.setLineDash([]);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = getUIFont(10, "bold");
+    ctx.fillStyle = "#ff2a44";
+    ctx.fillText("⚠ CATACLYSM OVERLOAD // SEEK COVER ⚠", pos.x, pos.y - enemy.radius - 18);
+
+    ctx.restore();
+  }
+
+  /**
+   * Renders a 30-tick converging telegraph reticle at a reinforcement spawn location.
+   */
+  public renderMaterializationTelegraph(
+    ctx: CanvasRenderingContext2D,
+    unit: MaterializingUnit
+  ): void {
+    ctx.save();
+    const progress = 1 - Math.max(0, unit.ticksRemaining / 30);
+    const radius = unit.radius + (1 - progress) * 20;
+
+    // Outer converging reticle ring
+    ctx.strokeStyle = `rgba(0, 240, 255, ${0.4 + progress * 0.6})`;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.arc(unit.x, unit.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Inner core dot
+    ctx.setLineDash([]);
+    ctx.fillStyle = "rgba(255, 42, 68, 0.75)";
+    ctx.beginPath();
+    ctx.arc(unit.x, unit.y, 4 * progress, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Crosshair ticks
+    ctx.strokeStyle = "#00f0ff";
+    ctx.lineWidth = 1;
+    const tickLen = 6;
+    ctx.beginPath();
+    ctx.moveTo(unit.x - radius - tickLen, unit.y);
+    ctx.lineTo(unit.x - radius + 2, unit.y);
+    ctx.moveTo(unit.x + radius - 2, unit.y);
+    ctx.lineTo(unit.x + radius + tickLen, unit.y);
+    ctx.moveTo(unit.x, unit.y - radius - tickLen);
+    ctx.lineTo(unit.x, unit.y - radius + 2);
+    ctx.moveTo(unit.x, unit.y + radius - 2);
+    ctx.lineTo(unit.x, unit.y + radius + tickLen);
+    ctx.stroke();
+
+    // Label
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = getUIFont(9, "bold");
+    ctx.fillStyle = UITheme.colors.cyan;
+    ctx.fillText("MATERIALIZING", unit.x, unit.y + radius + 12);
+
+    ctx.restore();
   }
 }

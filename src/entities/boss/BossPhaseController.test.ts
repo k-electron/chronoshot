@@ -400,4 +400,72 @@ describe("BossPhaseController", () => {
       expect(controller.isFinalPhase).toBe(false);
     });
   });
+
+  describe("overloadChannelTicks and invulnerability", () => {
+    it("initializes overload channel ticks from phase 0 when configured", () => {
+      const p0 = createTestPhase(0, { overloadChannelTicks: 50, speed: 60 });
+      const controller = new BossPhaseController([p0]);
+
+      expect(controller.overloadTicksRemaining).toBe(50);
+      expect(controller.isOverloading).toBe(true);
+      expect(controller.isInvulnerable).toBe(true);
+      expect(controller.speed).toBe(0); // Zero velocity while overloading
+    });
+
+    it("decrements overload ticks on update and restores speed when channel finishes", () => {
+      const p0 = createTestPhase(0, { overloadChannelTicks: 20, speed: 80 });
+      const controller = new BossPhaseController([p0]);
+
+      controller.update(10, vec2(100, 100));
+      expect(controller.overloadTicksRemaining).toBe(10);
+      expect(controller.isOverloading).toBe(true);
+      expect(controller.isInvulnerable).toBe(true);
+      expect(controller.speed).toBe(0);
+
+      controller.update(10, vec2(100, 100));
+      expect(controller.overloadTicksRemaining).toBe(0);
+      expect(controller.isOverloading).toBe(false);
+      expect(controller.isInvulnerable).toBe(false);
+      expect(controller.speed).toBe(80);
+    });
+
+    it("deflects damage during active overload channel without reducing shields", () => {
+      const p0 = createTestPhase(0, { maxShields: 3, overloadChannelTicks: 30 });
+      const controller = new BossPhaseController([p0]);
+
+      expect(controller.isInvulnerable).toBe(true);
+      const res = controller.takeDamage(1, 3);
+      expect(res.deflected).toBe(true);
+      expect(res.absorbed).toBe(true);
+      expect(res.remainingShields).toBe(3);
+      expect(controller.shields).toBe(3);
+
+      // Advance past overload
+      controller.update(30, vec2(100, 100));
+      expect(controller.isInvulnerable).toBe(false);
+
+      const hit = controller.takeDamage(1, 3);
+      expect(hit.deflected).toBeUndefined();
+      expect(hit.remainingShields).toBe(2);
+      expect(controller.shields).toBe(2);
+    });
+
+    it("initiates overload channel on transitioning into subsequent phase", () => {
+      const p0 = createTestPhase(0, { maxShields: 1 });
+      const p1 = createTestPhase(1, { maxShields: 2, overloadChannelTicks: 75, speed: 90 });
+      const controller = new BossPhaseController([p0, p1]);
+
+      expect(controller.isOverloading).toBe(false);
+      controller.takeDamage(1, 1); // Breaks p0 shield -> transitions to p1
+      expect(controller.currentPhaseIndex).toBe(1);
+      expect(controller.overloadTicksRemaining).toBe(75);
+      expect(controller.isOverloading).toBe(true);
+      expect(controller.isInvulnerable).toBe(true);
+      expect(controller.speed).toBe(0);
+
+      const deflect = controller.takeDamage(1, 2);
+      expect(deflect.deflected).toBe(true);
+      expect(controller.shields).toBe(2);
+    });
+  });
 });

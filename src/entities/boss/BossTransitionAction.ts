@@ -8,7 +8,9 @@
  * - Combinators for chaining multiple transition effects
  */
 
-import { Vector2D } from "../../math/vector";
+import { rayIntersectsAABB } from "../../math/collision";
+import { vecDistance, vecScale, vecSub, Vector2D } from "../../math/vector";
+import { Obstacle } from "../Obstacle";
 import { BossTransitionContext } from "./BossPhaseController";
 
 /**
@@ -243,8 +245,8 @@ export function createAudioCue(
 }
 
 /**
- * Combines multiple transition actions into a single composite lifecycle hook.
- */
+  * Combines multiple transition actions into a single composite lifecycle hook.
+  */
 export function combineTransitionActions(
   ...actions: ((ctx: BossTransitionContext) => any)[]
 ): (ctx: BossTransitionContext) => void {
@@ -253,4 +255,120 @@ export function combineTransitionActions(
       action(ctx);
     }
   };
+}
+
+/**
+ * Result returned upon evaluating Cataclysm Pulse line-of-sight occlusion.
+ */
+export interface CataclysmPulseResult {
+  occluded: boolean;
+  damageDealt: number;
+  occludingObstacle?: Obstacle;
+}
+
+/**
+ * Tests raycast line-of-sight between origin and target against solid obstacles.
+ * Returns true if line-of-sight is clear (unobstructed), false if blocked by any obstacle.
+ */
+export function testLineOfSightOcclusion(
+  origin: Vector2D,
+  target: Vector2D,
+  obstacles: readonly Obstacle[] = []
+): { occluded: boolean; obstacle?: Obstacle } {
+  const diff = vecSub(target, origin);
+  const dist = vecDistance(origin, target);
+
+  if (dist < 1e-4) {
+    return { occluded: false };
+  }
+
+  const dir = vecScale(diff, 1 / dist);
+
+  for (const obstacle of obstacles) {
+    const hit = rayIntersectsAABB(
+      origin,
+      dir,
+      obstacle.bounds.min,
+      obstacle.bounds.max,
+      dist
+    );
+
+    if (hit && hit.distance < dist) {
+      return { occluded: true, obstacle };
+    }
+  }
+
+  return { occluded: false };
+}
+
+export interface CataclysmPulseConfig {
+  particleCount?: number;
+  speed?: number;
+  color?: string;
+  damage?: number;
+}
+
+export interface CataclysmPulseAction {
+  (ctx: BossTransitionContext): CataclysmPulseResult;
+  readonly type: "cataclysm_pulse";
+  readonly config: CataclysmPulseConfig;
+  execute(ctx: BossTransitionContext): CataclysmPulseResult;
+}
+
+/**
+ * Creates a Cataclysm Pulse action discharging an arena-wide energy wave
+ * that inflicts damage unless occluded by solid obstacle geometry.
+ */
+export function createCataclysmPulse(
+  config: CataclysmPulseConfig = {}
+): CataclysmPulseAction {
+  const particleCount = config.particleCount ?? 36;
+  const speed = config.speed ?? 360;
+  const color = config.color ?? "#ff1744";
+  const damage = config.damage ?? 1;
+
+  const action = ((ctx: BossTransitionContext): CataclysmPulseResult => {
+    // 1. Emit radial shockwave particles and audio
+    if (ctx.particles && typeof ctx.particles.emitShatter === "function") {
+      ctx.particles.emitShatter(ctx.bossPosition, particleCount, color, speed);
+    }
+    if (ctx.soundSynth && typeof ctx.soundSynth.playShieldBreak === "function") {
+      ctx.soundSynth.playShieldBreak(1.0);
+    }
+
+    const player = ctx.player ?? ctx.arena?.player;
+    const obstacles: readonly Obstacle[] = ctx.obstacles ?? ctx.arena?.obstacles ?? [];
+
+    if (!player || !player.isAlive) {
+      return { occluded: false, damageDealt: 0 };
+    }
+
+    const { occluded, obstacle } = testLineOfSightOcclusion(
+      ctx.bossPosition,
+      player.position,
+      obstacles
+    );
+
+    if (occluded) {
+      // Occluded behind obstacle: 0 damage, emit deflection feedback
+      if (ctx.particles && typeof ctx.particles.emitImpactSparks === "function" && obstacle) {
+        ctx.particles.emitImpactSparks(player.position, { x: 0, y: 1 }, 8);
+      }
+      if (ctx.soundSynth && typeof ctx.soundSynth.playShieldDeflect === "function") {
+        ctx.soundSynth.playShieldDeflect(1.0);
+      }
+      return { occluded: true, damageDealt: 0, occludingObstacle: obstacle };
+    }
+
+    // Exposed in open line of sight: inflict damage on player
+    player.takeDamage(damage);
+    return { occluded: false, damageDealt: damage };
+  }) as CataclysmPulseAction;
+
+  const fn = action as any;
+  fn.type = "cataclysm_pulse";
+  fn.config = { particleCount, speed, color, damage };
+  fn.execute = (ctx: BossTransitionContext) => action(ctx);
+
+  return action;
 }
