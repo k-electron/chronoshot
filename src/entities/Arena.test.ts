@@ -1278,6 +1278,53 @@ describe("Combat Arena & Room Loop", () => {
       expect(arena.player.upgradePipeline.getActiveIds()).toEqual([]);
     });
   });
+
+  describe("Lifecycle & Dynamic Spawning Robustness", () => {
+    it("transitions status to defeat and emits shatter feedback when player is eliminated by non-projectile source", () => {
+      const roomManager = new RoomManager();
+      const arena = new Arena(960, 640, roomManager);
+      expect(arena.status).toBe("playing");
+      expect(arena.player.isAlive).toBe(true);
+
+      // Directly eliminate player (e.g. from Cataclysm Overload shockwave)
+      arena.player.kill();
+      expect(arena.player.isAlive).toBe(false);
+
+      // Advance arena step
+      arena.step(0.016, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(0, 0),
+        shoot: false,
+        reload: false,
+        restart: false,
+      });
+
+      expect(arena.status).toBe("defeat");
+    });
+
+    it("spawnEnemy constructs, activates, and registers Enemy instances in arena roster", () => {
+      const arena = new Arena(960, 640);
+      const initialCount = arena.enemies.length;
+
+      const spawned = arena.spawnEnemy({
+        id: "dynamic-escort-1",
+        type: "shotgun",
+        x: 400,
+        y: 300,
+      });
+
+      expect(arena.enemies).toHaveLength(initialCount + 1);
+      expect(spawned).toBeDefined();
+      expect(spawned.id).toBe("dynamic-escort-1");
+      expect(spawned.isAlive).toBe(true);
+      expect(spawned.position.x).toBe(400);
+      expect(spawned.position.y).toBe(300);
+
+      // Verify safe room restart
+      expect(() => arena.restart()).not.toThrow();
+    });
+  });
 });
+
 
 

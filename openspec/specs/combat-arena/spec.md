@@ -48,11 +48,15 @@ The arena SHALL support distinct enemy archetypes including Pistol Grunt, Shotgu
 - **THEN** it halts movement, projects a charging red sightline laser for 30 ticks, and discharges a high-velocity precision bullet at a 110-tick cadence
 
 ### Requirement: One-Hit Lethality and Instant Room Reset
-The arena SHALL enforce instant lethal elimination for unshielded combat units upon projectile impact, enforce hit-count shield durability for shielded units before exposing them to lethal damage, and present an interactive dual-card defeat screen upon player elimination that supports cascading boss checkpoint rollbacks or full run resets.
+The arena SHALL enforce instant lethal elimination for unshielded combat units upon projectile impact or environmental/shockwave damage, enforce hit-count shield durability for shielded units before exposing them to lethal damage, and present an interactive dual-card defeat screen upon player elimination that supports cascading boss checkpoint rollbacks or full run resets. When the player unit is eliminated by any damage source, the arena SHALL synchronize elimination state by emitting player shatter particles, halting combat, and activating the defeat interface.
 
 #### Scenario: Player struck by projectile
 - **WHEN** an enemy projectile impacts the player hitbox with zero remaining shields
 - **THEN** the player entity shatters, a defeat state is triggered displaying run statistics and dual interactive defeat cards, suppressing in-canvas reticle, and restoring pointer cursor interaction
+
+#### Scenario: Player eliminated by non-projectile lethal shockwave
+- **WHEN** an arena-wide shockwave or environmental effect inflicts lethal damage on a player with zero remaining shields
+- **THEN** the arena immediately triggers the defeat state, emits cyan crystalline shatter particles, plays the shatter audio effect, and displays the dual-card defeat HUD
 
 #### Scenario: Player struck by projectile with reactive shield online
 - **WHEN** an enemy projectile impacts a player possessing an active reactive shield
@@ -206,4 +210,11 @@ The combat arena rendering system SHALL delegate enemy visual drawing to a modul
 #### Scenario: Rendering an enemy with procedural hull profile
 - **WHEN** an active enemy unit is rendered on the canvas
 - **THEN** its assigned chassis shape, directional orientation, barrel hardpoint, and any active shield buffer or charging sightline laser are drawn according to its visual profile
+
+### Requirement: Dynamic Hostile Entity Spawning
+The combat arena SHALL provide an explicit enemy instantiation and registration method (`spawnEnemy`) that constructs and activates fully featured combat units dynamically during combat simulation, supporting mid-encounter boss reinforcements and wave spawners.
+
+#### Scenario: Spawning dynamic reinforcement entity
+- **WHEN** a transition hook or wave spawner invokes `spawnEnemy` with an enemy configuration
+- **THEN** an active `Enemy` instance is constructed, configured with active lifecycle state (`isAlive = true`), registered in the arena's active enemy roster, and integrated into subsequent AI updates, collision passes, and rendering
 

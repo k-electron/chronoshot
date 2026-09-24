@@ -96,7 +96,7 @@ The combat system SHALL support the Vektor-Prime Phase Sovereign milestone boss 
 - **THEN** it relentlessly advances toward the player at 115 px/s with zero shields, discharging 16-pellet 360-degree radial novae with rotational angular offsets at 65-tick cadence
 
 ### Requirement: Cataclysm Overload Channel and Line-of-Sight Occlusion
-The boss combat system SHALL support a telegraphed Cataclysm Overload channeling state upon shield layer depletion, during which the boss entity anchors in place, gains complete invulnerability to projectile damage, and charges a lethal arena-wide shockwave that detonates after a configured tick duration unless occluded by solid obstacle geometry.
+The boss combat system SHALL support a telegraphed Cataclysm Overload channeling state upon shield layer depletion, during which the boss entity anchors in place, gains complete invulnerability to projectile damage, and charges a lethal arena-wide shockwave that detonates after a configured tick duration unless occluded by solid obstacle geometry. Upon detonation, open line-of-sight lethal impact SHALL immediately trigger player elimination with defeat state synchronization in the combat arena.
 
 #### Scenario: Boss enters overload channel upon shield depletion
 - **WHEN** a boss entity configured with Cataclysm Overload suffers a shield break
@@ -112,14 +112,14 @@ The boss combat system SHALL support a telegraphed Cataclysm Overload channeling
 
 #### Scenario: Lethal shockwave impact in open line-of-sight
 - **WHEN** the Cataclysm shockwave discharges while line-of-sight between the boss and player is unobstructed by any obstacle
-- **THEN** the player receives lethal damage or consumes exactly one reactive shield charge
+- **THEN** the player receives lethal damage or consumes exactly one reactive shield charge, and if lethal damage is inflicted, the combat arena immediately transitions to the defeat state with full shatter debris and defeat audio
 
 #### Scenario: Pre-fired projectile landing post-channel
 - **WHEN** a player discharges a projectile during the overload channel that travels across the arena and impacts the boss after the channel timer has expired and the shockwave has detonated
 - **THEN** the boss is no longer invulnerable, and the projectile successfully inflicts damage or decrements the subsequent shield layer
 
 ### Requirement: Chrono-Zenith Zero Sovereign Milestone Final Boss
-The boss combat system SHALL support the Chrono-Zenith Zero Sovereign milestone final boss encounter for Room 20, featuring a 4-phase state machine with escalating offensive armaments, telegraphed Cataclysm Overload transitions, and high-velocity core pursuit.
+The boss combat system SHALL support the Chrono-Zenith Zero Sovereign milestone final boss encounter for Room 20, featuring a 4-phase state machine with escalating offensive armaments, telegraphed Cataclysm Overload transitions, active speed acceleration across phases, and high-velocity core pursuit, with transition escort minions spawned as active combat entities.
 
 #### Scenario: Citadel Bastion defense in phase one
 - **WHEN** Chrono-Zenith engages the player in phase one
@@ -127,11 +127,11 @@ The boss combat system SHALL support the Chrono-Zenith Zero Sovereign milestone 
 
 #### Scenario: Cataclysm transition to Temporal Warp in phase two
 - **WHEN** Chrono-Zenith's initial 5 shield charges are depleted
-- **THEN** it executes a 75-tick Cataclysm Overload channel, summons one Shotgun Guard and one Stalker escort upon detonation, and transitions to phase two with 3 shield charges, maintaining 95 px/s kiting movement and charging 25-tick telegraphed sniper laser beams
+- **THEN** it executes a 75-tick Cataclysm Overload channel, materializes one Shotgun Guard and one Stalker escort as active combat units upon detonation, and transitions to phase two with 3 shield charges, accelerating to 95 px/s kiting movement and charging 25-tick telegraphed sniper laser beams
 
 #### Scenario: Cataclysm transition to Singularity Tempest in phase three
 - **WHEN** Chrono-Zenith's secondary 3 shield charges are depleted
-- **THEN** it executes a 65-tick Cataclysm Overload channel, detonates the shockwave, and transitions to phase three with 2 shield charges, strafing at 105 px/s while discharging twin counter-rotating 12-pellet radial novae
+- **THEN** it executes a 65-tick Cataclysm Overload channel, detonates the shockwave, materializes one Warden escort as an active combat unit, and transitions to phase three with 2 shield charges, accelerating to 105 px/s while discharging twin counter-rotating 12-pellet radial novae
 
 #### Scenario: Cataclysm transition to Zero-Point Overdrive in phase four
 - **WHEN** Chrono-Zenith's remaining 2 shield charges are depleted

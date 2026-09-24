@@ -127,6 +127,14 @@ export class Enemy implements CombatUnit {
     this._speed = val;
   }
 
+  public get x(): number {
+    return this.position.x;
+  }
+
+  public get y(): number {
+    return this.position.y;
+  }
+
   public get isOverloading(): boolean {
     return this.phaseController?.isOverloading ?? false;
   }
