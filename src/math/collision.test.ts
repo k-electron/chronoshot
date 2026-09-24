@@ -159,9 +159,33 @@ describe("Collision Mathematics", () => {
       expect(hasNavigationClearance(from, to, 16, [obstacle])).toBe(false);
     });
 
-    it("returns false when start position is already intersecting obstacle boundary", () => {
-      // Unit center at (90, 150) with radius 16 overlaps wall at x=100 (overlap 6px)
+    it("returns true when in contact with obstacle but moving away from it into open space", () => {
+      // Unit center at (90, 150) with radius 16 touches/overlaps wall at x=100, but moves left to (50, 150)
       const from = vec2(90, 150);
+      const to = vec2(50, 150);
+
+      expect(hasNavigationClearance(from, to, 16, [obstacle])).toBe(true);
+    });
+
+    it("returns false when in contact with obstacle and moving into it", () => {
+      // Unit center at (90, 150) with radius 16 touches wall at x=100 and moves right toward (150, 150)
+      const from = vec2(90, 150);
+      const to = vec2(150, 150);
+
+      expect(hasNavigationClearance(from, to, 16, [obstacle])).toBe(false);
+    });
+
+    it("returns true when in contact with obstacle and moving parallel along its tangent", () => {
+      // Unit center at (84, 150) with radius 16 touches wall at x=100 and moves down along tangent to (84, 250)
+      const from = vec2(84, 150);
+      const to = vec2(84, 250);
+
+      expect(hasNavigationClearance(from, to, 16, [obstacle])).toBe(true);
+    });
+
+    it("returns false when entity center is strictly inside the obstacle box", () => {
+      // Unit center at (150, 150) is strictly inside obstacle [100, 200] x [100, 200]
+      const from = vec2(150, 150);
       const to = vec2(50, 150);
 
       expect(hasNavigationClearance(from, to, 16, [obstacle])).toBe(false);

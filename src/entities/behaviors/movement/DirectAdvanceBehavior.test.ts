@@ -260,4 +260,45 @@ describe("DirectAdvanceBehavior", () => {
     expect(behavior.currentWaypointIndex).toBe(0);
     expect(vecLength(vel)).toBeCloseTo(120);
   });
+
+  it("falls back to direct pursuit when sightline is clear but A* returns empty path", () => {
+    const behavior = new DirectAdvanceBehavior();
+    const ctx = createMockContext({
+      position: vec2(100, 100),
+      speed: 120,
+      hasLineOfSight: true,
+    });
+    const target = createMockTarget(200, 100);
+
+    const mockPf = new GridPathfinder(960, 640, 40);
+    mockPf.findPath = () => [];
+
+    // Simulate an obstacle blocking physical clearance so it invokes pathfinder
+    const obstacle = createObstacle("blocking", 140, 90, 20, 20);
+    const vel = behavior.update(ctx, target, [obstacle], 1, 1 / 60, mockPf);
+
+    // Direct vector fallback toward target (+X)
+    expect(vel.x).toBeCloseTo(120);
+    expect(vel.y).toBeCloseTo(0);
+  });
+
+  it("falls back to nearest walkable cell when sightline is blocked and A* returns empty path", () => {
+    const behavior = new DirectAdvanceBehavior();
+    const ctx = createMockContext({
+      position: vec2(400, 200),
+      speed: 120,
+      hasLineOfSight: false,
+    });
+    const target = createMockTarget(100, 200);
+
+    const mockPf = new GridPathfinder(960, 640, 40);
+    mockPf.findPath = () => [];
+    mockPf.findNearestWalkable = () => vec2(200, 200);
+
+    const vel = behavior.update(ctx, target, [], 1, 1 / 60, mockPf);
+
+    // Nearest walkable fallback toward (200, 200) which is left (-X)
+    expect(vel.x).toBeCloseTo(-120);
+    expect(vel.y).toBeCloseTo(0);
+  });
 });

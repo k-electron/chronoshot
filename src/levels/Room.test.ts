@@ -27,6 +27,8 @@ import {
   CHRONO_ZENITH_BLUEPRINT,
   VEKTOR_PRIME_BLUEPRINT,
 } from "../entities/boss/BossBlueprint";
+import { testCircleAABB } from "../math/collision";
+import { vec2 } from "../math/vector";
 
 describe("Room Level Configurations (Rooms 1 to 19)", () => {
   it("creates valid room configurations for Rooms 1 through 9", () => {
@@ -223,6 +225,47 @@ describe("Room Level Configurations (Rooms 1 to 19)", () => {
     expect(sequence[9].enemies.some((e) => e.type === "boss")).toBe(true);
     expect(sequence[14].enemies.some((e) => e.type === "boss")).toBe(true);
     expect(sequence[19].enemies.some((e) => e.type === "boss" && e.bossName === CHRONO_ZENITH_BLUEPRINT.name)).toBe(true);
+  });
+
+  it("Room 3 chicane maintains passable corridor openings of at least 70px around central pillar", () => {
+    const r3 = createRoom3();
+    const barrierTop = r3.obstacles.find((o) => o.id === "barrier-top")!;
+    const barrierBottom = r3.obstacles.find((o) => o.id === "barrier-bottom")!;
+    const pillarMid = r3.obstacles.find((o) => o.id === "pillar-mid")!;
+
+    expect(barrierTop).toBeDefined();
+    expect(barrierBottom).toBeDefined();
+    expect(pillarMid).toBeDefined();
+
+    // Top gap between barrier-top bottom and pillar-mid top
+    const topGap = pillarMid.bounds.min.y - barrierTop.bounds.max.y;
+    expect(topGap).toBeGreaterThanOrEqual(70);
+
+    // Bottom gap between pillar-mid bottom and barrier-bottom top
+    const bottomGap = barrierBottom.bounds.min.y - pillarMid.bounds.max.y;
+    expect(bottomGap).toBeGreaterThanOrEqual(70);
+  });
+
+  it("Rooms 17, 18, and 20 hostiles spawn outside all obstacle hitboxes with clean physical clearance", () => {
+    const checkedRooms = [createRoom17(), createRoom18(), createRoom20()];
+
+    for (const room of checkedRooms) {
+      for (const enemy of room.enemies) {
+        const radius = enemy.radius ?? 15;
+        for (const obs of room.obstacles) {
+          const collision = testCircleAABB(
+            vec2(enemy.x, enemy.y),
+            radius,
+            obs.bounds.min,
+            obs.bounds.max
+          );
+          expect(
+            collision,
+            `Enemy ${enemy.id} in ${room.id} collided with ${obs.id}`
+          ).toBeNull();
+        }
+      }
+    }
   });
 });
 
