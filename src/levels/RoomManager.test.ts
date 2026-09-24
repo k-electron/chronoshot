@@ -421,59 +421,74 @@ describe("RoomManager Tactical Puzzle Progression", () => {
     expect(ctx.fillText).toHaveBeenCalledWith(
       "MISSION ACCOMPLISHED",
       480,
-      245
+      115
     );
     expect(ctx.fillText).toHaveBeenCalledWith(
       "ALL 20 TACTICAL PROTOCOLS CONQUERED",
       480,
-      300
+      150
     );
     expect(ctx.fillText).toHaveBeenCalledWith(
       "✓ Goliath-01 Defeated    |    ✓ Chrono-Weaver Neutralized",
       480,
-      340
+      200
     );
     expect(ctx.fillText).toHaveBeenCalledWith(
       "✓ Vektor-Prime Obliterated    |    ✓ Chrono-Zenith Overthrown",
       480,
-      362
+      224
     );
   });
 
-  describe("Room 20 Golden Portal & Endless Mode Transition", () => {
-    it("identifies golden portal only on Room 20 when unlocked", () => {
+  describe("Boss Room & Endless Portal Suppression", () => {
+    it("suppresses floor portal rendering in all boss rooms (Rooms 5, 10, 15, 20) and endless mode", async () => {
       const manager = new RoomManager();
 
-      // Room 1 unlocked: normal portal
-      manager.setExitUnlocked(true);
-      expect(manager.isGoldenPortal()).toBe(false);
+      // Standard room (Room 1): portal renders
+      const ctx1 = createMockContext();
+      manager.renderPortal(ctx1, 0.016);
+      expect(ctx1.beginPath).toHaveBeenCalled();
 
-      // Advance to Room 20
-      for (let i = 1; i <= 19; i++) {
+      // Advance to Room 5 (Goliath-01)
+      for (let i = 1; i <= 4; i++) {
+        manager.advanceRoom();
+      }
+      expect(manager.getCurrentRoom().roomNumber).toBe(5);
+      expect(manager.isBossRoom()).toBe(true);
+
+      const ctxBoss5 = createMockContext();
+      manager.renderPortal(ctxBoss5, 0.016);
+      expect(ctxBoss5.beginPath).not.toHaveBeenCalled();
+
+      // Advance to Room 20 (Chrono-Zenith)
+      for (let i = 5; i <= 19; i++) {
         manager.advanceRoom();
       }
       expect(manager.getCurrentRoom().roomNumber).toBe(20);
+      expect(manager.isBossRoom()).toBe(true);
 
-      // Locked Room 20: not golden yet
-      expect(manager.isExitUnlocked()).toBe(false);
-      expect(manager.isGoldenPortal()).toBe(false);
-
-      // Unlocked Room 20: radiant golden portal!
+      const ctxBoss20 = createMockContext();
       manager.setExitUnlocked(true);
-      expect(manager.isGoldenPortal()).toBe(true);
-    });
+      manager.renderPortal(ctxBoss20, 0.016);
+      expect(ctxBoss20.beginPath).not.toHaveBeenCalled();
+      expect(ctxBoss20.fillText).not.toHaveBeenCalled();
 
-    it("renders golden portal visuals and label on Room 20", () => {
-      const manager = new RoomManager();
-      for (let i = 1; i <= 19; i++) {
-        manager.advanceRoom();
-      }
-      manager.setExitUnlocked(true);
+      // In Endless Mode: portal is also suppressed
+      manager.startEndlessMode();
+      expect(manager.isEndlessMode()).toBe(true);
+      const ctxEndless = createMockContext();
+      manager.renderPortal(ctxEndless, 0.016);
+      expect(ctxEndless.beginPath).not.toHaveBeenCalled();
 
-      const ctx = createMockContext();
-      manager.renderPortal(ctx, 0.016);
-
-      expect(ctx.fillText).toHaveBeenCalledWith("ENDLESS GATE", 0, expect.any(Number));
+      // In procedural seeded campaign non-boss room: portal renders normally
+      const { LevelDirector } = await import("./LevelDirector");
+      const proceduralManager = new RoomManager(new LevelDirector({ seed: 123 }));
+      expect(proceduralManager.getCurrentRoom().roomNumber).toBe(1);
+      expect(proceduralManager.isBossRoom()).toBe(false);
+      const ctxProcedural = createMockContext();
+      proceduralManager.setExitUnlocked(true);
+      proceduralManager.renderPortal(ctxProcedural, 0.016);
+      expect(ctxProcedural.beginPath).toHaveBeenCalled();
     });
 
     it("transitions seamlessly into Endless Survival Mode via startEndlessMode()", () => {

@@ -147,6 +147,6 @@ The boss combat system SHALL support the Chrono-Zenith Zero Sovereign milestone 
 
 #### Scenario: Destruction of Chrono-Zenith core
 - **WHEN** a player projectile strikes Chrono-Zenith's exposed core in phase four
-- **THEN** the boss is eliminated with a radiant geometric particle supernova, triggers victory audio fanfare, and unlocks the golden exit portal
+- **THEN** the boss is eliminated with a radiant geometric particle supernova, triggers victory audio fanfare, suppresses intermediate upgrade drafts, and immediately activates the campaign victory sequence
 
 

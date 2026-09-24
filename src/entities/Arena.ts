@@ -36,6 +36,7 @@ import { reactiveShield } from "../upgrades/definitions/reactiveShield";
 import { speedLoader } from "../upgrades/definitions/speedLoader";
 import { UpgradeDraftHUD } from "../ui/UpgradeDraftHUD";
 import { DefeatHUD } from "../ui/DefeatHUD";
+import { VictoryHUD } from "../ui/VictoryHUD";
 
 export type ArenaStatus = "playing" | "victory" | "defeat";
 
@@ -49,6 +50,7 @@ export interface ArenaInput {
   dash?: boolean;
   togglePause?: boolean;
   upgradeChoice?: 1 | 2 | 3 | number;
+  endlessChoice?: boolean;
 }
 
 export class Arena {
@@ -78,6 +80,7 @@ export class Arena {
   public activeUpgradeDraft: UpgradeDefinition[] = [];
   public hoveredUpgradeCardIndex: number | null = null;
   public hoveredDefeatCardIndex: number | null = null;
+  public hoveredVictoryCardIndex: number | null = null;
   public checkpointLoadouts: Map<number, string[]> = new Map();
 
   constructor(
@@ -228,6 +231,8 @@ export class Arena {
       this.loadRoom(endlessRoom);
     }
     this.player.equipFullEndlessLoadout();
+    this.status = "playing";
+    this.hoveredVictoryCardIndex = null;
   }
 
   /**
@@ -350,6 +355,37 @@ export class Arena {
       return;
     } else {
       this.hoveredDefeatCardIndex = null;
+    }
+
+    // In victory state, track hovered victory card and process victory actions
+    if (this.status === "victory") {
+      this.hoveredVictoryCardIndex = VictoryHUD.getCardAt(
+        input.mousePos.x,
+        input.mousePos.y,
+        this.width,
+        this.height
+      );
+
+      if (
+        input.endlessChoice ||
+        (input.shoot && this.hoveredVictoryCardIndex === 0)
+      ) {
+        this.startEndlessMode();
+        return;
+      }
+
+      if (
+        input.fullReset ||
+        input.restart ||
+        (input.shoot && this.hoveredVictoryCardIndex === 1)
+      ) {
+        this.restart();
+        return;
+      }
+
+      return;
+    } else {
+      this.hoveredVictoryCardIndex = null;
     }
 
     // Instant room restart trigger
@@ -486,10 +522,7 @@ export class Arena {
         )
       ) {
         this.soundSynth?.playVictory(this.timeGovernor.getTimeScale());
-        if (this.roomManager.getCurrentRoom().roomNumber === 20) {
-          // Room 20 completion: golden portal warps into Endless Mode!
-          this.startEndlessMode();
-        } else if (this.roomManager.hasNextRoom()) {
+        if (this.roomManager.hasNextRoom()) {
           this.roomManager.advanceRoom();
           this.loadRoom(this.roomManager.getCurrentRoom());
         } else {
@@ -598,7 +631,17 @@ export class Arena {
               if (enemy.isBoss) {
                 this.soundSynth?.playBossDefeat(this.timeGovernor.getTimeScale());
                 this.particles.emitShatter(hit.point, 36, "#ff2a44", 320);
-                this.openUpgradeDraft();
+                const isFinalBoss =
+                  this.roomManager &&
+                  (this.roomManager.getCurrentRoom().roomNumber === 20 ||
+                    !this.roomManager.hasNextRoom());
+                if (isFinalBoss) {
+                  this.soundSynth?.playVictory(this.timeGovernor.getTimeScale());
+                  this.status = "victory";
+                  this.roomManager?.advanceRoom();
+                } else {
+                  this.openUpgradeDraft();
+                }
               } else {
                 this.soundSynth?.playShatter(this.timeGovernor.getTimeScale());
                 this.particles.emitShatter(hit.point, 18, "#ff2a44", 220);
@@ -640,10 +683,7 @@ export class Arena {
         )
       ) {
         this.soundSynth?.playVictory(this.timeGovernor.getTimeScale());
-        if (this.roomManager.getCurrentRoom().roomNumber === 20) {
-          // Room 20 completion: golden portal warps into Endless Mode!
-          this.startEndlessMode();
-        } else if (this.roomManager.hasNextRoom()) {
+        if (this.roomManager.hasNextRoom()) {
           this.roomManager.advanceRoom();
           this.loadRoom(this.roomManager.getCurrentRoom());
         } else {
@@ -963,7 +1003,7 @@ export class Arena {
       );
     } else if (this.status === "victory") {
       if (this.roomManager && this.roomManager.isGameCompleted()) {
-        this.roomManager.renderGameVictory(ctx, this.width, this.height);
+        this.roomManager.renderGameVictory(ctx, this.width, this.height, this.hoveredVictoryCardIndex);
       } else {
         ctx.save();
         ctx.fillStyle = "rgba(4, 12, 16, 0.85)";
@@ -1182,7 +1222,22 @@ export class Arena {
       return "default";
     }
 
-    if (this.isPaused || this.status === "victory") {
+    if (this.status === "victory") {
+      if (mousePos) {
+        const cardIndex = VictoryHUD.getCardAt(
+          mousePos.x,
+          mousePos.y,
+          this.width,
+          this.height
+        );
+        if (cardIndex !== null) {
+          return "pointer";
+        }
+      }
+      return "default";
+    }
+
+    if (this.isPaused) {
       return "default";
     }
 

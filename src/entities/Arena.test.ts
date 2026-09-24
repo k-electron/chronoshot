@@ -759,7 +759,7 @@ describe("Combat Arena & Room Loop", () => {
   });
 
   describe("Endless Mode & Final Boss Integration", () => {
-    it("transitions into Endless Mode upon Room 20 golden portal entry and equips full loadout", () => {
+    it("triggers campaign victory on Room 20 final boss destruction and transitions into Endless Mode via victory screen", () => {
       const roomManager = new RoomManager();
       const arena = new Arena(960, 640, roomManager);
 
@@ -773,27 +773,55 @@ describe("Combat Arena & Room Loop", () => {
       expect(roomManager.getCurrentRoom().roomNumber).toBe(20);
       expect(arena.endlessDirector).toBeUndefined();
 
-      // Slay Chrono-Zenith and escorts
-      for (const enemy of arena.enemies) {
-        enemy.isAlive = false;
+      const zenith = arena.enemies.find((e) => e.isBoss);
+      expect(zenith).toBeDefined();
+
+      // Configure Zenith to exposed 0-shield core (Phase 4)
+      if (zenith!.phaseController) {
+        zenith!.phaseController.currentPhaseIndex = 3;
       }
+      zenith!.shields = 0;
 
-      // Check victory unlocks portal
-      roomManager.updateEnemyState(arena.enemies);
-      expect(roomManager.isExitUnlocked()).toBe(true);
-      expect(roomManager.isGoldenPortal()).toBe(true);
+      // Slay Chrono-Zenith with lethal shot
+      const lethalShot = createProjectile(
+        "lethal-shot",
+        vec2(zenith!.position.x - 45, zenith!.position.y),
+        0,
+        1000,
+        "player"
+      );
+      arena.projectiles.push(lethalShot);
 
-      // Move player into exit portal
-      const portal = roomManager.getCurrentRoom().exitPortal;
-      arena.player.position = vec2(portal.x, portal.y);
-
-      // Step arena to trigger portal stepping
-      arena.step(0.016, {
-        moveDir: vec2(0, 0),
+      arena.step(0.05, {
+        moveDir: vec2(1, 0),
         mousePos: vec2(500, 320),
         shoot: false,
         reload: false,
         restart: false,
+      });
+
+      // Zenith is eliminated and triggers immediate campaign victory without intermediate draft
+      expect(zenith!.isAlive).toBe(false);
+      expect(arena.isUpgradeDraftActive).toBe(false);
+      expect(arena.status).toBe("victory");
+      expect(roomManager.isGameCompleted()).toBe(true);
+
+      // Desired cursor reflects victory card hovering
+      // Card 0 (Endless): x: 170..460, y: 295..485
+      expect(arena.getDesiredCursor(vec2(250, 350))).toBe("pointer");
+      // Card 1 (Reset): x: 500..790, y: 295..485
+      expect(arena.getDesiredCursor(vec2(600, 350))).toBe("pointer");
+      // Outside cards
+      expect(arena.getDesiredCursor(vec2(100, 100))).toBe("default");
+
+      // Select Card 0 (Endless Protocol) via endlessChoice (key [E] or [Space])
+      arena.step(0.016, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(250, 350),
+        shoot: false,
+        reload: false,
+        restart: false,
+        endlessChoice: true,
       });
 
       // Seamlessly transitioned to Endless Survival Mode!
@@ -817,6 +845,55 @@ describe("Combat Arena & Room Loop", () => {
       expect(arena.player.maxShields).toBe(3);
       expect(arena.player.weapon.getAmmo()).toBe(8);
       expect(arena.player.weapon.getMagSize()).toBe(8);
+    });
+
+    it("resets expedition back to Room 1 when Card 2 (Reset) is selected on victory screen", () => {
+      const roomManager = new RoomManager();
+      const arena = new Arena(960, 640, roomManager);
+
+      for (let i = 1; i <= 19; i++) {
+        roomManager.advanceRoom();
+      }
+      arena.loadRoom(roomManager.getCurrentRoom());
+
+      // Slay boss to trigger victory
+      const zenith = arena.enemies.find((e) => e.isBoss);
+      if (zenith!.phaseController) {
+        zenith!.phaseController.currentPhaseIndex = 3;
+      }
+      zenith!.shields = 0;
+
+      const lethalShot = createProjectile(
+        "lethal-shot",
+        vec2(zenith!.position.x - 45, zenith!.position.y),
+        0,
+        1000,
+        "player"
+      );
+      arena.projectiles.push(lethalShot);
+      arena.step(0.05, {
+        moveDir: vec2(1, 0),
+        mousePos: vec2(500, 320),
+        shoot: false,
+        reload: false,
+        restart: false,
+      });
+
+      expect(arena.status).toBe("victory");
+
+      // Click Card 1 (Reset)
+      arena.step(0.016, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(600, 350), // Over Card 1
+        shoot: true,
+        reload: false,
+        restart: false,
+      });
+
+      expect(arena.status).toBe("playing");
+      expect(roomManager.getCurrentRoomIndex()).toBe(0);
+      expect(roomManager.getCurrentRoom().roomNumber).toBe(1);
+      expect(roomManager.isGameCompleted()).toBe(false);
     });
 
     it("spawns reinforcement waves dynamically via EndlessDirector and tracks kills", () => {

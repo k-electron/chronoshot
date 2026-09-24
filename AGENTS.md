@@ -58,6 +58,10 @@ ChronoShot is deliberately engineered without heavy third-party game engines (no
 - **Hairline Revolver Dial (`src/ui/CylinderHUD.ts`)**: Minimalist 6-chamber dial (dynamically expandable to 8 chambers with Extended Cylinder) with active chamber alignment notch, smooth rotational transition, incremental chamber seating visuals, and emergency dash abort prompt.
 - **Hairline Chrono-Telemetry (`src/ui/TimeHUD.ts`)**: Top-right gauge displaying numeric multiplier (`CHRONO // 0.05x`) and transient action burst pills.
 - **Phase-Aware Boss Telemetry (`src/ui/BossTelemetryHUD.ts`) & Endless Telemetry (`src/ui/EndlessTelemetryHUD.ts`)**: Decoupled top-center boss telemetry rendering boss designation, active phase badges (e.g. `PHASE 2/2 // OVERDRIVE`), and shield charge pips. In Endless Mode, in-canvas telemetry displays real-time threat budget, elapsed survival time (MM:SS), and kill counter.
+- **Campaign Victory HUD (`src/ui/VictoryHUD.ts`)**: Decoupled Swiss-style mission accomplished overlay celebrating completion of all 20 tactical protocols. Features milestone boss checkmarks and dual interactive cards:
+  - **Card 0: Endless Protocol** (<kbd>E</kbd>, <kbd>Space</kbd>, or mouse click) transitions directly into Endless Survival Mode in the Apex Colosseum with maxed loadout (all 7 augmentations, 3 shields, 8 rounds).
+  - **Card 1: Expedition Reset** (<kbd>R</kbd>, <kbd>Shift+R</kbd>, or mouse click) resets the expedition back to Room 1 with clean starter loadout.
+  - Interactive hover state dynamically shifts reticle cursor to `"pointer"` and applies hairline accent frames.
 - **Defeat HUD (`src/ui/DefeatHUD.ts`) & Cascading Boss Rollback (`src/levels/RollbackCalculator.ts`)**: Interactive elimination overlay. In Sector 1 (Rooms 1–5), collapses to a single centered **Expedition Reset** card (<kbd>R</kbd>, <kbd>Shift+R</kbd>, or click) to restart at Room 1. In Sectors 2–4 (Rooms 6–20) and Endless Mode, presents dual cards: **Card 1: Rollback** (<kbd>R</kbd> or click) and **Card 2: Full Reset** (<kbd>Shift+R</kbd> or click). Rollback evaluates the failure room and cascades tier-by-tier down to the beginning of the preceding boss fight (Rooms 6–10 $\to$ Room 5, Rooms 11–15 $\to$ Room 10, Rooms 16–20 $\to$ Room 15, Endless Mode $\to$ Room 20), restoring clean pre-boss upgrade snapshots. In Endless Mode, defeat renders a survival performance tally (elapsed time, max threat reached, hostiles eliminated).
 - **Tactical Upgrade Draft & Pipeline (`src/upgrades/` & `src/ui/UpgradeDraftHUD.ts`)**: Data-driven roguelike upgrade pipeline (`UpgradePipeline`) with centralized registry (`UpgradeRegistry`), dynamic $N$-card draft UI (`UpgradeDraftHUD`), stack control, and compounded modifiers. Baseline augmentations (Extended Cylinder, Speed Loader, Reactive Shield) and advanced perks (Kinetic Stride, Chrono Burst, Phase Deflector, Overcharge Dash).
 - **Pause Lifecycle**: Toggleable with <kbd>Esc</kbd> or <kbd>P</kbd>. Halts simulation ticks and displays a frosted Swiss-style control matrix card.
@@ -67,7 +71,12 @@ ChronoShot is deliberately engineered without heavy third-party game engines (no
 - **`EncounterDirector`**: Threat-budget encounter synthesizer selecting hostile archetypes dynamically based on difficulty tier while enforcing composition constraints (max 2 snipers, frontliner escort rules) and geometric separation ($\ge 48\text{px}$ between units, outside obstacle collision boxes).
 - **`EndlessDirector`**: Survival mode wave coordinator dynamically tracking active threat load against a climbing simulation threat budget ($50 + \lfloor \text{ticks}/120 \rfloor \times 5$), safely filtering spatial candidates ($\ge 350\text{px}$ from player, $\ge 48\text{px}$ unit clearance), and queuing 30-tick visual telegraph rings before unit materialization.
 - **`LevelDirector`**: Deterministic Mulberry32 PRNG engine producing reproducible room configurations from numeric or string seeds, with automated milestone boss injection every 5th room (Sector 1: Goliath-01, Sector 2: Chrono-Weaver, Sector 3: Vektor-Prime, Sector 4: Chrono-Zenith).
-- **`RoomManager` Dynamic Mode**: Seamlessly switches between classic fixed campaign sequences (20 rooms) and endless procedural room streams upon portal entry. Completing Room 20 unlocks a golden exit gate directly transitioning into Endless Survival Mode with full loadout injection (all 7 upgrades equipped, 3 shields, 8 rounds).
+- **`RoomManager` & Progression Architecture**:
+  - Regular rooms (1–4, 6–9, 11–14, 16–19) unlock radiant cyan exit portals upon clearing all hostiles; stepping into the portal advances to the next room.
+  - Boss arenas (Rooms 5, 10, 15, 20) and the Endless Colosseum completely suppress floor portals (no zombie inactive portals).
+  - Intermediate bosses (Rooms 5, 10, 15) trigger an immediate freeze-frame upgrade draft upon elimination; selecting an upgrade automatically advances the operative into the subsequent sector.
+  - Final boss Chrono-Zenith (Room 20) bypasses intermediate drafts upon elimination and immediately triggers the Campaign Victory HUD (`status = "victory"` and `roomManager.advanceRoom()`, marking `isGameCompleted = true`).
+  - Selecting **Endless Protocol** on the Victory HUD deploys into Endless Survival Mode in the Apex Colosseum with full loadout injection (all 7 upgrades equipped, 3 shields, 8 rounds).
 
 ---
 
@@ -104,7 +113,7 @@ npm run dev
    - Use mock Canvas 2D contexts (`createMockContext()`) with `vi.fn()` for rendering tests.
    - Use mock audio contexts to verify audio trigger calls without requiring real audio devices.
 3. **Keep Tests Fast & Deterministic**:
-   - The entire suite (511+ tests) runs in under 700ms. Avoid arbitrary `setTimeout` or wall-clock waits in tests.
+   - The entire suite (690+ tests) runs in under 900ms. Avoid arbitrary `setTimeout` or wall-clock waits in tests.
 
 ---
 

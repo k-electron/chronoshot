@@ -50,6 +50,7 @@ window.addEventListener("DOMContentLoaded", () => {
   let fullResetRequested = false;
   let pauseRequested = false;
   let upgradeChoiceRequested: 1 | 2 | 3 | number | undefined = undefined;
+  let endlessChoiceRequested = false;
   let isMuted = false;
 
   // Window coordinate mapping for canvas scaling
@@ -86,6 +87,13 @@ window.addEventListener("DOMContentLoaded", () => {
       }
     }
 
+    if (arena.status === "victory") {
+      if (e.code === "KeyE" || e.code === "Space") {
+        endlessChoiceRequested = true;
+        return;
+      }
+    }
+
     if (e.code === "Escape" || e.code === "KeyP") {
       e.preventDefault();
       pauseRequested = true;
@@ -99,7 +107,11 @@ window.addEventListener("DOMContentLoaded", () => {
           restartRequested = true;
         }
       } else if (arena.status === "victory") {
-        restartRequested = true;
+        if (e.shiftKey) {
+          fullResetRequested = true;
+        } else {
+          restartRequested = true;
+        }
       } else if (e.shiftKey) {
         // Shift+R quick restart of current room
         restartRequested = true;
@@ -133,10 +145,8 @@ window.addEventListener("DOMContentLoaded", () => {
     if (e.button === 0) {
       const coords = getCanvasCoords(e);
       mousePos = vec2(coords.x, coords.y);
-      if (arena.status === "defeat") {
+      if (arena.status === "defeat" || arena.status === "victory") {
         shootRequested = true;
-      } else if (arena.status === "victory") {
-        restartRequested = true;
       } else if (arena.isPaused) {
         pauseRequested = true;
       } else {
@@ -173,6 +183,7 @@ window.addEventListener("DOMContentLoaded", () => {
       fullReset: fullResetRequested,
       togglePause: pauseRequested,
       upgradeChoice: upgradeChoiceRequested,
+      endlessChoice: endlessChoiceRequested,
     };
 
     // Reset single-frame triggers
@@ -183,6 +194,7 @@ window.addEventListener("DOMContentLoaded", () => {
     fullResetRequested = false;
     pauseRequested = false;
     upgradeChoiceRequested = undefined;
+    endlessChoiceRequested = false;
 
     // Step physics & fixed simulation
     arena.step(wallDeltaTime, input);
