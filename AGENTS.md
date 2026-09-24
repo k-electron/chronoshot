@@ -66,17 +66,16 @@ ChronoShot is deliberately engineered without heavy third-party game engines (no
 - **Tactical Upgrade Draft & Pipeline (`src/upgrades/` & `src/ui/UpgradeDraftHUD.ts`)**: Data-driven roguelike upgrade pipeline (`UpgradePipeline`) with centralized registry (`UpgradeRegistry`), dynamic $N$-card draft UI (`UpgradeDraftHUD`), stack control, and compounded modifiers. Baseline augmentations (Extended Cylinder, Speed Loader, Reactive Shield) and advanced perks (Kinetic Stride, Chrono Burst, Phase Deflector, Overcharge Dash).
 - **Pause Lifecycle**: Toggleable with <kbd>Esc</kbd> or <kbd>P</kbd>. Halts simulation ticks and displays a frosted Swiss-style control matrix card.
 
-### 6. Modular Level Director, Endless Director & Procedural Generation
-- **`RoomLayoutTemplate` & `DEFAULT_LAYOUT_REGISTRY`**: Composable tactical geometry layouts (`CenterPillarsTemplate`, `TwinBunkersTemplate`, `SplitCorridorTemplate`, `KillboxLanesTemplate`, `ArenaQuadrantTemplate`, `ApexRedoubtTemplate`, `ApexColosseumTemplate`) with verified spawn safety ($\ge 280\text{px}$ from player spawn).
-- **`EncounterDirector`**: Threat-budget encounter synthesizer selecting hostile archetypes dynamically based on difficulty tier while enforcing composition constraints (max 2 snipers, frontliner escort rules) and geometric separation ($\ge 48\text{px}$ between units, outside obstacle collision boxes).
-- **`EndlessDirector`**: Survival mode wave coordinator dynamically tracking active threat load against a climbing simulation threat budget ($50 + \lfloor \text{ticks}/120 \rfloor \times 5$), safely filtering spatial candidates ($\ge 350\text{px}$ from player, $\ge 48\text{px}$ unit clearance), and queuing 30-tick visual telegraph rings before unit materialization.
-- **`LevelDirector`**: Deterministic Mulberry32 PRNG engine producing reproducible room configurations from numeric or string seeds, with automated milestone boss injection every 5th room (Sector 1: Goliath-01, Sector 2: Chrono-Weaver, Sector 3: Vektor-Prime, Sector 4: Chrono-Zenith).
+### 6. Progression Architecture, Endless Director & Playtest Bypass
 - **`RoomManager` & Progression Architecture**:
+  - Discrete lifecycle manager coordinating sequential progression across 20 handcrafted rooms (Sectors 1–4).
   - Regular rooms (1–4, 6–9, 11–14, 16–19) unlock radiant cyan exit portals upon clearing all hostiles; stepping into the portal advances to the next room.
   - Boss arenas (Rooms 5, 10, 15, 20) and the Endless Colosseum completely suppress floor portals (no zombie inactive portals).
   - Intermediate bosses (Rooms 5, 10, 15) trigger an immediate freeze-frame upgrade draft upon elimination; selecting an upgrade automatically advances the operative into the subsequent sector.
   - Final boss Chrono-Zenith (Room 20) bypasses intermediate drafts upon elimination and immediately triggers the Campaign Victory HUD (`status = "victory"` and `roomManager.advanceRoom()`, marking `isGameCompleted = true`).
   - Selecting **Endless Protocol** on the Victory HUD deploys into Endless Survival Mode in the Apex Colosseum with full loadout injection (all 7 upgrades equipped, 3 shields, 8 rounds).
+- **`EndlessDirector` & `ApexColosseumTemplate`**: Survival mode wave coordinator dynamically tracking active threat load against a climbing simulation threat budget ($50 + \lfloor \text{ticks}/120 \rfloor \times 5$), safely filtering spatial candidates ($\ge 350\text{px}$ from player, $\ge 48\text{px}$ unit clearance, zero obstacle overlap), and queuing 30-tick visual telegraph rings before unit materialization. Self-contains archetype threat costs (`THREAT_COSTS`) and cadence timings (`ARCHETYPE_CONFIGS`).
+- **Playtest Campaign Bypass (`?skip`)**: Fast developer/playtest hook (`Arena.bypassToCampaignVictory()`) activated via the `?skip` URL query parameter. Directly initializes the operative into the post-Zenith campaign victory screen with completed Room 20 status, pre-Zenith loadout (Extended Cylinder, Speed Loader, Reactive Shield), historical checkpoint snapshots (Rooms 5, 10, 15, 20), and fully functional interactive cards for Endless Protocol and Expedition Reset.
 
 ---
 

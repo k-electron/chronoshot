@@ -1,10 +1,33 @@
 import { describe, expect, it } from "vitest";
 import { testCircleAABB } from "../math/collision";
 import { vec2, vecDistance } from "../math/vector";
-import { EndlessDirector } from "./EndlessDirector";
-import { ApexColosseumTemplate } from "./templates/ApexColosseumTemplate";
+import {
+  ApexColosseumTemplate,
+} from "./templates/ApexColosseumTemplate";
+import {
+  ARCHETYPE_CONFIGS,
+  EndlessDirector,
+  THREAT_COSTS,
+} from "./EndlessDirector";
 
 describe("EndlessDirector Threat Budget & Dynamic Spawner", () => {
+  describe("Threat Constants & Archetype Timings", () => {
+    it("exports valid threat costs and archetype configs", () => {
+      expect(THREAT_COSTS.grunt).toBe(10);
+      expect(THREAT_COSTS.shotgun).toBe(20);
+      expect(THREAT_COSTS.stalker).toBe(25);
+      expect(THREAT_COSTS.warden).toBe(35);
+      expect(THREAT_COSTS.sniper).toBe(40);
+      expect(THREAT_COSTS.boss).toBe(120);
+
+      expect(ARCHETYPE_CONFIGS.grunt.fireCadenceTicks).toBe(50);
+      expect(ARCHETYPE_CONFIGS.shotgun.fireCadenceTicks).toBe(80);
+      expect(ARCHETYPE_CONFIGS.stalker.fireCadenceTicks).toBe(32);
+      expect(ARCHETYPE_CONFIGS.warden.fireCadenceTicks).toBe(65);
+      expect(ARCHETYPE_CONFIGS.sniper.fireCadenceTicks).toBe(110);
+    });
+  });
+
   describe("Threat Curve & Telemetry Metrics", () => {
     it("calculates escalating threat budget correctly based on simulation ticks", () => {
       const director = new EndlessDirector();

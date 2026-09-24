@@ -15,7 +15,6 @@
 import { vecDistance, Vector2D } from "../math/vector";
 import { truncateText } from "../ui/textUtils";
 import { createStandardRoomSequence, RoomConfig } from "./Room";
-import { LevelDirector } from "./LevelDirector";
 import { EndlessDirector } from "./EndlessDirector";
 import { ApexColosseumTemplate } from "./templates/ApexColosseumTemplate";
 import { computeRollbackTarget, RollbackTarget } from "./RollbackCalculator";
@@ -40,7 +39,6 @@ export function createEndlessSurvivalRoom(width = 960, height = 640): RoomConfig
 }
 
 export class RoomManager {
-  public readonly levelDirector?: LevelDirector;
   public endlessDirector?: EndlessDirector;
   private rooms: RoomConfig[];
   private currentRoomIndex: number = 0;
@@ -48,12 +46,9 @@ export class RoomManager {
   private gameCompleted: boolean = false;
   private portalAnimationTimer: number = 0;
 
-  constructor(roomsOrDirector?: RoomConfig[] | LevelDirector) {
-    if (roomsOrDirector instanceof LevelDirector) {
-      this.levelDirector = roomsOrDirector;
-      this.rooms = [this.levelDirector.generateRoom(1)];
-    } else if (Array.isArray(roomsOrDirector) && roomsOrDirector.length > 0) {
-      this.rooms = roomsOrDirector;
+  constructor(rooms?: RoomConfig[]) {
+    if (Array.isArray(rooms) && rooms.length > 0) {
+      this.rooms = rooms;
     } else {
       this.rooms = createStandardRoomSequence();
     }
@@ -66,7 +61,7 @@ export class RoomManager {
    * Returns whether the manager is running in dynamic endless mode.
    */
   public isEndlessMode(): boolean {
-    return this.levelDirector !== undefined || this.endlessDirector !== undefined;
+    return this.endlessDirector !== undefined;
   }
 
   /**
@@ -125,10 +120,10 @@ export class RoomManager {
 
   /**
    * Returns whether there is a subsequent room after the current one.
-   * In endless mode (with LevelDirector or EndlessDirector), always returns true.
+   * In endless mode (with EndlessDirector), always returns true.
    */
   public hasNextRoom(): boolean {
-    if (this.levelDirector || this.endlessDirector) {
+    if (this.endlessDirector) {
       return true;
     }
     return this.currentRoomIndex < this.rooms.length - 1;
@@ -175,21 +170,11 @@ export class RoomManager {
 
   /**
    * Advances the sequence to the next room.
-   * In endless mode, synthesizes the subsequent room dynamically.
    * If called on the final campaign room, sets gameCompleted to true.
    *
    * @returns true if progressed to next room; false if final room completed.
    */
   public advanceRoom(): boolean {
-    if (this.levelDirector) {
-      this.currentRoomIndex++;
-      this.exitUnlocked = false;
-      if (this.currentRoomIndex >= this.rooms.length) {
-        this.rooms.push(this.levelDirector.generateRoom(this.currentRoomIndex + 1));
-      }
-      return true;
-    }
-
     if (this.hasNextRoom()) {
       this.currentRoomIndex++;
       this.exitUnlocked = false;
@@ -243,12 +228,6 @@ export class RoomManager {
       }
     }
 
-    if (this.levelDirector) {
-      while (this.rooms.length <= target.roomIndex) {
-        this.rooms.push(this.levelDirector.generateRoom(this.rooms.length + 1));
-      }
-    }
-
     this.currentRoomIndex = target.roomIndex;
     this.exitUnlocked = false;
     this.gameCompleted = false;
@@ -265,12 +244,24 @@ export class RoomManager {
         this.rooms = this.rooms.slice(0, 20);
       }
     }
-    if (this.levelDirector) {
-      this.rooms = [this.levelDirector.generateRoom(1)];
-    }
     this.currentRoomIndex = 0;
     this.exitUnlocked = false;
     this.gameCompleted = false;
+  }
+
+  /**
+   * Directly sets the manager state to completed campaign victory at Room 20 (for playtest bypass).
+   */
+  public bypassToCampaignVictory(): void {
+    if (this.endlessDirector) {
+      this.endlessDirector = undefined;
+      if (this.rooms.length > 20) {
+        this.rooms = this.rooms.slice(0, 20);
+      }
+    }
+    this.currentRoomIndex = Math.min(19, this.rooms.length - 1);
+    this.exitUnlocked = false;
+    this.gameCompleted = true;
   }
 
   /**

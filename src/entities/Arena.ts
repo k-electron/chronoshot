@@ -12,7 +12,7 @@
 import { SoundSynthesizer } from "../audio/SoundSynthesizer";
 import { FixedStepSimulator } from "../engine/FixedStepSimulator";
 import { TimeGovernor } from "../engine/TimeGovernor";
-import { RoomConfig } from "../levels/Room";
+import { createRoom20, RoomConfig } from "../levels/Room";
 import { createEndlessSurvivalRoom, RoomManager } from "../levels/RoomManager";
 import { EndlessDirector, MaterializingUnit } from "../levels/EndlessDirector";
 import { vec2, vecLength, vecNormalize, Vector2D } from "../math/vector";
@@ -233,6 +233,52 @@ export class Arena {
     this.player.equipFullEndlessLoadout();
     this.status = "playing";
     this.hoveredVictoryCardIndex = null;
+  }
+
+  /**
+   * Drops the operative directly onto the post-Zenith campaign victory screen,
+   * matching the exact state as having legitimately conquered Room 20:
+   * - Room 20 completed (gameCompleted = true, currentRoomIndex = 19)
+   * - Pre-Zenith loadout: Extended Cylinder, Speed Loader, Reactive Shield (8 ammo capacity, 1 shield)
+   * - Pre-boss checkpoint loadouts populated for Rooms 5, 10, 15, and 20
+   * - Active Mission Accomplished overlay with interactive cards (Endless Protocol vs Expedition Reset)
+   */
+  public bypassToCampaignVictory(): void {
+    if (this.roomManager) {
+      this.roomManager.bypassToCampaignVictory();
+      this.loadRoom(this.roomManager.getCurrentRoom());
+    } else {
+      this.loadRoom(createRoom20(this.width, this.height));
+    }
+
+    // Neutralize any enemies instantiated by loadRoom
+    this.enemies = [];
+    this.projectiles = [];
+    this.particles.clear();
+    this.isUpgradeDraftActive = false;
+    this.activeUpgradeDraft = [];
+    this.hoveredVictoryCardIndex = null;
+    this.endlessDirector = undefined;
+
+    // Equip pre-Zenith Sector 4 loadout (3 drafted augmentations)
+    const preZenithLoadout = [
+      "extended-cylinder",
+      "speed-loader",
+      "reactive-shield",
+    ];
+    this.player.setLoadoutFromIds(preZenithLoadout);
+    this.player.weapon.reload();
+    if (this.player.maxShields > 0) {
+      this.player.shields = this.player.maxShields;
+    }
+
+    // Populate historical boss checkpoint snapshots
+    this.checkpointLoadouts.set(5, []);
+    this.checkpointLoadouts.set(10, ["extended-cylinder"]);
+    this.checkpointLoadouts.set(15, ["extended-cylinder", "speed-loader"]);
+    this.checkpointLoadouts.set(20, [...preZenithLoadout]);
+
+    this.status = "victory";
   }
 
   /**
