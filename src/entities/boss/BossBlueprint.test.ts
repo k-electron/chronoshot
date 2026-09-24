@@ -217,6 +217,8 @@ describe("BossBlueprint & Multi-Phase Archetypes", () => {
     expect(p1.phaseTitle).toBe("CITADEL BASTION");
     expect(p1.maxShields).toBe(5);
     expect(p1.speed).toBe(45);
+    expect(p1.onPhaseExit).toBeUndefined();
+    expect(p1.onOverloadDetonate).toBeUndefined();
     expect(p1.movement()).toBeInstanceOf(DirectAdvanceBehavior);
     expect(p1.attack()).toBeInstanceOf(AlternatingAttackBehavior);
 
@@ -226,6 +228,7 @@ describe("BossBlueprint & Multi-Phase Archetypes", () => {
     expect(p2.maxShields).toBe(3);
     expect(p2.speed).toBe(95);
     expect(p2.overloadChannelTicks).toBe(75);
+    expect(p2.onOverloadDetonate).toBeDefined();
     expect(p2.movement()).toBeInstanceOf(KiterBehavior);
     expect(p2.attack()).toBeInstanceOf(TelegraphedBeamBehavior);
 
@@ -235,6 +238,7 @@ describe("BossBlueprint & Multi-Phase Archetypes", () => {
     expect(p3.maxShields).toBe(2);
     expect(p3.speed).toBe(105);
     expect(p3.overloadChannelTicks).toBe(65);
+    expect(p3.onOverloadDetonate).toBeDefined();
     expect(p3.movement()).toBeInstanceOf(KiterBehavior);
     expect(p3.attack()).toBeInstanceOf(RadialNovaBehavior);
 
@@ -244,6 +248,7 @@ describe("BossBlueprint & Multi-Phase Archetypes", () => {
     expect(p4.maxShields).toBe(0);
     expect(p4.speed).toBe(125);
     expect(p4.overloadChannelTicks).toBe(60);
+    expect(p4.onOverloadDetonate).toBeDefined();
     expect(p4.movement()).toBeInstanceOf(DirectAdvanceBehavior);
     expect(p4.attack()).toBeInstanceOf(RadialNovaBehavior);
   });

@@ -603,5 +603,123 @@ describe("Enemy - Boss Archetype (Goliath-01)", () => {
       expect(postChannelHit.remainingShields).toBe(2);
       expect(boss.shields).toBe(2);
     });
+
+    it("executes Chrono-Zenith Cataclysm Overload in correct sequence: channel countdown -> detonation -> escort spawn", () => {
+      const boss = new Enemy({
+        id: "chrono-zenith-test",
+        type: "boss",
+        x: 600,
+        y: 320,
+        blueprint: CHRONO_ZENITH_BLUEPRINT,
+      });
+
+      const spawnedEscorts: any[] = [];
+      const mockArena: any = {
+        spawnEnemy: (cfg: any) => {
+          spawnedEscorts.push(cfg);
+          return new Enemy(cfg);
+        },
+        player: null,
+        obstacles: [],
+        status: "playing",
+      };
+
+      const pillar = createObstacle("cover-pillar", 350, 260, 80, 120);
+      const player = new Player({ x: 150, y: 320 });
+      mockArena.player = player;
+      mockArena.obstacles = [pillar];
+
+      if (boss.phaseController) {
+        boss.phaseController.transitionContextExtras = {
+          arena: mockArena,
+          player: player,
+          obstacles: [pillar],
+          particles: { emitShatter: () => {}, emitImpactSparks: () => {} },
+          soundSynth: { playShieldBreak: () => {}, playShieldDeflect: () => {} },
+        };
+      }
+
+      // Step 1: Deplete Phase 0's 5 shields
+      for (let i = 0; i < 5; i++) {
+        boss.takeDamage(1);
+      }
+
+      // Boss has transitioned into Phase 1 Overload channel
+      expect(boss.phaseController?.currentPhaseIndex).toBe(1);
+      expect(boss.isOverloading).toBe(true);
+      expect(boss.isInvulnerable).toBe(true);
+      expect(boss.speed).toBe(0);
+      expect(player.isAlive).toBe(true);
+      // Crucial: Shockwave must NOT have fired yet and escorts must NOT be spawned yet
+      expect(spawnedEscorts).toHaveLength(0);
+
+      // Step 2: Mid-channel shots at tick 30 deflect harmlessly
+      const midHit = boss.takeDamage(1);
+      expect(midHit.deflected).toBe(true);
+      expect(boss.shields).toBe(3);
+
+      // Step 3: Advance 74 ticks (1 tick before detonation)
+      boss.update(player, [pillar], 74);
+      expect(boss.isOverloading).toBe(true);
+      expect(boss.isInvulnerable).toBe(true);
+      expect(spawnedEscorts).toHaveLength(0);
+      expect(player.isAlive).toBe(true);
+
+      // Step 4: Advance the 75th tick -> Detonation!
+      // Player is behind cover (pillar), so takes 0 damage
+      boss.update(player, [pillar], 1);
+      expect(boss.isOverloading).toBe(false);
+      expect(boss.isInvulnerable).toBe(false);
+      expect(boss.speed).toBe(95); // Phase 1 speed restored
+      expect(player.isAlive).toBe(true); // Survived due to cover occlusion
+      expect(spawnedEscorts).toHaveLength(2); // Shotgun + Stalker escorts spawned!
+      expect(spawnedEscorts[0].type).toBe("shotgun");
+      expect(spawnedEscorts[1].type).toBe("stalker");
+
+      // Step 5: Post-channel attacks damage boss
+      const postHit = boss.takeDamage(1);
+      expect(postHit.deflected).toBeUndefined();
+      expect(boss.shields).toBe(2);
+    });
+
+    it("eliminates player exposed in open line of sight when Cataclysm Overload channel expires", () => {
+      const boss = new Enemy({
+        id: "chrono-zenith-open-los",
+        type: "boss",
+        x: 600,
+        y: 320,
+        blueprint: CHRONO_ZENITH_BLUEPRINT,
+      });
+
+      const player = new Player({ x: 150, y: 320 });
+      const mockArena: any = {
+        spawnEnemy: (cfg: any) => new Enemy(cfg),
+        player,
+        obstacles: [],
+        status: "playing",
+      };
+
+      if (boss.phaseController) {
+        boss.phaseController.transitionContextExtras = {
+          arena: mockArena,
+          player,
+          obstacles: [],
+          particles: { emitShatter: () => {}, emitImpactSparks: () => {} },
+          soundSynth: { playShieldBreak: () => {}, playShieldDeflect: () => {}, playShatter: () => {} },
+        };
+      }
+
+      // Break Phase 0 shields
+      for (let i = 0; i < 5; i++) {
+        boss.takeDamage(1);
+      }
+      expect(boss.isOverloading).toBe(true);
+      expect(player.isAlive).toBe(true);
+
+      // Advance 75 ticks in open LOS -> detonation should hit player lethally
+      boss.update(player, [], 75);
+      expect(player.isAlive).toBe(false);
+      expect(mockArena.status).toBe("defeat");
+    });
   });
 });

@@ -45,6 +45,7 @@ export interface BossPhaseConfig {
   onPhaseEnter?: (ctx: BossTransitionContext) => void;
   onPhaseExit?: (ctx: BossTransitionContext) => void;
   overloadChannelTicks?: number;
+  onOverloadDetonate?: (ctx: BossTransitionContext) => void;
 }
 
 /**
@@ -184,7 +185,18 @@ export class BossPhaseController {
     this.phaseElapsedTicks += deltaTicks;
 
     if (this.overloadTicksRemaining > 0) {
+      const prevOverload = this.overloadTicksRemaining;
       this.overloadTicksRemaining = Math.max(0, this.overloadTicksRemaining - deltaTicks);
+
+      if (prevOverload > 0 && this.overloadTicksRemaining === 0) {
+        const detonateCtx: BossTransitionContext = {
+          bossPosition: { ...this.lastBossPosition },
+          currentPhase: this.currentPhaseIndex,
+          nextPhase: this.currentPhaseIndex,
+          ...this.transitionContextExtras,
+        };
+        this.currentPhase.onOverloadDetonate?.(detonateCtx);
+      }
     }
 
     if (!this.hasNextPhase) {

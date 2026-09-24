@@ -535,7 +535,7 @@ export class Arena {
     }
 
     // 3. Update Enemies AI
-    for (const enemy of this.enemies) {
+    for (const enemy of [...this.enemies]) {
       if (enemy.isAlive) {
         const wasCharging = enemy.isChargingLaser;
         const enemyBullets = enemy.update(this.player, this.obstacles, 1, fixedDt);

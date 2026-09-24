@@ -467,5 +467,51 @@ describe("BossPhaseController", () => {
       expect(deflect.deflected).toBe(true);
       expect(controller.shields).toBe(2);
     });
+
+    it("triggers onOverloadDetonate precisely when overload channel expires", () => {
+      const onDetonateSpy = vi.fn();
+      const p0 = createTestPhase(0, {
+        maxShields: 1,
+      });
+      const p1 = createTestPhase(1, {
+        maxShields: 2,
+        overloadChannelTicks: 30,
+        onOverloadDetonate: onDetonateSpy,
+      });
+
+      const controller = new BossPhaseController([p0, p1], vec2(400, 300));
+      controller.transitionContextExtras = { customExtra: "test-val" };
+
+      // Transition to phase 1
+      controller.takeDamage(1, 1);
+      expect(controller.currentPhaseIndex).toBe(1);
+      expect(controller.isOverloading).toBe(true);
+      expect(onDetonateSpy).not.toHaveBeenCalled();
+
+      // Tick 29: still active, should not trigger yet
+      controller.update(29, vec2(405, 305));
+      expect(controller.overloadTicksRemaining).toBe(1);
+      expect(controller.isOverloading).toBe(true);
+      expect(onDetonateSpy).not.toHaveBeenCalled();
+
+      // Tick 30: channel reaches 0, triggers detonation
+      controller.update(1, vec2(410, 310));
+      expect(controller.overloadTicksRemaining).toBe(0);
+      expect(controller.isOverloading).toBe(false);
+      expect(onDetonateSpy).toHaveBeenCalledTimes(1);
+      expect(onDetonateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          bossPosition: { x: 410, y: 310 },
+          currentPhase: 1,
+          nextPhase: 1,
+          customExtra: "test-val",
+        })
+      );
+
+      // Subsequent update should not trigger again
+      controller.update(10, vec2(410, 310));
+      expect(onDetonateSpy).toHaveBeenCalledTimes(1);
+    });
   });
 });
+

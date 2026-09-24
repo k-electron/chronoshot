@@ -927,6 +927,83 @@ describe("Combat Arena & Room Loop", () => {
       );
     });
 
+    it("renders Cataclysm hazard aura during overload countdown and ceases rendering after detonation", () => {
+      const arena = new Arena();
+      const boss = new Enemy({
+        id: "boss-aura-timing",
+        type: "boss",
+        x: 400,
+        y: 300,
+        blueprint: CHRONO_ZENITH_BLUEPRINT,
+      });
+      arena.enemies = [boss];
+
+      // Deplete Phase 0 shields to enter Phase 1 Overload channel
+      for (let i = 0; i < 5; i++) {
+        boss.takeDamage(1);
+      }
+      expect(boss.isOverloading).toBe(true);
+
+      const mockCtx = {
+        save: vi.fn(),
+        restore: vi.fn(),
+        beginPath: vi.fn(),
+        closePath: vi.fn(),
+        arc: vi.fn(),
+        fill: vi.fn(),
+        stroke: vi.fn(),
+        fillRect: vi.fn(),
+        strokeRect: vi.fn(),
+        fillText: vi.fn(),
+        moveTo: vi.fn(),
+        lineTo: vi.fn(),
+        translate: vi.fn(),
+        rotate: vi.fn(),
+        setLineDash: vi.fn(),
+        createLinearGradient: vi.fn().mockReturnValue({ addColorStop: vi.fn() }),
+        createRadialGradient: vi.fn().mockReturnValue({ addColorStop: vi.fn() }),
+      } as unknown as CanvasRenderingContext2D;
+
+      // Render while channel is active (tick 0-74)
+      arena.render(mockCtx, 0.016);
+      expect(mockCtx.fillText).toHaveBeenCalledWith(
+        expect.stringContaining("CATACLYSM OVERLOAD // SEEK COVER"),
+        400,
+        expect.any(Number)
+      );
+
+      // Advance through the remaining 75 ticks to complete overload channel
+      boss.update(arena.player, arena.obstacles, 75);
+      expect(boss.isOverloading).toBe(false);
+
+      const postChannelCtx = {
+        save: vi.fn(),
+        restore: vi.fn(),
+        beginPath: vi.fn(),
+        closePath: vi.fn(),
+        arc: vi.fn(),
+        fill: vi.fn(),
+        stroke: vi.fn(),
+        fillRect: vi.fn(),
+        strokeRect: vi.fn(),
+        fillText: vi.fn(),
+        moveTo: vi.fn(),
+        lineTo: vi.fn(),
+        translate: vi.fn(),
+        rotate: vi.fn(),
+        setLineDash: vi.fn(),
+        createLinearGradient: vi.fn().mockReturnValue({ addColorStop: vi.fn() }),
+        createRadialGradient: vi.fn().mockReturnValue({ addColorStop: vi.fn() }),
+      } as unknown as CanvasRenderingContext2D;
+
+      arena.render(postChannelCtx, 0.016);
+      expect(postChannelCtx.fillText).not.toHaveBeenCalledWith(
+        expect.stringContaining("CATACLYSM OVERLOAD // SEEK COVER"),
+        expect.any(Number),
+        expect.any(Number)
+      );
+    });
+
     it("evaluates desired cursor across combat, upgrade draft, pause, and game over states", () => {
       const arena = new Arena();
 
