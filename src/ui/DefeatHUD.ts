@@ -1,9 +1,11 @@
 /**
  * DefeatHUD module for ChronoShot.
  *
- * Renders the tactical dual-card defeat screen:
- * - Card 1: Checkpoint Rollback ([R] key or mouse click)
- * - Card 2: Full Expedition Reset ([Shift+R] key or mouse click)
+ * Renders the tactical defeat screen:
+ * - Sector 1 (Rooms 1–5): Single centered Expedition Reset card ([R], [Shift+R], or mouse click)
+ * - Sectors 2–4 & Endless: Dual interactive cards:
+ *   - Card 1: Checkpoint Rollback ([R] key or mouse click)
+ *   - Card 2: Full Expedition Reset ([Shift+R] key or mouse click)
  * - Hover detection and interactive pointer cursor integration
  * - Endless Mode survival metrics header display
  */
@@ -23,7 +25,7 @@ export interface DefeatLayout {
   cardH: number;
   cardY: number;
   gap: number;
-  cards: [DefeatCardRect, DefeatCardRect];
+  cards: DefeatCardRect[];
 }
 
 export interface DefeatRenderData {
@@ -42,18 +44,32 @@ export interface DefeatRenderData {
 }
 
 /**
- * Computes bounding boxes for the 2 defeat cards centered within the arena.
+ * Computes bounding boxes for defeat card(s) centered within the arena.
+ * Supports 1 card (Sector 1) or 2 cards (Sectors 2–4 & Endless).
  */
 export function computeDefeatLayout(
   arenaWidth = 960,
-  arenaHeight = 640
+  arenaHeight = 640,
+  cardCount: 1 | 2 = 2
 ): DefeatLayout {
   const cardW = 280;
   const cardH = 200;
   const gap = 40;
+  const cardY = Math.floor(arenaHeight / 2 - 30);
+
+  if (cardCount === 1) {
+    const startX = Math.floor((arenaWidth - cardW) / 2);
+    return {
+      cardW,
+      cardH,
+      cardY,
+      gap,
+      cards: [{ x: startX, y: cardY, width: cardW, height: cardH }],
+    };
+  }
+
   const totalW = cardW * 2 + gap;
   const startX = Math.floor((arenaWidth - totalW) / 2);
-  const cardY = Math.floor(arenaHeight / 2 - 30);
 
   return {
     cardW,
@@ -69,15 +85,16 @@ export function computeDefeatLayout(
 
 export class DefeatHUD {
   /**
-   * Returns index of the defeat card under the given mouse coordinates (0 for Rollback, 1 for Reset, or null).
+   * Returns index of the defeat card under the given mouse coordinates (0 for Rollback or single Reset, 1 for Reset in dual-card mode, or null).
    */
   public static getCardAt(
     mouseX: number,
     mouseY: number,
     arenaWidth = 960,
-    arenaHeight = 640
+    arenaHeight = 640,
+    cardCount: 1 | 2 = 2
   ): 0 | 1 | null {
-    const layout = computeDefeatLayout(arenaWidth, arenaHeight);
+    const layout = computeDefeatLayout(arenaWidth, arenaHeight, cardCount);
     for (let i = 0; i < layout.cards.length; i++) {
       const c = layout.cards[i];
       if (
@@ -161,15 +178,31 @@ export class DefeatHUD {
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // 3. Dual Defeat Cards
-    const layout = computeDefeatLayout(arenaWidth, arenaHeight);
-    const [card0, card1] = layout.cards;
+    // 3. Defeat Card(s)
+    const isSingleCard = data.roomNumber <= 5;
+    const layout = computeDefeatLayout(
+      arenaWidth,
+      arenaHeight,
+      isSingleCard ? 1 : 2
+    );
 
-    // Card 0: Rollback Card
-    this.renderRollbackCard(ctx, card0, data, data.hoveredCardIndex === 0);
+    if (isSingleCard) {
+      this.renderResetCard(
+        ctx,
+        layout.cards[0],
+        data.hoveredCardIndex === 0,
+        "[ R ]",
+        "Restart expedition from Room 01 (0 Augmentations)"
+      );
+    } else {
+      const [card0, card1] = layout.cards;
 
-    // Card 1: Full Reset Card
-    this.renderResetCard(ctx, card1, data.hoveredCardIndex === 1);
+      // Card 0: Rollback Card
+      this.renderRollbackCard(ctx, card0, data, data.hoveredCardIndex === 0);
+
+      // Card 1: Full Reset Card
+      this.renderResetCard(ctx, card1, data.hoveredCardIndex === 1);
+    }
 
     ctx.restore();
   }
@@ -243,7 +276,9 @@ export class DefeatHUD {
   private static renderResetCard(
     ctx: CanvasRenderingContext2D,
     rect: DefeatCardRect,
-    isHovered: boolean
+    isHovered: boolean,
+    shortcutText = "[ SHIFT + R ]",
+    description = "Abandon run & clear augmentations"
   ): void {
     ctx.save();
 
@@ -265,17 +300,18 @@ export class DefeatHUD {
     const midX = rect.x + rect.width / 2;
 
     // Key shortcut badge
+    const badgeWidth = shortcutText.length > 5 ? 90 : 50;
     ctx.fillStyle = "rgba(255, 42, 68, 0.15)";
-    ctx.fillRect(midX - 45, rect.y + 16, 90, 20);
+    ctx.fillRect(midX - badgeWidth / 2, rect.y + 16, badgeWidth, 20);
     ctx.strokeStyle = UITheme.colors.crimson;
     ctx.lineWidth = 1;
-    ctx.strokeRect(midX - 45, rect.y + 16, 90, 20);
+    ctx.strokeRect(midX - badgeWidth / 2, rect.y + 16, badgeWidth, 20);
 
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = getUIFont(11, "bold");
     ctx.fillStyle = UITheme.colors.crimson;
-    ctx.fillText("[ SHIFT + R ]", midX, rect.y + 26);
+    ctx.fillText(shortcutText, midX, rect.y + 26);
 
     // Title
     ctx.font = getUIFont(14, "800");
@@ -290,7 +326,7 @@ export class DefeatHUD {
     // Description
     ctx.font = getUIFont(10, "600");
     ctx.fillStyle = UITheme.colors.textSecondary;
-    ctx.fillText("Abandon run & clear augmentations", midX, rect.y + 116);
+    ctx.fillText(description, midX, rect.y + 116);
 
     // Action Prompt
     ctx.font = getUIFont(11, "bold");

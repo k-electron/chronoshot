@@ -20,8 +20,8 @@ function createMockContext(): CanvasRenderingContext2D {
 }
 
 describe("DefeatHUD", () => {
-  it("computes two centered cards for 960x640 canvas", () => {
-    const layout = computeDefeatLayout(960, 640);
+  it("computes two centered cards for 960x640 canvas in dual-card mode", () => {
+    const layout = computeDefeatLayout(960, 640, 2);
     expect(layout.cards).toHaveLength(2);
     const [card0, card1] = layout.cards;
 
@@ -37,22 +37,79 @@ describe("DefeatHUD", () => {
     expect(card1.x).toBe(180 + 280 + 40); // 500
   });
 
-  it("detects mouse hit inside card 0 and card 1, and null elsewhere", () => {
-    // Card 0 bounds: x in [180..460], y in [290..490]
-    expect(DefeatHUD.getCardAt(250, 350)).toBe(0);
+  it("computes one centered card for 960x640 canvas in single-card mode", () => {
+    const layout = computeDefeatLayout(960, 640, 1);
+    expect(layout.cards).toHaveLength(1);
+    const [card0] = layout.cards;
 
-    // Card 1 bounds: x in [500..780], y in [290..490]
-    expect(DefeatHUD.getCardAt(600, 350)).toBe(1);
+    expect(card0.width).toBe(280);
+    expect(card0.height).toBe(200);
 
-    // Outside (in the gap between cards)
-    expect(DefeatHUD.getCardAt(480, 350)).toBeNull();
-
-    // Outside (above or below)
-    expect(DefeatHUD.getCardAt(250, 100)).toBeNull();
-    expect(DefeatHUD.getCardAt(250, 550)).toBeNull();
+    // Total width is 280, centered in 960 => startX = (960 - 280) / 2 = 340
+    expect(card0.x).toBe(340);
   });
 
-  it("renders campaign defeat overlay without throwing", () => {
+  it("detects mouse hit inside card 0 and card 1, and null elsewhere in dual-card mode", () => {
+    // Card 0 bounds: x in [180..460], y in [290..490]
+    expect(DefeatHUD.getCardAt(250, 350, 960, 640, 2)).toBe(0);
+
+    // Card 1 bounds: x in [500..780], y in [290..490]
+    expect(DefeatHUD.getCardAt(600, 350, 960, 640, 2)).toBe(1);
+
+    // Outside (in the gap between cards)
+    expect(DefeatHUD.getCardAt(480, 350, 960, 640, 2)).toBeNull();
+
+    // Outside (above or below)
+    expect(DefeatHUD.getCardAt(250, 100, 960, 640, 2)).toBeNull();
+    expect(DefeatHUD.getCardAt(250, 550, 960, 640, 2)).toBeNull();
+  });
+
+  it("detects mouse hit inside single card, and null outside in single-card mode", () => {
+    // Single card bounds: x in [340..620], y in [290..490]
+    expect(DefeatHUD.getCardAt(480, 350, 960, 640, 1)).toBe(0);
+    expect(DefeatHUD.getCardAt(350, 350, 960, 640, 1)).toBe(0);
+    expect(DefeatHUD.getCardAt(610, 350, 960, 640, 1)).toBe(0);
+
+    // Outside bounds (e.g. left of card or right of card)
+    expect(DefeatHUD.getCardAt(250, 350, 960, 640, 1)).toBeNull();
+    expect(DefeatHUD.getCardAt(700, 350, 960, 640, 1)).toBeNull();
+    expect(DefeatHUD.getCardAt(480, 100, 960, 640, 1)).toBeNull();
+    expect(DefeatHUD.getCardAt(480, 550, 960, 640, 1)).toBeNull();
+  });
+
+  it("renders Sector 1 defeat overlay with a single reset card", () => {
+    const ctx = createMockContext();
+    const data: DefeatRenderData = {
+      roomNumber: 3,
+      totalRooms: 20,
+      tier: "TIER 1",
+      roomTitle: "BASIC COVER",
+      rollbackTarget: {
+        roomNumber: 1,
+        roomIndex: 0,
+        bossName: "BASIC COVER",
+        loadoutDescription: "Full expedition reset (0 Augmentations)",
+        requiredAugmentationCount: 0,
+      },
+      isEndless: false,
+      hoveredCardIndex: 0,
+    };
+
+    expect(() => DefeatHUD.render(ctx, data, 960, 640)).not.toThrow();
+    expect(ctx.fillRect).toHaveBeenCalled();
+    expect(ctx.fillText).toHaveBeenCalledWith(
+      "[ R ]",
+      expect.any(Number),
+      expect.any(Number)
+    );
+    expect(ctx.fillText).toHaveBeenCalledWith(
+      "EXPEDITION RESET",
+      expect.any(Number),
+      expect.any(Number)
+    );
+  });
+
+  it("renders campaign defeat overlay with dual cards for Sector 2+", () => {
     const ctx = createMockContext();
     const data: DefeatRenderData = {
       roomNumber: 8,
@@ -72,7 +129,16 @@ describe("DefeatHUD", () => {
 
     expect(() => DefeatHUD.render(ctx, data, 960, 640)).not.toThrow();
     expect(ctx.fillRect).toHaveBeenCalled();
-    expect(ctx.fillText).toHaveBeenCalled();
+    expect(ctx.fillText).toHaveBeenCalledWith(
+      "[ SHIFT + R ]",
+      expect.any(Number),
+      expect.any(Number)
+    );
+    expect(ctx.fillText).toHaveBeenCalledWith(
+      "TIMELINE ROLLBACK",
+      expect.any(Number),
+      expect.any(Number)
+    );
   });
 
   it("renders endless mode defeat overlay with survival stats without throwing", () => {

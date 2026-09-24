@@ -1071,12 +1071,12 @@ describe("Combat Arena & Room Loop", () => {
       const roomManager = new RoomManager();
       const arena = new Arena(960, 640, roomManager);
 
-      // Advance to Room 8
+      // Advance to Room 8 (Sector 2)
       for (let i = 0; i < 7; i++) roomManager.advanceRoom();
       arena.loadRoom(roomManager.getCurrentRoom());
       expect(roomManager.getCurrentRoom().roomNumber).toBe(8);
 
-      // Set to defeat
+      // Set to defeat in Room 8 (Dual cards: Card 0 at 180..460, Card 1 at 500..780)
       arena.status = "defeat";
 
       // Mouse over Card 0 (Rollback, e.g. x: 250, y: 350)
@@ -1087,7 +1087,7 @@ describe("Combat Arena & Room Loop", () => {
 
       // Mouse outside cards
       expect(arena.getDesiredCursor(vec2(100, 100))).toBe("default");
-      expect(arena.getDesiredCursor(vec2(480, 350))).toBe("default");
+      expect(arena.getDesiredCursor(vec2(480, 350))).toBe("default"); // gap between dual cards
 
       // Mouse click on Card 0 triggers rollback to Room 5
       arena.step(0.016, {
@@ -1101,18 +1101,37 @@ describe("Combat Arena & Room Loop", () => {
       expect(roomManager.getCurrentRoom().roomNumber).toBe(5);
       expect(arena.status).toBe("playing");
 
-      // Die again in Room 5
+      // Die again in Room 5 (Sector 1: Single centered card at x: 340..620)
       arena.status = "defeat";
 
-      // Mouse click on Card 1 triggers full reset to Room 1
+      // Mouse over single centered card (x: 480, y: 350)
+      expect(arena.getDesiredCursor(vec2(480, 350))).toBe("pointer");
+
+      // Mouse outside single card
+      expect(arena.getDesiredCursor(vec2(250, 350))).toBe("default"); // was Card 0 in dual mode
+      expect(arena.getDesiredCursor(vec2(700, 350))).toBe("default"); // was Card 1 in dual mode
+
+      // Mouse click on single centered card triggers full reset to Room 1
       arena.step(0.016, {
         moveDir: vec2(0, 0),
-        mousePos: vec2(600, 350),
+        mousePos: vec2(480, 350),
         shoot: true,
         reload: false,
         restart: false,
       });
 
+      expect(roomManager.getCurrentRoom().roomNumber).toBe(1);
+      expect(arena.status).toBe("playing");
+
+      // Die in Room 1 (Sector 1) and verify [R] key triggers full restart
+      arena.status = "defeat";
+      arena.step(0.016, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(0, 0),
+        shoot: false,
+        reload: false,
+        restart: true,
+      });
       expect(roomManager.getCurrentRoom().roomNumber).toBe(1);
       expect(arena.status).toBe("playing");
     });

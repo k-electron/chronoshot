@@ -307,11 +307,17 @@ export class Arena {
   public step(wallDeltaTime: number, input: ArenaInput): void {
     // In defeat state, track hovered defeat card and process defeat actions
     if (this.status === "defeat") {
+      const roomNum = this.roomManager
+        ? this.roomManager.getCurrentRoom().roomNumber
+        : 1;
+      const isSingleCard = roomNum <= 5;
+
       this.hoveredDefeatCardIndex = DefeatHUD.getCardAt(
         input.mousePos.x,
         input.mousePos.y,
         this.width,
-        this.height
+        this.height,
+        isSingleCard ? 1 : 2
       );
 
       if (input.fullReset) {
@@ -320,15 +326,23 @@ export class Arena {
       }
 
       if (input.restart) {
-        this.rollbackToCheckpoint();
+        if (isSingleCard) {
+          this.restart();
+        } else {
+          this.rollbackToCheckpoint();
+        }
         return;
       }
 
       if (input.shoot) {
         if (this.hoveredDefeatCardIndex === 0) {
-          this.rollbackToCheckpoint();
+          if (isSingleCard) {
+            this.restart();
+          } else {
+            this.rollbackToCheckpoint();
+          }
           return;
-        } else if (this.hoveredDefeatCardIndex === 1) {
+        } else if (this.hoveredDefeatCardIndex === 1 && !isSingleCard) {
           this.restart();
           return;
         }
@@ -1150,11 +1164,16 @@ export class Arena {
 
     if (this.status === "defeat") {
       if (mousePos) {
+        const roomNum = this.roomManager
+          ? this.roomManager.getCurrentRoom().roomNumber
+          : 1;
+        const isSingleCard = roomNum <= 5;
         const cardIndex = DefeatHUD.getCardAt(
           mousePos.x,
           mousePos.y,
           this.width,
-          this.height
+          this.height,
+          isSingleCard ? 1 : 2
         );
         if (cardIndex !== null) {
           return "pointer";

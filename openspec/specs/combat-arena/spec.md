@@ -48,15 +48,15 @@ The arena SHALL support distinct enemy archetypes including Pistol Grunt, Shotgu
 - **THEN** it halts movement, projects a charging red sightline laser for 30 ticks, and discharges a high-velocity precision bullet at a 110-tick cadence
 
 ### Requirement: One-Hit Lethality and Instant Room Reset
-The arena SHALL enforce instant lethal elimination for unshielded combat units upon projectile impact or environmental/shockwave damage, enforce hit-count shield durability for shielded units before exposing them to lethal damage, and present an interactive dual-card defeat screen upon player elimination that supports cascading boss checkpoint rollbacks or full run resets. When the player unit is eliminated by any damage source, the arena SHALL synchronize elimination state by emitting player shatter particles, halting combat, and activating the defeat interface.
+The arena SHALL enforce instant lethal elimination for unshielded combat units upon projectile impact or environmental/shockwave damage, enforce hit-count shield durability for shielded units before exposing them to lethal damage, and present an interactive defeat screen upon player elimination that presents a single centered reset card in Sector 1 (Rooms 1–5) or dual interactive cards in later sectors supporting cascading boss checkpoint rollbacks or full run resets. When the player unit is eliminated by any damage source, the arena SHALL synchronize elimination state by emitting player shatter particles, halting combat, and activating the defeat interface.
 
 #### Scenario: Player struck by projectile
 - **WHEN** an enemy projectile impacts the player hitbox with zero remaining shields
-- **THEN** the player entity shatters, a defeat state is triggered displaying run statistics and dual interactive defeat cards, suppressing in-canvas reticle, and restoring pointer cursor interaction
+- **THEN** the player entity shatters, a defeat state is triggered displaying run statistics and interactive defeat card(s), suppressing in-canvas reticle, and restoring pointer cursor interaction
 
 #### Scenario: Player eliminated by non-projectile lethal shockwave
 - **WHEN** an arena-wide shockwave or environmental effect inflicts lethal damage on a player with zero remaining shields
-- **THEN** the arena immediately triggers the defeat state, emits cyan crystalline shatter particles, plays the shatter audio effect, and displays the dual-card defeat HUD
+- **THEN** the arena immediately triggers the defeat state, emits cyan crystalline shatter particles, plays the shatter audio effect, and displays the defeat HUD
 
 #### Scenario: Player struck by projectile with reactive shield online
 - **WHEN** an enemy projectile impacts a player possessing an active reactive shield
@@ -72,7 +72,7 @@ The arena SHALL enforce instant lethal elimination for unshielded combat units u
 
 #### Scenario: Player eliminated in Sector 1
 - **WHEN** the player suffers lethal damage in Rooms 1 through 5 (including during the Goliath-01 boss encounter)
-- **THEN** the player shatters, the arena enters defeat state displaying dual interactive cards, and triggering Rollback (via [R] or clicking Card 1) respawns the player at Room 1 with 0 augmentations
+- **THEN** the player shatters, the arena enters defeat state displaying a single centered interactive reset card, and triggering reset (via [R], [Shift+R], or clicking the card) respawns the player at Room 1 with 0 augmentations
 
 #### Scenario: Player eliminated in Sector 2
 - **WHEN** the player suffers lethal damage in Rooms 6 through 10 (including during the Chrono-Weaver boss encounter)
@@ -91,7 +91,7 @@ The arena SHALL enforce instant lethal elimination for unshielded combat units u
 - **THEN** rollback recalculates from the newly failed room, demoting the player down the checkpoint ladder tier-by-tier until Room 1
 
 #### Scenario: Full run reset from defeat screen
-- **WHEN** the player triggers Full Reset (via [Shift+R] or clicking Card 2) on the defeat screen
+- **WHEN** the player triggers Full Reset (via [Shift+R] or clicking Card 2 in multi-card view, or via [R] / [Shift+R] / clicking the single card in Sector 1) on the defeat screen
 - **THEN** the run is abandoned, all augmentations and checkpoint snapshots are cleared, and the game resets to pristine Room 1
 
 #### Scenario: Endless Mode defeat score screen and Apex rollback
