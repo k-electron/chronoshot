@@ -26,7 +26,7 @@ export class EndlessTelemetryHUD {
     data: EndlessTelemetryData,
     arenaWidth: number = 960
   ): void {
-    const cardWidth = 360;
+    const cardWidth = Math.min(440, Math.max(280, arenaWidth - 32));
     const cardHeight = 44;
     const x = (arenaWidth - cardWidth) / 2;
     const y = 14;
@@ -75,7 +75,7 @@ export class EndlessTelemetryHUD {
     const killsText = `KILLS: ${data.kills}`;
 
     const textY = y + 22;
-    ctx.fillText(`${threatText}    |    ${timeText}    |    ${killsText}`, arenaWidth / 2, textY);
+    ctx.fillText(`${threatText}  |  ${timeText}  |  ${killsText}`, arenaWidth / 2, textY);
 
     ctx.restore();
   }

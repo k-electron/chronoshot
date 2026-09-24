@@ -116,7 +116,7 @@ describe("HUD Rendering", () => {
       20
     );
     expect(ctx.fillText).toHaveBeenCalledWith(
-      expect.stringContaining("THREAT: 85    |    SURVIVED: 02:40    |    KILLS: 14"),
+      expect.stringContaining("THREAT: 85  |  SURVIVED: 02:40  |  KILLS: 14"),
       480,
       36
     );

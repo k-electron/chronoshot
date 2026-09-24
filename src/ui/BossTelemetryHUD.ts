@@ -9,6 +9,7 @@
  * - Signal-crimson overdrive / enraged pulse states
  */
 
+import { measureTextWidth, truncateText } from "./textUtils";
 import { getUIFont, UITheme } from "./theme";
 
 export interface BossTelemetryData {
@@ -116,15 +117,24 @@ export class BossTelemetryHUD {
     const yRow2 = barY + 33;
 
     // --- ROW 1: Designation & Threat Status ---
+    const rightStatusText = isEnraged
+      ? "CORE VULNERABLE // ENRAGED"
+      : data.maxShields > 0
+      ? "SHIELDS"
+      : "UNSHIELDED";
+    const rightStatusWidth = measureTextWidth(ctx, rightStatusText);
+    const maxTitleWidth = Math.max(80, barW - 32 - rightStatusWidth - 16);
+
     // Left: Boss Designation
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.font = getUIFont(11, "bold");
     ctx.fillStyle = isEnraged ? UITheme.colors.crimson : UITheme.colors.cyan;
-    const bossTitle =
+    const rawBossTitle =
       data.name && data.name.trim().length > 0
         ? data.name
         : "GOLIATH-01: AEGIS COLOSSUS";
+    const bossTitle = truncateText(ctx, rawBossTitle, maxTitleWidth);
     ctx.fillText(bossTitle, barX + 16, yRow1);
 
     // Right: Overdrive status or Shields status label
@@ -133,20 +143,31 @@ export class BossTelemetryHUD {
     if (isEnraged) {
       ctx.font = getUIFont(10, "bold");
       ctx.fillStyle = UITheme.colors.crimson;
-      ctx.fillText("CORE VULNERABLE // ENRAGED", barX + barW - 16, yRow1);
-    } else if (data.maxShields > 0) {
-      ctx.font = getUIFont(9, "bold");
-      ctx.fillStyle = UITheme.colors.textMuted;
-      ctx.fillText("SHIELDS", barX + barW - 16, yRow1);
+      ctx.fillText(rightStatusText, barX + barW - 16, yRow1);
     } else {
       ctx.font = getUIFont(9, "bold");
       ctx.fillStyle = UITheme.colors.textMuted;
-      ctx.fillText("UNSHIELDED", barX + barW - 16, yRow1);
+      ctx.fillText(rightStatusText, barX + barW - 16, yRow1);
     }
 
     // --- ROW 2: Phase Badge & Multi-Tier Shield Pips ---
+    const maxShields = Math.max(0, data.maxShields ?? 0);
+    const currentShields = Math.max(0, Math.min(data.shields ?? 0, maxShields));
+    const pipSize = 10;
+    const pipGap = 5;
+    const totalShieldW = maxShields > 0 ? maxShields * pipSize + (maxShields - 1) * pipGap : 0;
+
+    const currentPhase = Math.max(1, data.currentPhase || 1);
+    const totalPhases = Math.max(1, data.totalPhases || 1);
+    const phasePipSize = 5;
+    const phasePipGap = 4;
+    const totalPhasePipsW = totalPhases > 1 ? totalPhases * (phasePipSize + phasePipGap) : 0;
+
+    const maxBadgeWidth = Math.max(60, barW - 32 - totalShieldW - totalPhasePipsW - 20);
+    const rawPhaseBadge = BossTelemetryHUD.getPhaseBadgeText(data);
+    const phaseBadge = truncateText(ctx, rawPhaseBadge, maxBadgeWidth);
+
     // Left: Phase Indicator / Badge
-    const phaseBadge = BossTelemetryHUD.getPhaseBadgeText(data);
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.font = getUIFont(9, "bold");
@@ -154,16 +175,8 @@ export class BossTelemetryHUD {
     ctx.fillText(phaseBadge, barX + 16, yRow2);
 
     // Phase Progression Pips (small tick indicators next to phase badge)
-    const currentPhase = Math.max(1, data.currentPhase || 1);
-    const totalPhases = Math.max(1, data.totalPhases || 1);
     if (totalPhases > 1) {
-      const badgeWidth =
-        typeof ctx.measureText === "function" && ctx.measureText(phaseBadge)?.width
-          ? ctx.measureText(phaseBadge).width
-          : phaseBadge.length * 6;
-
-      const phasePipSize = 5;
-      const phasePipGap = 4;
+      const badgeWidth = measureTextWidth(ctx, phaseBadge);
       const phasePipsStartX = barX + 16 + badgeWidth + 10;
 
       for (let p = 1; p <= totalPhases; p++) {
@@ -190,13 +203,7 @@ export class BossTelemetryHUD {
     }
 
     // Right: Multi-Tier Shield Charge Pips
-    const maxShields = Math.max(0, data.maxShields ?? 0);
-    const currentShields = Math.max(0, Math.min(data.shields ?? 0, maxShields));
-
     if (maxShields > 0) {
-      const pipSize = 10;
-      const pipGap = 5;
-      const totalShieldW = maxShields * pipSize + (maxShields - 1) * pipGap;
       const pipsStartX = barX + barW - 16 - totalShieldW;
       const py = yRow2 - pipSize / 2;
 

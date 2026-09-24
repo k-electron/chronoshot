@@ -366,6 +366,73 @@ describe("UpgradeDraftHUD", () => {
       // Verify install button text for card 2 called
       expect(ctx.fillText).toHaveBeenCalledWith("INSTALL [2]", 480, 434);
     });
+
+    it("truncates oversized archetype subtitles with an ellipsis", () => {
+      const ctx = createMockContext();
+      const longArchetypeOption: UpgradeDefinition[] = [
+        {
+          id: "ultra-mod",
+          name: "ULTRA MOD",
+          archetype: "TACTICAL EXTREME REPOSITORY // CYBERNETIC SPECIALIZED AUGMENTATION",
+          statHighlight: "+50% POWER",
+          description: "A test augmentation.",
+        },
+      ];
+
+      renderUpgradeDraft(ctx, longArchetypeOption, 960, 640);
+
+      const calls = (ctx.fillText as any).mock.calls;
+      const archetypeCall = calls.find(
+        (call: any[]) =>
+          typeof call[0] === "string" &&
+          call[0].startsWith("TACTICAL") &&
+          call[0].endsWith("…")
+      );
+      expect(archetypeCall).toBeDefined();
+    });
+
+    it("caps long description text at 5 lines with ellipsis on the 5th line", () => {
+      const ctx = createMockContext();
+      const longDescOption: UpgradeDefinition[] = [
+        {
+          id: "long-desc-mod",
+          name: "VERBOSE MOD",
+          archetype: "PROTOCOL // VERBOSE",
+          statHighlight: "+10 STAT",
+          description:
+            "Line one explains tactical mechanics. Line two delves deeper into system architecture. Line three details the defensive mitigation buffers. Line four describes the offensive escalation parameters. Line five provides additional tactical notes. Line six would normally overflow beyond the install button if not capped.",
+        },
+      ];
+
+      renderUpgradeDraft(ctx, longDescOption, 960, 640);
+
+      const calls = (ctx.fillText as any).mock.calls;
+      const descLineCalls = calls.filter(
+        (call: any[]) =>
+          typeof call[0] === "string" &&
+          call[0].includes("Line")
+      );
+      expect(descLineCalls.length).toBeLessThanOrEqual(5);
+      const lastLine = descLineCalls[descLineCalls.length - 1][0];
+      expect(lastLine.endsWith("…")).toBe(true);
+    });
+
+    it("renders parameterized sector progression prompts for later sectors", () => {
+      const ctx = createMockContext();
+
+      renderUpgradeDraft(ctx, mockDraftOptions, 960, 640, null, 3);
+
+      expect(ctx.fillText).toHaveBeenCalledWith(
+        "SECTOR 3 BOSS NEUTRALIZED — SELECT 1 COMBAT SYSTEM UPGRADE",
+        480,
+        95
+      );
+      expect(ctx.fillText).toHaveBeenCalledWith(
+        "PRESS [1], [2], OR [3] OR CLICK A CARD TO INSTALL AND ADVANCE TO ZONE 4",
+        480,
+        expect.any(Number)
+      );
+    });
   });
 
   describe("wrapText helper", () => {

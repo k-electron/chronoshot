@@ -254,4 +254,26 @@ describe("BossTelemetryHUD", () => {
     hudInstance.render(ctx, data, 800);
     expect(ctx.fillText).toHaveBeenCalledWith("TITAN-02", expect.any(Number), expect.any(Number));
   });
+
+  it("truncates excessively long boss names and phase titles with ellipsis to prevent shield pip collisions", () => {
+    const ctx = createMockContext();
+    const data: BossTelemetryData = {
+      name: "CHRONO-ZENITH: ZERO SOVEREIGN OMEGA HYPERION TITAN OF THE VOID",
+      currentPhase: 3,
+      totalPhases: 3,
+      phaseTitle: "CATACLYSM OVERLOAD MATRIX PROTOCOL EXTREME DESTRUCTION",
+      shields: 8,
+      maxShields: 8,
+      isAlive: true,
+      isEnraged: true,
+    };
+
+    BossTelemetryHUD.render(ctx, data, 960);
+    const calls = (ctx.fillText as any).mock.calls;
+    const truncatedTitleCall = calls.find((c: any[]) => typeof c[0] === "string" && c[0].startsWith("CHRONO-ZENITH") && c[0].endsWith("…"));
+    expect(truncatedTitleCall).toBeDefined();
+
+    const truncatedPhaseCall = calls.find((c: any[]) => typeof c[0] === "string" && c[0].startsWith("PHASE") && c[0].endsWith("…"));
+    expect(truncatedPhaseCall).toBeDefined();
+  });
 });

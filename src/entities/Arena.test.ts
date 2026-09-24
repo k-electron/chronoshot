@@ -345,7 +345,7 @@ describe("Combat Arena & Room Loop", () => {
 
     // Active gameplay render with corner hint
     arena.render(mockCtx, 0.016);
-    expect(mockCtx.fillText).toHaveBeenCalledWith("[ESC] PAUSE", 936, 46);
+    expect(mockCtx.fillText).toHaveBeenCalledWith("[ESC] PAUSE", 936, 66);
 
     // Paused state render
     arena.isPaused = true;
@@ -374,6 +374,8 @@ describe("Combat Arena & Room Loop", () => {
       480,
       expect.any(Number)
     );
+    expect(mockCtx.moveTo).toHaveBeenCalledWith(280, 270);
+    expect(mockCtx.lineTo).toHaveBeenCalledWith(680, 270);
   });
 
   it("handles player bullet hitting shielded enemy with deflection and break effects", () => {
