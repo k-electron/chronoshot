@@ -139,7 +139,7 @@ The boss combat system SHALL support the Chrono-Zenith Zero Sovereign milestone 
 
 #### Scenario: Cataclysm transition to Singularity Tempest in phase three
 - **WHEN** Chrono-Zenith's secondary 3 shield charges are depleted
-- **THEN** it executes a 65-tick Cataclysm Overload channel, detonates the shockwave, materializes one Warden escort as an active combat unit, and transitions to phase three with 2 shield charges, accelerating to 105 px/s while discharging twin counter-rotating 12-pellet radial novae
+- **THEN** it executes a 65-tick Cataclysm Overload channel, detonates the shockwave, materializes one Warden escort as an active combat unit, and transitions to phase three with 2 shield charges, accelerating to 105 px/s while discharging twin counter-rotating 12-pellet radial novae (24 projectiles per volley at 60-tick cadence, rotating in opposite directions with interleaved angular offsets)
 
 #### Scenario: Cataclysm transition to Zero-Point Overdrive in phase four
 - **WHEN** Chrono-Zenith's remaining 2 shield charges are depleted

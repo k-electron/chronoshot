@@ -243,4 +243,115 @@ describe("RadialNovaBehavior", () => {
     behavior.discharge(dummyContext);
     expect(behavior.currentRotationAngle).toBeCloseTo(Math.PI - Math.PI / 2);
   });
+
+  describe("counter-rotating twin novae", () => {
+    it("discharges dual rings (2x pellets) when counterRotating is true", () => {
+      const behavior = new RadialNovaBehavior({
+        pellets: 12,
+        bulletSpeed: 420,
+        counterRotating: true,
+      });
+
+      expect(behavior.counterRotating).toBe(true);
+      expect(behavior.counterOffsetPhase).toBeCloseTo(Math.PI / 12);
+      expect(behavior.currentRotationAngle).toBeCloseTo(0);
+      expect(behavior.counterRotationAngle).toBeCloseTo(Math.PI / 12);
+
+      const bullets = behavior.discharge(dummyContext);
+      expect(bullets).toHaveLength(24);
+
+      // First 12 bullets are primary ring (starting at 0)
+      const ring1 = bullets.slice(0, 12);
+      const angleStep = (2 * Math.PI) / 12;
+      for (let i = 0; i < 12; i++) {
+        const expectedAngle = (i * angleStep) % (2 * Math.PI);
+        const actualAngle = (Math.atan2(ring1[i].velocity.y, ring1[i].velocity.x) + 2 * Math.PI) % (2 * Math.PI);
+        expect(actualAngle).toBeCloseTo(expectedAngle);
+      }
+
+      // Second 12 bullets are counter-rotating ring (starting at counterOffsetPhase = PI/12)
+      const ring2 = bullets.slice(12, 24);
+      for (let i = 0; i < 12; i++) {
+        const expectedAngle = (Math.PI / 12 + i * angleStep) % (2 * Math.PI);
+        const actualAngle = (Math.atan2(ring2[i].velocity.y, ring2[i].velocity.x) + 2 * Math.PI) % (2 * Math.PI);
+        expect(actualAngle).toBeCloseTo(expectedAngle);
+      }
+    });
+
+    it("advances primary ring clockwise and counter-ring counter-clockwise on each discharge", () => {
+      const offsetStep = 0.14;
+      const behavior = new RadialNovaBehavior({
+        pellets: 12,
+        angularOffsetStep: offsetStep,
+        counterRotating: true,
+      });
+
+      const initialCounter = Math.PI / 12;
+
+      // Discharge 1
+      behavior.discharge(dummyContext);
+      expect(behavior.currentRotationAngle).toBeCloseTo(offsetStep);
+      expect(behavior.counterRotationAngle).toBeCloseTo(initialCounter - offsetStep);
+      expect(behavior.currentAngle).toBeCloseTo(offsetStep);
+      expect(behavior.counterAngle).toBeCloseTo(initialCounter - offsetStep);
+
+      // Discharge 2
+      const b2 = behavior.discharge(dummyContext);
+      expect(b2).toHaveLength(24);
+      expect(behavior.currentRotationAngle).toBeCloseTo(2 * offsetStep);
+      expect(behavior.counterRotationAngle).toBeCloseTo(initialCounter - 2 * offsetStep);
+
+      const ring1Bullet0Angle = Math.atan2(b2[0].velocity.y, b2[0].velocity.x);
+      expect(ring1Bullet0Angle).toBeCloseTo(offsetStep);
+
+      const ring2Bullet0Angle = Math.atan2(b2[12].velocity.y, b2[12].velocity.x);
+      expect(ring2Bullet0Angle).toBeCloseTo(initialCounter - offsetStep);
+    });
+
+    it("restores pristine counter-rotation angle on reset()", () => {
+      const behavior = new RadialNovaBehavior({
+        pellets: 8,
+        angularOffsetStep: 0.2,
+        counterRotating: true,
+        initialAngle: 0.1,
+      });
+
+      const expectedInitialCounter = 0.1 + Math.PI / 8;
+      expect(behavior.counterRotationAngle).toBeCloseTo(expectedInitialCounter);
+
+      behavior.discharge(dummyContext);
+      behavior.discharge(dummyContext);
+      expect(behavior.currentRotationAngle).toBeCloseTo(0.1 + 0.4);
+      expect(behavior.counterRotationAngle).toBeCloseTo(expectedInitialCounter - 0.4);
+
+      behavior.reset();
+      expect(behavior.currentRotationAngle).toBeCloseTo(0.1);
+      expect(behavior.counterRotationAngle).toBeCloseTo(expectedInitialCounter);
+    });
+
+    it("allows custom counterOffsetPhase override", () => {
+      const behavior = new RadialNovaBehavior({
+        pellets: 6,
+        counterRotating: true,
+        counterOffsetPhase: Math.PI / 3,
+      });
+
+      expect(behavior.counterOffsetPhase).toBeCloseTo(Math.PI / 3);
+      expect(behavior.counterRotationAngle).toBeCloseTo(Math.PI / 3);
+    });
+
+    it("handles pellets = 0 with counterRotating gracefully", () => {
+      const behavior = new RadialNovaBehavior({
+        pellets: 0,
+        angularOffsetStep: 0.1,
+        counterRotating: true,
+      });
+
+      const bullets = behavior.discharge(dummyContext);
+      expect(bullets).toHaveLength(0);
+      expect(behavior.currentRotationAngle).toBeCloseTo(0.1);
+      expect(behavior.counterRotationAngle).toBeCloseTo(-0.1);
+    });
+  });
 });
+
