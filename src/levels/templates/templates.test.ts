@@ -3,31 +3,21 @@ import {
   ALL_LAYOUT_TEMPLATES,
   ApexColosseumTemplate,
   ApexRedoubtTemplate,
-  ArenaQuadrantTemplate,
-  CenterPillarsTemplate,
   DEFAULT_LAYOUT_REGISTRY,
-  KillboxLanesTemplate,
   RoomLayoutTemplate,
-  SplitCorridorTemplate,
-  TwinBunkersTemplate,
   validateSpawnSeparation,
 } from "./index";
 
 describe("Modular Tactical Cover Templates", () => {
   const templates: RoomLayoutTemplate[] = [
-    CenterPillarsTemplate,
-    TwinBunkersTemplate,
-    SplitCorridorTemplate,
-    KillboxLanesTemplate,
-    ArenaQuadrantTemplate,
     ApexRedoubtTemplate,
     ApexColosseumTemplate,
   ];
 
-  it("exports exactly 7 distinct templates in ALL_LAYOUT_TEMPLATES", () => {
-    expect(ALL_LAYOUT_TEMPLATES).toHaveLength(7);
+  it("exports exactly 2 distinct templates in ALL_LAYOUT_TEMPLATES", () => {
+    expect(ALL_LAYOUT_TEMPLATES).toHaveLength(2);
     const ids = new Set(ALL_LAYOUT_TEMPLATES.map((t) => t.id));
-    expect(ids.size).toBe(7);
+    expect(ids.size).toBe(2);
   });
 
   describe.each(templates)("Template: $id ($name)", (template) => {
@@ -124,26 +114,16 @@ describe("Modular Tactical Cover Templates", () => {
   });
 
   describe("DEFAULT_LAYOUT_REGISTRY", () => {
-    it("auto-registers all 7 tactical templates", () => {
-      expect(DEFAULT_LAYOUT_REGISTRY.getAll()).toHaveLength(7);
+    it("auto-registers active tactical templates", () => {
+      expect(DEFAULT_LAYOUT_REGISTRY.getAll()).toHaveLength(2);
 
-      expect(DEFAULT_LAYOUT_REGISTRY.get("center-pillars")).toBe(CenterPillarsTemplate);
-      expect(DEFAULT_LAYOUT_REGISTRY.get("twin-bunkers")).toBe(TwinBunkersTemplate);
-      expect(DEFAULT_LAYOUT_REGISTRY.get("split-corridor")).toBe(SplitCorridorTemplate);
-      expect(DEFAULT_LAYOUT_REGISTRY.get("killbox-lanes")).toBe(KillboxLanesTemplate);
-      expect(DEFAULT_LAYOUT_REGISTRY.get("arena-quadrant")).toBe(ArenaQuadrantTemplate);
       expect(DEFAULT_LAYOUT_REGISTRY.get("apex-redoubt")).toBe(ApexRedoubtTemplate);
       expect(DEFAULT_LAYOUT_REGISTRY.get("apex-colosseum")).toBe(ApexColosseumTemplate);
     });
 
-    it("allows deterministic sampling across all 7 templates", () => {
-      expect(DEFAULT_LAYOUT_REGISTRY.sample(() => 0.0).id).toBe("center-pillars");
-      expect(DEFAULT_LAYOUT_REGISTRY.sample(() => 0.15).id).toBe("twin-bunkers");
-      expect(DEFAULT_LAYOUT_REGISTRY.sample(() => 0.30).id).toBe("split-corridor");
-      expect(DEFAULT_LAYOUT_REGISTRY.sample(() => 0.45).id).toBe("killbox-lanes");
-      expect(DEFAULT_LAYOUT_REGISTRY.sample(() => 0.60).id).toBe("arena-quadrant");
-      expect(DEFAULT_LAYOUT_REGISTRY.sample(() => 0.75).id).toBe("apex-redoubt");
-      expect(DEFAULT_LAYOUT_REGISTRY.sample(() => 0.90).id).toBe("apex-colosseum");
+    it("allows deterministic sampling across active templates", () => {
+      expect(DEFAULT_LAYOUT_REGISTRY.sample(() => 0.1).id).toBe("apex-redoubt");
+      expect(DEFAULT_LAYOUT_REGISTRY.sample(() => 0.9).id).toBe("apex-colosseum");
     });
   });
 });

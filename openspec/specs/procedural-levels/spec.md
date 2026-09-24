@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the modular level director, composable room layout geometry templates, threat-budget tactical encounter spawning, and deterministic procedural room generation for dynamic campaigns and endless runs.
+Defines the composable room layout geometry templates, hand-crafted tactical encounter progressions, campaign milestone boss sequences, endless survival mode protocol with dynamic reinforcement spawning, and developer playtest bypass hooks.
 
 ## Requirements
 
@@ -21,56 +21,30 @@ The level generation system SHALL provide modular layout templates defining geom
 - **WHEN** fixed campaign rooms (Rooms 1 through 20) and Endless Mode initialize enemy positions
 - **THEN** every initial enemy spawn point is strictly positioned outside all obstacle hitboxes with verified clearance, ensuring no combat unit materializes inside solid geometry
 
-### Requirement: Threat-Budget Tactical Encounter Generation
-The level generation system SHALL synthesize enemy encounters by allocating an escalating numerical threat budget across available hostile archetypes, enforcing tactical composition constraints and role diversity.
-
-#### Scenario: Allocating threat budget across archetypes
-- **WHEN** an encounter is generated for a specified room difficulty tier and threat budget
-- **THEN** enemy units are selected from available archetypes (Pistol Grunt, Shotgun Guard, Stalker Rusher, Aegis Warden, Marksman Sniper) whose combined threat costs do not exceed the allocated budget
-
-#### Scenario: Enforcing sniper composition cap
-- **WHEN** an encounter generates long-range Marksman Sniper units
-- **THEN** the encounter spawner limits Marksman units to a maximum of 2 per room and requires at least one mobile frontline escort unit (Grunt, Guard, or Rusher) to prevent static sniper cheese
-
-#### Scenario: Spacing enemy initial positions
-- **WHEN** enemy positions are placed within designated spawn zones
-- **THEN** units are separated by at least 48 pixels from each other and placed outside obstacle collision bounds
-
-### Requirement: Deterministic Seeded Room Generation
-The level generation system SHALL support deterministic generation of complete room configurations from a numeric or string seed using a seedable pseudo-random number generator (PRNG).
-
-#### Scenario: Reproducible generation from identical seed
-- **WHEN** two rooms are generated using the same seed, difficulty tier, and template pool
-- **THEN** both rooms produce identical obstacle placements, enemy archetypes, enemy coordinates, and exit portal positions
-
-#### Scenario: Distinct variation across different seeds
-- **WHEN** rooms are generated using distinct seeds
-- **THEN** the director selects varying layout templates and squad configurations appropriate for the requested difficulty tier
-
 ### Requirement: Dynamic RoomManager Integration and Endless Mode
-The combat progression system SHALL support supplying dynamic room generators to the room manager, enabling continuous room generation upon portal entry.
+The combat progression system SHALL support sequential room lifecycle management across the 20-room campaign and seamless handoff into Endless Survival Mode upon campaign victory.
 
 #### Scenario: Generating next room on demand
-- **WHEN** the player enters an exit portal in endless progression mode
-- **THEN** the room manager invokes the level director to generate the subsequent room with escalated threat budget and loads it seamlessly into the combat arena
+- **WHEN** the player enters an unlocked exit portal in campaign mode
+- **THEN** the room manager advances sequentially to the subsequent hand-built room in the 20-room sequence and loads it seamlessly into the combat arena
 
 #### Scenario: Preserving standard campaign sequence
-- **WHEN** room manager is initialized without a dynamic director
-- **THEN** the manager defaults to the 19-room campaign sequence with zero behavioral regression
+- **WHEN** room manager is initialized
+- **THEN** the manager defaults to the 20-room hand-built campaign sequence with verified milestone boss encounters
 
 ### Requirement: Multi-Sector Campaign Sequence and Sector Milestone Bosses
-The level progression system SHALL provide an expanded 20-room campaign sequence spanning Sector 1, Zone 2, Sector 3, and Sector 4, integrating distinct milestone bosses and progressive tactical squad compositions culminating in the Room 20 final boss encounter, while ensuring procedural milestone boss placements maintain verified clearance outside all layout obstacle boundaries and room victory screens format milestone completions and dual interactive progression choices across multi-line bounds that fit within the viewport frame.
+The level progression system SHALL provide a hand-built 20-room campaign sequence spanning Sector 1, Zone 2, Sector 3, and Sector 4, integrating distinct milestone bosses and progressive tactical squad compositions culminating in the Room 20 final boss encounter, while room victory screens format milestone completions and dual interactive progression choices across multi-line bounds that fit within the viewport frame.
 
 #### Scenario: Progressing through 14-room campaign sequence
-- **WHEN** the player progresses sequentially through the fixed campaign without a dynamic director
-- **THEN** the sequence advances beyond the initial 14 rooms through Sector 1 (Rooms 1–5, Boss Goliath-01), Zone 2 (Rooms 6–9), Milestone Boss 2 (Room 10, Chrono-Weaver), Sector 3 (Rooms 11–14), Milestone Boss 3 (Room 15, Vektor-Prime), and Sector 4 (Rooms 16–20, culminating in Room 20 Milestone Final Boss Chrono-Zenith) before completing the main campaign
+- **WHEN** the player progresses sequentially through the fixed campaign
+- **THEN** the sequence advances through Sector 1 (Rooms 1–5, Boss Goliath-01), Zone 2 (Rooms 6–9), Milestone Boss 2 (Room 10, Chrono-Weaver), Sector 3 (Rooms 11–14), Milestone Boss 3 (Room 15, Vektor-Prime), and Sector 4 (Rooms 16–20, culminating in Room 20 Milestone Final Boss Chrono-Zenith) before completing the main campaign
 
 #### Scenario: Sector-indexed milestone boss injection
-- **WHEN** the level director synthesizes milestone boss encounters for room numbers divisible by 5
-- **THEN** it routes milestone bosses based on sector index, selecting Goliath-01 for Sector 1 (Room 5), Chrono-Weaver for Sector 2 (Room 10), Vektor-Prime for Sector 3 (Room 15), and Chrono-Zenith for Sector 4 (Room 20)
+- **WHEN** milestone boss encounters are loaded for room numbers divisible by 5
+- **THEN** the campaign sequence routes distinct milestone bosses for each sector: Goliath-01 for Sector 1 (Room 5), Chrono-Weaver for Sector 2 (Room 10), Vektor-Prime for Sector 3 (Room 15), and Chrono-Zenith for Sector 4 (Room 20)
 
 #### Scenario: Verified clearance for procedural Room 20 milestone boss
-- **WHEN** the level director generates the Room 20 Chrono-Zenith encounter using The Apex Redoubt template
+- **WHEN** Room 20 Chrono-Zenith encounter initializes in The Apex Redoubt
 - **THEN** the boss spawn position is set to `arenaWidth - 350` (610, 320), maintaining verified separation outside the east pillar (`redoubt-pillar-east` bounds 716..764) and preventing units from spawning embedded in solid cover
 
 #### Scenario: Multi-row victory checkmark display
@@ -115,7 +89,7 @@ The combat progression system SHALL support unlocking a continuous Endless Survi
 - **WHEN** a reinforcement hostile candidate position is selected in Endless Mode
 - **THEN** the spawner validates that the candidate is at least 350 pixels away from the player's current position, maintains at least 48 pixels separation from other units, and does not overlap any obstacle bounds
 
-#### Scenario: Visual materialization telegraph before unit engagement
+#### Scenario: Visual materialization telegraph ring before unit engagement
 - **WHEN** a reinforcement hostile is spawned into the arena
 - **THEN** a visual materialization telegraph ring renders at its coordinates for 30 simulation ticks during which the hostile cannot fire or damage the player, providing clear warning before active combat engagement
 
@@ -123,3 +97,17 @@ The combat progression system SHALL support unlocking a continuous Endless Survi
 - **WHEN** Endless Mode is active
 - **THEN** the in-canvas HUD displays real-time survival telemetry including current threat budget, active elapsed survival time, and count of hostiles eliminated inside a 440px wide card with compacted text spacing, while the room progression header suppresses duplicate survival stats to prevent spatial overlap
 
+### Requirement: Campaign Victory Playtest Bypass
+The game initialization system SHALL support a URL playtest parameter (`?skip`) that initializes the combat arena directly into the post-Zenith campaign victory state with completed Room 20 status, active victory overlay, pre-Zenith loadout, and pre-boss checkpoint snapshots, allowing seamless verification of Endless Protocol transitions and expedition resets without replaying Rooms 1–20.
+
+#### Scenario: Initializing combat arena with playtest bypass
+- **WHEN** the game is loaded with the `?skip` URL query parameter
+- **THEN** the combat arena initializes directly into the post-Zenith victory state with Room 20 completed (`roomManager.isGameCompleted() === true`), active Mission Accomplished overlay, pre-Zenith loadout (Extended Cylinder, Speed Loader, Reactive Shield), and fully interactive victory cards
+
+#### Scenario: Selecting Endless Protocol from playtest bypass
+- **WHEN** the operative activates Card 0 (Endless Protocol) from the bypass victory screen via `[E]`, `[Space]`, or mouse click
+- **THEN** the combat arena transitions seamlessly into Endless Survival Mode in the Apex Colosseum, equips all 7 combat augmentations, restores shields to 3, sets ammo capacity to 8 rounds, and begins dynamic reinforcement wave spawning matching a natural campaign completion run
+
+#### Scenario: Selecting Expedition Reset from playtest bypass
+- **WHEN** the operative activates Card 1 (Expedition Reset) from the bypass victory screen via `[R]`, `[Shift+R]`, or mouse click
+- **THEN** the combat arena resets progression back to Room 1 with a clean starter loadout (0 augmentations, 6 rounds, 0 shields) matching a natural reset

@@ -12,26 +12,6 @@ import {
 } from "./RoomLayoutTemplate";
 
 import {
-  CenterPillarsTemplate,
-  centerPillarsTemplate,
-} from "./CenterPillarsTemplate";
-import {
-  TwinBunkersTemplate,
-  twinBunkersTemplate,
-} from "./TwinBunkersTemplate";
-import {
-  SplitCorridorTemplate,
-  splitCorridorTemplate,
-} from "./SplitCorridorTemplate";
-import {
-  KillboxLanesTemplate,
-  killboxLanesTemplate,
-} from "./KillboxLanesTemplate";
-import {
-  ArenaQuadrantTemplate,
-  arenaQuadrantTemplate,
-} from "./ArenaQuadrantTemplate";
-import {
   ApexRedoubtTemplate,
   apexRedoubtTemplate,
 } from "./ApexRedoubtTemplate";
@@ -49,16 +29,6 @@ export {
 };
 
 export {
-  CenterPillarsTemplate,
-  centerPillarsTemplate,
-  TwinBunkersTemplate,
-  twinBunkersTemplate,
-  SplitCorridorTemplate,
-  splitCorridorTemplate,
-  KillboxLanesTemplate,
-  killboxLanesTemplate,
-  ArenaQuadrantTemplate,
-  arenaQuadrantTemplate,
   ApexRedoubtTemplate,
   apexRedoubtTemplate,
   ApexColosseumTemplate,
@@ -66,17 +36,12 @@ export {
 };
 
 export const ALL_LAYOUT_TEMPLATES: readonly RoomLayoutTemplate[] = [
-  CenterPillarsTemplate,
-  TwinBunkersTemplate,
-  SplitCorridorTemplate,
-  KillboxLanesTemplate,
-  ArenaQuadrantTemplate,
   ApexRedoubtTemplate,
   ApexColosseumTemplate,
 ];
 
 /**
- * Registers all layout templates into the specified registry.
+ * Registers all active layout templates into the specified registry.
  * Defaults to DEFAULT_LAYOUT_REGISTRY.
  */
 export function registerDefaultTemplates(
@@ -87,5 +52,5 @@ export function registerDefaultTemplates(
   }
 }
 
-// Auto-register the templates into DEFAULT_LAYOUT_REGISTRY
+// Auto-register active templates into DEFAULT_LAYOUT_REGISTRY
 registerDefaultTemplates(DEFAULT_LAYOUT_REGISTRY);

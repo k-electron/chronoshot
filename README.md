@@ -133,16 +133,14 @@ Powered by a decoupled data-driven architecture (`UpgradePipeline`, `UpgradeRegi
   - **Room 20 (`PROTOCOL OMEGA`)**: Supreme campaign climax against Chrono-Zenith: Zero Sovereign inside the fortified Apex Redoubt. Overcoming its 4 escalating phases and Cataclysm Pulses triggers the MISSION ACCOMPLISHED Campaign Victory screen, celebrating completion of all 20 tactical protocols.
 - **Cascading Boss Checkpoint Rollback**: On defeat, the dual-card defeat screen gives players the choice between **Rollback** (<kbd>R</kbd> or click) and **Full Reset** (<kbd>Shift+R</kbd> or click). Rollback evaluates the room of elimination, cascading down sector-by-sector (Rooms 1–5 $\to$ Room 1, Rooms 6–10 $\to$ Room 5 Goliath-01, Rooms 11–15 $\to$ Room 10 Chrono-Weaver, Rooms 16–20 $\to$ Room 15 Vektor-Prime, Endless Mode $\to$ Room 20 Chrono-Zenith), restoring clean pre-boss upgrade snapshots. Repeated failure in a boss fight or sector demotes the player down the checkpoint ladder tier-by-tier until Room 1.
 
-### 11. Modular Level Director & Endless Survival Mode
-- **Composable Tactical Layouts**: 7 geometry templates (`CenterPillarsTemplate`, `TwinBunkersTemplate`, `SplitCorridorTemplate`, `KillboxLanesTemplate`, `ArenaQuadrantTemplate`, `ApexRedoubtTemplate`, `ApexColosseumTemplate`) providing varied obstacle geometries, tactical sightlines, and verified spawn safety ($\ge 280\text{px}$ from player).
-- **Threat-Budget Encounter Spawner (`EncounterDirector`)**: Scales difficulty by assigning numerical threat budgets across hostiles while enforcing squad composition constraints (maximum 2 Marksman snipers per room, mandatory frontline escorts) and non-overlapping safe spawn sampling ($\ge 48\text{px}$ unit separation).
-- **Deterministic Seeded PRNG (`LevelDirector`)**: High-performance Mulberry32 pseudo-random number generator enabling 100% reproducible room seeds, daily challenges, and milestone boss synthesis on every 5th room (Sector 1: Goliath-01, Sector 2: Chrono-Weaver, Sector 3: Vektor-Prime, Sector 4: Chrono-Zenith).
+### 11. Endless Survival Mode Protocol & Playtest Bypass
 - **Endless Survival Mode (`EndlessDirector` & `ApexColosseumTemplate`)**: Upon defeating Chrono-Zenith in Room 20, the Mission Accomplished overlay presents dual options: **Endless Protocol** (<kbd>E</kbd> / <kbd>Space</kbd> / click) to enter the endless gauntlet, or **Expedition Reset** (<kbd>R</kbd> / <kbd>Shift+R</kbd> / click) to restart at Room 1. Choosing Endless Protocol deploys the operative directly into the infinite tactical Apex Colosseum:
   - **Full Augmentation Loadout**: Automatically installs all 7 upgrades (`extended-cylinder`, `speed-loader`, `reactive-shield`, `kinetic-stride`, `chrono-burst`, `phase-deflector`, `overcharge-dash`), tops shields off to maximum capacity (3 shields), and loads cylinder to 8 rounds.
   - **Climbing Threat Budget**: Threat budget steadily scales upward ($50 + \lfloor \text{ticks}/120 \rfloor \times 5$), spawning mixed hostile squads according to dynamic threat costs.
   - **Fair Distant Spatial Sampling**: Enemies only spawn at distant coordinates ($\ge 350\text{px}$ from player, $\ge 48\text{px}$ from other units, completely outside obstacle collision boundaries) to eliminate cheap, unavoidable deaths.
   - **Materialization Reticles**: Queued hostiles display 30-tick expanding geometric telegraph rings before materializing into active combatants.
   - **In-Canvas Endless Telemetry HUD**: Persistent real-time status HUD displaying current active threat budget, survival duration (MM:SS), and total kill counter.
+- **Playtest Campaign Bypass (`?skip`)**: Fast developer/playtest bypass activated by launching with `?skip` in the URL. Automatically drops the operative onto the post-Zenith campaign victory screen with completed Room 20 status, 3 pre-Zenith augmentations (Extended Cylinder, Speed Loader, Reactive Shield), and fully functional interactive cards for Endless Protocol and Expedition Reset.
 
 ---
 
@@ -292,13 +290,12 @@ chronoshot/
 │   │   ├── ParticleSystem.ts
 │   │   ├── Player.ts
 │   │   └── Projectile.ts
-│   ├── levels/                   # Procedural level director & tactical templates
+│   ├── levels/                   # Campaign progression & Endless director
 │   │   ├── templates/            # Composable cover & geometry layout templates
 │   │   │   ├── ApexColosseumTemplate.ts
 │   │   │   └── ApexRedoubtTemplate.ts
-│   │   ├── EncounterDirector.ts
 │   │   ├── EndlessDirector.ts
-│   │   ├── LevelDirector.ts
+│   │   ├── RollbackCalculator.ts
 │   │   ├── Room.ts
 │   │   └── RoomManager.ts
 │   ├── math/                     # 2D vector primitives & continuous collision math
@@ -341,7 +338,7 @@ ChronoShot is developed following [OpenSpec](https://github.com/openspec/openspe
 - **`combat-arena`**: 2D arena layout, obstacle cover, enemy AI, 1-hit lethality, and puzzle rooms.
 - **`boss-encounters`**: Multi-phase boss architecture, shield absorption, radial novae, and telemetry.
 - **`roguelike-upgrades`**: Data-driven upgrade pipeline, dynamic card draft UI, and stat compounding.
-- **`procedural-levels`**: Modular layout templates, threat-budget spawner, and deterministic PRNG.
+- **`procedural-levels`**: 20-room campaign progression, victory transitions, playtest bypass hook, and Endless Protocol.
 
 ---
 

@@ -13,7 +13,34 @@ import { EnemyConfig, EnemyType } from "../entities/Enemy";
 import { Obstacle } from "../entities/Obstacle";
 import { testCircleAABB } from "../math/collision";
 import { vec2, vecDistance, Vector2D } from "../math/vector";
-import { ARCHETYPE_CONFIGS, THREAT_COSTS } from "./EncounterDirector";
+/**
+ * Threat costs for dynamic Endless Mode reinforcement wave scaling.
+ */
+export const THREAT_COSTS: Record<EnemyType, number> = {
+  grunt: 10,
+  shotgun: 20,
+  stalker: 25,
+  warden: 35,
+  sniper: 40,
+  marksman: 40,
+  boss: 120,
+};
+
+/**
+ * Standard archetype timings and collision radii for Endless Mode reinforcement units.
+ */
+export const ARCHETYPE_CONFIGS: Record<
+  EnemyType,
+  { fireCadenceTicks: number; initialDelayTicks: number; radius: number }
+> = {
+  grunt: { fireCadenceTicks: 50, initialDelayTicks: 25, radius: 15 },
+  shotgun: { fireCadenceTicks: 80, initialDelayTicks: 35, radius: 16 },
+  stalker: { fireCadenceTicks: 32, initialDelayTicks: 20, radius: 13 },
+  warden: { fireCadenceTicks: 65, initialDelayTicks: 30, radius: 18 },
+  sniper: { fireCadenceTicks: 110, initialDelayTicks: 40, radius: 14 },
+  marksman: { fireCadenceTicks: 110, initialDelayTicks: 40, radius: 14 },
+  boss: { fireCadenceTicks: 60, initialDelayTicks: 30, radius: 24 },
+};
 
 export interface MaterializingUnit {
   id: string;

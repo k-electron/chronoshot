@@ -896,6 +896,104 @@ describe("Combat Arena & Room Loop", () => {
       expect(roomManager.isGameCompleted()).toBe(false);
     });
 
+    describe("Playtest Campaign Victory Bypass (?skip)", () => {
+      it("drops directly onto post-Zenith campaign victory screen matching actual Room 20 completion", () => {
+        const roomManager = new RoomManager();
+        const arena = new Arena(960, 640, roomManager);
+
+        arena.bypassToCampaignVictory();
+
+        // 1. Victory status and room completion
+        expect(arena.status).toBe("victory");
+        expect(roomManager.isGameCompleted()).toBe(true);
+        expect(roomManager.getCurrentRoomIndex()).toBe(19);
+        expect(roomManager.getCurrentRoom().roomNumber).toBe(20);
+        expect(arena.enemies).toHaveLength(0);
+        expect(arena.projectiles).toHaveLength(0);
+
+        // 2. Pre-Zenith loadout (3 baseline augs: cylinder, loader, shield)
+        const augIds = arena.player.upgradePipeline.getActiveIds();
+        expect(augIds).toEqual([
+          "extended-cylinder",
+          "speed-loader",
+          "reactive-shield",
+        ]);
+        expect(arena.player.weapon.getAmmo()).toBe(8);
+        expect(arena.player.weapon.getMagSize()).toBe(8);
+        expect(arena.player.shields).toBe(1);
+        expect(arena.player.maxShields).toBe(1);
+
+        // 3. Historical boss checkpoint snapshots populated
+        expect(arena.checkpointLoadouts.get(5)).toEqual([]);
+        expect(arena.checkpointLoadouts.get(10)).toEqual(["extended-cylinder"]);
+        expect(arena.checkpointLoadouts.get(15)).toEqual([
+          "extended-cylinder",
+          "speed-loader",
+        ]);
+        expect(arena.checkpointLoadouts.get(20)).toEqual([
+          "extended-cylinder",
+          "speed-loader",
+          "reactive-shield",
+        ]);
+      });
+
+      it("seamlessly deploys into Endless Protocol via Card 0 from bypass victory screen", () => {
+        const roomManager = new RoomManager();
+        const arena = new Arena(960, 640, roomManager);
+
+        arena.bypassToCampaignVictory();
+        expect(arena.status).toBe("victory");
+
+        // Select Card 0 (Endless Protocol) via endlessChoice (key [E] or [Space])
+        arena.step(0.016, {
+          moveDir: vec2(0, 0),
+          mousePos: vec2(500, 320),
+          shoot: false,
+          reload: false,
+          dash: false,
+          restart: false,
+          endlessChoice: true,
+        });
+
+        expect(arena.status).toBe("playing");
+        expect(roomManager.isEndlessMode()).toBe(true);
+        expect(roomManager.getCurrentRoom().id).toBe("endless-colosseum");
+        expect(roomManager.getCurrentRoom().roomNumber).toBe(21);
+
+        // Full 7 augmentations, 3 shields, 8 rounds
+        const augs = arena.player.upgradePipeline.getActiveIds();
+        expect(augs).toHaveLength(7);
+        expect(arena.player.shields).toBe(3);
+        expect(arena.player.weapon.getAmmo()).toBe(8);
+        expect(arena.endlessDirector).toBeDefined();
+      });
+
+      it("cleanly resets expedition to Room 1 via Card 1 from bypass victory screen", () => {
+        const roomManager = new RoomManager();
+        const arena = new Arena(960, 640, roomManager);
+
+        arena.bypassToCampaignVictory();
+        expect(arena.status).toBe("victory");
+
+        // Select Card 1 (Expedition Reset) via restart [R]
+        arena.step(0.016, {
+          moveDir: vec2(0, 0),
+          mousePos: vec2(500, 320),
+          shoot: false,
+          reload: false,
+          dash: false,
+          restart: true,
+        });
+
+        expect(arena.status).toBe("playing");
+        expect(roomManager.getCurrentRoomIndex()).toBe(0);
+        expect(roomManager.getCurrentRoom().roomNumber).toBe(1);
+        expect(roomManager.isGameCompleted()).toBe(false);
+        expect(arena.player.upgradePipeline.getActiveIds()).toHaveLength(0);
+        expect(arena.player.weapon.getMagSize()).toBe(6);
+      });
+    });
+
     it("spawns reinforcement waves dynamically via EndlessDirector and tracks kills", () => {
       const arena = new Arena();
       arena.startEndlessMode();
