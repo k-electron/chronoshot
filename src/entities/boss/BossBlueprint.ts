@@ -370,6 +370,7 @@ export const CHRONO_ZENITH_BLUEPRINT: BossBlueprint = {
           pellets: 12,
           stutterTicks: 6,
           angularOffsetStep: 0.14,
+          counterRotating: true,
         }),
       transitionTrigger: (ctx) => ctx.shields <= 0,
     },

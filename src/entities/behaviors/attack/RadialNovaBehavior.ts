@@ -19,6 +19,8 @@ export interface RadialNovaConfig {
   angularOffsetStep?: number;
   initialDelayTicks?: number;
   initialAngle?: number;
+  counterRotating?: boolean;
+  counterOffsetPhase?: number;
 }
 
 export class RadialNovaBehavior implements AttackBehavior {
@@ -32,6 +34,9 @@ export class RadialNovaBehavior implements AttackBehavior {
   public stutterTicks: number;
   public angularOffsetStep: number;
   public currentRotationAngle: number;
+  public counterRotating: boolean;
+  public counterOffsetPhase: number;
+  public counterRotationAngle: number;
   private readonly initialDelayTicks: number;
   private readonly initialAngle: number;
 
@@ -42,6 +47,13 @@ export class RadialNovaBehavior implements AttackBehavior {
     this.currentRotationAngle = val;
   }
 
+  public get counterAngle(): number {
+    return this.counterRotationAngle;
+  }
+  public set counterAngle(val: number) {
+    this.counterRotationAngle = val;
+  }
+
   constructor(config: RadialNovaConfig = {}) {
     this.fireCadenceTicks = config.fireCadenceTicks ?? 60;
     this.bulletSpeed = config.bulletSpeed ?? 420;
@@ -50,6 +62,10 @@ export class RadialNovaBehavior implements AttackBehavior {
     this.angularOffsetStep = config.angularOffsetStep ?? 0;
     this.initialAngle = config.initialAngle ?? 0;
     this.currentRotationAngle = this.initialAngle;
+    this.counterRotating = config.counterRotating ?? false;
+    this.counterOffsetPhase =
+      config.counterOffsetPhase ?? (this.pellets > 0 ? Math.PI / this.pellets : 0);
+    this.counterRotationAngle = this.initialAngle + this.counterOffsetPhase;
     this.initialDelayTicks =
       config.initialDelayTicks ?? Math.floor(this.fireCadenceTicks * 0.5);
     this.fireCooldownTicks = this.initialDelayTicks;
@@ -90,12 +106,16 @@ export class RadialNovaBehavior implements AttackBehavior {
 
   /**
    * Discharges an evenly spaced 360-degree ring of `pellets` projectiles offset by `ctx.radius + 6`.
+   * When counterRotating is enabled, discharges a second ring rotating in the opposite direction.
    * Advances internal rotation by `angularOffsetStep` on each discharge.
    */
   public discharge(ctx: AttackContext): Projectile[] {
     const projectiles: Projectile[] = [];
     if (this.pellets <= 0) {
       this.currentRotationAngle += this.angularOffsetStep;
+      if (this.counterRotating) {
+        this.counterRotationAngle -= this.angularOffsetStep;
+      }
       return projectiles;
     }
 
@@ -119,6 +139,26 @@ export class RadialNovaBehavior implements AttackBehavior {
       );
     }
 
+    if (this.counterRotating) {
+      for (let i = 0; i < this.pellets; i++) {
+        const pelletAngle = this.counterRotationAngle + i * angleStep;
+        const spawnPos = vec2(
+          ctx.position.x + Math.cos(pelletAngle) * spawnOffset,
+          ctx.position.y + Math.sin(pelletAngle) * spawnOffset
+        );
+        projectiles.push(
+          createProjectile(
+            `bullet-${ctx.id}-${Date.now()}-counter-nova-${i}`,
+            spawnPos,
+            pelletAngle,
+            this.bulletSpeed,
+            "enemy"
+          )
+        );
+      }
+      this.counterRotationAngle -= this.angularOffsetStep;
+    }
+
     this.currentRotationAngle += this.angularOffsetStep;
     return projectiles;
   }
@@ -131,5 +171,6 @@ export class RadialNovaBehavior implements AttackBehavior {
     this.stutterTimerTicks = 0;
     this.isChargingLaser = false;
     this.currentRotationAngle = this.initialAngle;
+    this.counterRotationAngle = this.initialAngle + this.counterOffsetPhase;
   }
 }

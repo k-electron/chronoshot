@@ -232,7 +232,7 @@ describe("BossBlueprint & Multi-Phase Archetypes", () => {
     expect(p2.movement()).toBeInstanceOf(KiterBehavior);
     expect(p2.attack()).toBeInstanceOf(TelegraphedBeamBehavior);
 
-    // Phase 3: Singularity Tempest (2 shields, 105 px/s, 65-tick overload channel, radial nova)
+    // Phase 3: Singularity Tempest (2 shields, 105 px/s, 65-tick overload channel, twin counter-rotating radial novae)
     const p3 = bp.phases[2];
     expect(p3.phaseTitle).toBe("SINGULARITY TEMPEST");
     expect(p3.maxShields).toBe(2);
@@ -240,7 +240,23 @@ describe("BossBlueprint & Multi-Phase Archetypes", () => {
     expect(p3.overloadChannelTicks).toBe(65);
     expect(p3.onOverloadDetonate).toBeDefined();
     expect(p3.movement()).toBeInstanceOf(KiterBehavior);
-    expect(p3.attack()).toBeInstanceOf(RadialNovaBehavior);
+    const p3Attack = p3.attack();
+    expect(p3Attack).toBeInstanceOf(RadialNovaBehavior);
+    if (p3Attack instanceof RadialNovaBehavior) {
+      expect(p3Attack.counterRotating).toBe(true);
+      expect(p3Attack.pellets).toBe(12);
+      expect(p3Attack.angularOffsetStep).toBe(0.14);
+      expect(p3Attack.bulletSpeed).toBe(420);
+      expect(p3Attack.fireCadenceTicks).toBe(60);
+      const testCtx = {
+        id: "zenith-phase-3",
+        position: { x: 400, y: 300 },
+        aimAngle: 0,
+        radius: 28,
+      };
+      const fired = p3Attack.discharge(testCtx);
+      expect(fired).toHaveLength(24);
+    }
 
     // Phase 4: Zero-Point Overdrive (0 shields, 125 px/s, 60-tick overload channel, direct advance 16-pellet nova)
     const p4 = bp.phases[3];
