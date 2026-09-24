@@ -298,7 +298,14 @@ export const CHRONO_ZENITH_BLUEPRINT: BossBlueprint = {
           ],
         }),
       transitionTrigger: (ctx) => ctx.shields <= 0,
-      onPhaseExit: (ctx) => {
+    },
+    {
+      phaseIndex: 1,
+      phaseTitle: "TEMPORAL WARP",
+      maxShields: 3,
+      speed: 95,
+      overloadChannelTicks: 75,
+      onOverloadDetonate: (ctx) => {
         const action = combineTransitionActions(
           createCataclysmPulse({ particleCount: 36, speed: 340, color: "#00f0ff", damage: 1 }),
           createMinionEscortSpawn([
@@ -322,13 +329,6 @@ export const CHRONO_ZENITH_BLUEPRINT: BossBlueprint = {
         );
         action(ctx);
       },
-    },
-    {
-      phaseIndex: 1,
-      phaseTitle: "TEMPORAL WARP",
-      maxShields: 3,
-      speed: 95,
-      overloadChannelTicks: 75,
       movement: () => new KiterBehavior({ minDist: 260, maxDist: 440 }),
       attack: () =>
         new TelegraphedBeamBehavior({
@@ -338,7 +338,14 @@ export const CHRONO_ZENITH_BLUEPRINT: BossBlueprint = {
           laserChargeTicks: 25,
         }),
       transitionTrigger: (ctx) => ctx.shields <= 0,
-      onPhaseExit: (ctx) => {
+    },
+    {
+      phaseIndex: 2,
+      phaseTitle: "SINGULARITY TEMPEST",
+      maxShields: 2,
+      speed: 105,
+      overloadChannelTicks: 65,
+      onOverloadDetonate: (ctx) => {
         const action = combineTransitionActions(
           createCataclysmPulse({ particleCount: 42, speed: 380, color: "#a855f7", damage: 1 }),
           createMinionEscortSpawn([
@@ -355,13 +362,6 @@ export const CHRONO_ZENITH_BLUEPRINT: BossBlueprint = {
         );
         action(ctx);
       },
-    },
-    {
-      phaseIndex: 2,
-      phaseTitle: "SINGULARITY TEMPEST",
-      maxShields: 2,
-      speed: 105,
-      overloadChannelTicks: 65,
       movement: () => new KiterBehavior({ minDist: 200, maxDist: 380 }),
       attack: () =>
         new RadialNovaBehavior({
@@ -372,13 +372,6 @@ export const CHRONO_ZENITH_BLUEPRINT: BossBlueprint = {
           angularOffsetStep: 0.14,
         }),
       transitionTrigger: (ctx) => ctx.shields <= 0,
-      onPhaseExit: (ctx) => {
-        const action = combineTransitionActions(
-          createCataclysmPulse({ particleCount: 48, speed: 420, color: "#ff1744", damage: 1 }),
-          createAudioCue("shieldBreak")
-        );
-        action(ctx);
-      },
     },
     {
       phaseIndex: 3,
@@ -386,6 +379,13 @@ export const CHRONO_ZENITH_BLUEPRINT: BossBlueprint = {
       maxShields: 0,
       speed: 125,
       overloadChannelTicks: 60,
+      onOverloadDetonate: (ctx) => {
+        const action = combineTransitionActions(
+          createCataclysmPulse({ particleCount: 48, speed: 420, color: "#ff1744", damage: 1 }),
+          createAudioCue("shieldBreak")
+        );
+        action(ctx);
+      },
       movement: () => new DirectAdvanceBehavior(),
       attack: () =>
         new RadialNovaBehavior({
