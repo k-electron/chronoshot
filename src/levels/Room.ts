@@ -156,8 +156,8 @@ export function createRoom3(width = 960, height = 640): RoomConfig {
     playerSpawn: vec2(140, height / 2),
     obstacles: [
       ...createPerimeterWalls(width, height),
-      createObstacle("barrier-top", 380, 0, 24, height / 2 - 40),
-      createObstacle("barrier-bottom", 520, height / 2 + 40, 24, height / 2 - 40),
+      createObstacle("barrier-top", 380, 0, 24, height / 2 - 100),
+      createObstacle("barrier-bottom", 520, height / 2 + 100, 24, height / 2 - 100),
       createPillar("pillar-mid", 450, height / 2, 45),
     ],
     enemies: [
@@ -787,7 +787,7 @@ export function createRoom13(width = 960, height = 640): RoomConfig {
         id: "guard-choke-bottom",
         type: "shotgun",
         x: width - 260,
-        y: height / 2 + 80,
+        y: height / 2 + 65,
         maxShields: 1,
         fireCadenceTicks: 70,
         initialDelayTicks: 30,
@@ -1131,7 +1131,7 @@ export function createRoom17(width = 960, height = 640): RoomConfig {
       {
         id: "guard-upper",
         type: "shotgun",
-        x: width - 360,
+        x: width - 430,
         y: height / 2 - 100,
         maxShields: 1,
         fireCadenceTicks: 75,
@@ -1140,7 +1140,7 @@ export function createRoom17(width = 960, height = 640): RoomConfig {
       {
         id: "guard-lower",
         type: "shotgun",
-        x: width - 360,
+        x: width - 430,
         y: height / 2 + 100,
         maxShields: 1,
         fireCadenceTicks: 75,
@@ -1195,7 +1195,7 @@ export function createRoom18(width = 960, height = 640): RoomConfig {
       {
         id: "stalker-3",
         type: "stalker",
-        x: width - 340,
+        x: width - 440,
         y: height / 2,
         fireCadenceTicks: 32,
         initialDelayTicks: 15,
@@ -1374,7 +1374,7 @@ export function createRoom20(width = 960, height = 640): RoomConfig {
       {
         id: "boss-chrono-zenith",
         type: "boss",
-        x: width - 220,
+        x: width - 350,
         y: height / 2,
         maxShields: 5,
         fireCadenceTicks: 45,

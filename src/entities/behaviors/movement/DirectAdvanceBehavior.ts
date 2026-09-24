@@ -140,13 +140,39 @@ export class DirectAdvanceBehavior implements MovementBehavior {
           this.resultVelocity.x = 0;
           this.resultVelocity.y = 0;
         }
+        return this.resultVelocity;
+      }
+    }
+
+    // 3. Fallback locomotion when A* yields an empty path or path is exhausted
+    if (ctx.hasLineOfSight) {
+      // Direct vector pursuit toward target
+      const dx = target.position.x - ctx.position.x;
+      const dy = target.position.y - ctx.position.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist > 1e-6) {
+        this.resultVelocity.x = (dx / dist) * ctx.speed;
+        this.resultVelocity.y = (dy / dist) * ctx.speed;
       } else {
         this.resultVelocity.x = 0;
         this.resultVelocity.y = 0;
       }
     } else {
-      this.resultVelocity.x = 0;
-      this.resultVelocity.y = 0;
+      // Optical LOS blocked: steer toward nearest walkable cell to target
+      const pf = pathfinder ?? this.getOrCreatePathfinder(obstacles, ctx.radius);
+      const fallbackGoal = pf.findNearestWalkable(target.position) ?? target.position;
+      const dx = fallbackGoal.x - ctx.position.x;
+      const dy = fallbackGoal.y - ctx.position.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist > 1e-6) {
+        this.resultVelocity.x = (dx / dist) * ctx.speed;
+        this.resultVelocity.y = (dy / dist) * ctx.speed;
+      } else {
+        this.resultVelocity.x = 0;
+        this.resultVelocity.y = 0;
+      }
     }
 
     return this.resultVelocity;

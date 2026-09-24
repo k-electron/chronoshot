@@ -233,12 +233,13 @@ describe("KiterBehavior", () => {
       expect(vecLength(vel)).toBeCloseTo(80);
     });
 
-    it("holds position instead of driving backwards into an obstacle when retreat path is obstructed", () => {
+    it("evaluates lateral wall tangents when backwards retreat is obstructed by an obstacle", () => {
       const kiter = new KiterBehavior(300, 500);
       const wall = createObstacle("wall-behind", 50, 180, 40, 40);
 
       // Target at (200, 200). Unit at (105, 200). Dist = 95 < minDist (300).
       // Retreat vector points left (-1, 0) directly towards wall at x=50..90.
+      // Lateral escape tangents (0, 1) and (0, -1) are open.
       const ctx = createMockContext({
         position: vec2(105, 200),
         radius: 14,
@@ -249,8 +250,73 @@ describe("KiterBehavior", () => {
 
       const vel = kiter.update(ctx, target, [wall], 1);
 
+      // Must escape laterally along open tangent rather than freezing
+      expect(vel.x).toBe(0);
+      expect(Math.abs(vel.y)).toBeCloseTo(80);
+      expect(vecLength(vel)).toBeCloseTo(80);
+    });
+
+    it("holds position when backwards retreat and both lateral escape directions are blocked (cul-de-sac)", () => {
+      const kiter = new KiterBehavior(300, 500);
+      // Box surrounding unit at (105, 200) on left, top, and bottom
+      const wallBehind = createObstacle("wall-behind", 50, 180, 40, 40);
+      const wallTop = createObstacle("wall-top", 80, 140, 60, 40);
+      const wallBottom = createObstacle("wall-bottom", 80, 220, 60, 40);
+
+      const ctx = createMockContext({
+        position: vec2(105, 200),
+        radius: 14,
+        speed: 80,
+        hasLineOfSight: true,
+      });
+      const target = createMockTarget(200, 200);
+
+      const vel = kiter.update(ctx, target, [wallBehind, wallTop, wallBottom], 1);
+
+      // Trapped on rear and both sides: must hold ground
       expect(vel.x).toBe(0);
       expect(vel.y).toBe(0);
+    });
+
+    it("falls back to direct pursuit when sightline is clear but advancing path has no grid solution", () => {
+      const kiter = new KiterBehavior(100, 200);
+      // Unit far away (dist = 400 > maxDist 200)
+      const ctx = createMockContext({
+        position: vec2(600, 200),
+        speed: 80,
+        hasLineOfSight: true,
+      });
+      const target = createMockTarget(200, 200);
+
+      // Provide a mock pathfinder that returns an empty path
+      const mockPf = new GridPathfinder(960, 640, 40);
+      mockPf.findPath = () => [];
+
+      const vel = kiter.update(ctx, target, [], 1, 1 / 60, mockPf);
+
+      // Fallback locomotion advances directly toward target (-X)
+      expect(vel.x).toBeCloseTo(-80);
+      expect(vel.y).toBeCloseTo(0);
+    });
+
+    it("falls back to nearest walkable cell when sightline is blocked and A* returns empty path", () => {
+      const kiter = new KiterBehavior(100, 200);
+      const ctx = createMockContext({
+        position: vec2(400, 200),
+        speed: 80,
+        hasLineOfSight: false,
+      });
+      const target = createMockTarget(100, 200);
+
+      const mockPf = new GridPathfinder(960, 640, 40);
+      mockPf.findPath = () => [];
+      mockPf.findNearestWalkable = () => vec2(200, 200);
+
+      const vel = kiter.update(ctx, target, [], 1, 1 / 60, mockPf);
+
+      // Fallback locomotion steers toward (200, 200) which is left (-X)
+      expect(vel.x).toBeCloseTo(-80);
+      expect(vel.y).toBeCloseTo(0);
     });
   });
 });

@@ -320,8 +320,22 @@ export class Enemy implements CombatUnit {
           // Project velocity along wall tangent
           const velDot = vecDot(this.velocity, collision.normal);
           if (velDot < 0) {
-            this.velocity.x -= collision.normal.x * velDot;
-            this.velocity.y -= collision.normal.y * velDot;
+            const vSpeed = vecLength(this.velocity);
+            const isCorner =
+              Math.abs(collision.normal.x) > 0.1 && Math.abs(collision.normal.y) > 0.1;
+
+            if (vSpeed > 1e-4 && isCorner && velDot / vSpeed < -0.85) {
+              // Head-on corner vertex collision: deflect along dominant adjacent face tangent
+              // to break symmetry and prevent deadlocks
+              if (Math.abs(this.velocity.x) >= Math.abs(this.velocity.y)) {
+                this.velocity.y = 0;
+              } else {
+                this.velocity.x = 0;
+              }
+            } else {
+              this.velocity.x -= collision.normal.x * velDot;
+              this.velocity.y -= collision.normal.y * velDot;
+            }
           }
         }
       }

@@ -181,6 +181,48 @@ describe("Enemy Tactical AI & Archetypes", () => {
     expect(enemy.velocity.y).toBe(80);
   });
 
+  it("deflects velocity along dominant horizontal face tangent on head-on corner collision", () => {
+    const enemy = new Enemy({
+      id: "corner-slider-x",
+      type: "grunt",
+      x: 90,
+      y: 90,
+      radius: 15,
+    });
+    // Box at x: 100..200, y: 100..200. Top-left corner is at (100, 100).
+    const box = createObstacle("box-corner", 100, 100, 100, 100);
+
+    // Velocity approaching down-right directly opposing the top-left corner normal (-0.707, -0.707)
+    // Dominant X (|100| >= |90|)
+    enemy.velocity = vec2(100, 90);
+
+    enemy.resolveObstacleCollisions([box]);
+
+    // Head-on corner collision should deflect along horizontal tangent (y = 0, x preserved)
+    expect(enemy.velocity.x).toBe(100);
+    expect(enemy.velocity.y).toBe(0);
+  });
+
+  it("deflects velocity along dominant vertical face tangent on head-on corner collision", () => {
+    const enemy = new Enemy({
+      id: "corner-slider-y",
+      type: "grunt",
+      x: 90,
+      y: 90,
+      radius: 15,
+    });
+    const box = createObstacle("box-corner", 100, 100, 100, 100);
+
+    // Dominant Y (|100| > |90|)
+    enemy.velocity = vec2(90, 100);
+
+    enemy.resolveObstacleCollisions([box]);
+
+    // Deflect along vertical tangent (x = 0, y preserved)
+    expect(enemy.velocity.x).toBe(0);
+    expect(enemy.velocity.y).toBe(100);
+  });
+
   it("navigates around cover using A* pathfinding when line-of-sight is obstructed", () => {
     const enemy = new Enemy({
       id: "pather",

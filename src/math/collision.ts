@@ -399,9 +399,24 @@ export function hasNavigationClearance(
   for (const obstacle of obstacles) {
     const { min, max } = obstacle.bounds;
 
-    // 1. If start position is already intersecting obstacle hitbox
-    if (testCircleAABB(from, radius, min, max) !== null) {
-      return false;
+    // 1. If start position is in contact with obstacle, check departure direction
+    const contact = testCircleAABB(from, radius, min, max);
+    if (contact && contact.collided) {
+      // If entity center is strictly inside obstacle AABB, clearance is blocked
+      if (
+        from.x >= min.x &&
+        from.x <= max.x &&
+        from.y >= min.y &&
+        from.y <= max.y
+      ) {
+        return false;
+      }
+      // If moving into obstacle (opposing normal), clearance is blocked
+      if (vecDot(dir, contact.normal) < -0.05) {
+        return false;
+      }
+      // Moving away or along tangent: this obstacle does not obstruct departure
+      continue;
     }
 
     // 2. Broad-phase: check if ray hits bounding box of Minkowski sum

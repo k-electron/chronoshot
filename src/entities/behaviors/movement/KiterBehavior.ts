@@ -102,9 +102,38 @@ export class KiterBehavior implements MovementBehavior {
           this.resultVelocity.x = retreatDirX * ctx.speed;
           this.resultVelocity.y = retreatDirY * ctx.speed;
         } else {
-          // Obstacle directly behind: hold ground instead of jamming into wall
-          this.resultVelocity.x = 0;
-          this.resultVelocity.y = 0;
+          // Obstacle directly behind: probe lateral wall escape tangents
+          const lateralCandidates: Vector2D[] = [
+            { x: -retreatDirY, y: retreatDirX },
+            { x: retreatDirY, y: -retreatDirX },
+          ];
+          let chosenLateral: Vector2D | null = null;
+          let maxDistSq = -1;
+
+          for (const lat of lateralCandidates) {
+            const probe = vec2(
+              ctx.position.x + lat.x * retreatProbeDist,
+              ctx.position.y + lat.y * retreatProbeDist
+            );
+            if (hasNavigationClearance(ctx.position, probe, ctx.radius, obstacles)) {
+              const dX = probe.x - target.position.x;
+              const dY = probe.y - target.position.y;
+              const dSq = dX * dX + dY * dY;
+              if (dSq > maxDistSq) {
+                maxDistSq = dSq;
+                chosenLateral = lat;
+              }
+            }
+          }
+
+          if (chosenLateral) {
+            this.resultVelocity.x = chosenLateral.x * ctx.speed;
+            this.resultVelocity.y = chosenLateral.y * ctx.speed;
+          } else {
+            // Trapped on all sides: hold ground instead of jamming into wall
+            this.resultVelocity.x = 0;
+            this.resultVelocity.y = 0;
+          }
         }
 
         return this.resultVelocity;
@@ -211,13 +240,39 @@ export class KiterBehavior implements MovementBehavior {
           this.resultVelocity.x = 0;
           this.resultVelocity.y = 0;
         }
+        return this.resultVelocity;
+      }
+    }
+
+    // 3. Fallback locomotion when A* yields an empty path or path is exhausted
+    if (ctx.hasLineOfSight) {
+      // Advance directly toward target
+      const dx = target.position.x - ctx.position.x;
+      const dy = target.position.y - ctx.position.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist > 1e-6) {
+        this.resultVelocity.x = (dx / dist) * ctx.speed;
+        this.resultVelocity.y = (dy / dist) * ctx.speed;
       } else {
         this.resultVelocity.x = 0;
         this.resultVelocity.y = 0;
       }
     } else {
-      this.resultVelocity.x = 0;
-      this.resultVelocity.y = 0;
+      // Steer toward nearest walkable cell to target
+      const pf = pathfinder ?? this.getOrCreatePathfinder(obstacles, ctx.radius);
+      const fallbackGoal = pf.findNearestWalkable(target.position) ?? target.position;
+      const dx = fallbackGoal.x - ctx.position.x;
+      const dy = fallbackGoal.y - ctx.position.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist > 1e-6) {
+        this.resultVelocity.x = (dx / dist) * ctx.speed;
+        this.resultVelocity.y = (dy / dist) * ctx.speed;
+      } else {
+        this.resultVelocity.x = 0;
+        this.resultVelocity.y = 0;
+      }
     }
 
     return this.resultVelocity;
