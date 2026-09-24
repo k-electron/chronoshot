@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg)](https://vitejs.dev/)
-[![Tests](https://img.shields.io/badge/Tests-511%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-690%20passing-brightgreen.svg)]()
 
 ---
 
@@ -130,14 +130,14 @@ Powered by a decoupled data-driven architecture (`UpgradePipeline`, `UpgradeRegi
   - **Room 17 (`TWIN BASTIONS`)**: Fortified bunker siege requiring disciplined cover peeking against dual snipers and wardens.
   - **Room 18 (`CHRONO CHOKE`)**: Relentless close-quarters containment testing rapid target prioritization against triple stalkers and wardens.
   - **Room 19 (`PROTOCOL ZENITH`)**: Ultimate campaign gauntlet featuring a coordinated quadrant matrix of Wardens, Snipers, and Stalkers.
-  - **Room 20 (`PROTOCOL OMEGA`)**: Supreme campaign climax against Chrono-Zenith: Zero Sovereign inside the fortified Apex Redoubt. Overcoming its 4 escalating phases and Cataclysm Pulses unlocks the golden exit gate to Endless Survival Mode.
+  - **Room 20 (`PROTOCOL OMEGA`)**: Supreme campaign climax against Chrono-Zenith: Zero Sovereign inside the fortified Apex Redoubt. Overcoming its 4 escalating phases and Cataclysm Pulses triggers the MISSION ACCOMPLISHED Campaign Victory screen, celebrating completion of all 20 tactical protocols.
 - **Cascading Boss Checkpoint Rollback**: On defeat, the dual-card defeat screen gives players the choice between **Rollback** (<kbd>R</kbd> or click) and **Full Reset** (<kbd>Shift+R</kbd> or click). Rollback evaluates the room of elimination, cascading down sector-by-sector (Rooms 1–5 $\to$ Room 1, Rooms 6–10 $\to$ Room 5 Goliath-01, Rooms 11–15 $\to$ Room 10 Chrono-Weaver, Rooms 16–20 $\to$ Room 15 Vektor-Prime, Endless Mode $\to$ Room 20 Chrono-Zenith), restoring clean pre-boss upgrade snapshots. Repeated failure in a boss fight or sector demotes the player down the checkpoint ladder tier-by-tier until Room 1.
 
 ### 11. Modular Level Director & Endless Survival Mode
 - **Composable Tactical Layouts**: 7 geometry templates (`CenterPillarsTemplate`, `TwinBunkersTemplate`, `SplitCorridorTemplate`, `KillboxLanesTemplate`, `ArenaQuadrantTemplate`, `ApexRedoubtTemplate`, `ApexColosseumTemplate`) providing varied obstacle geometries, tactical sightlines, and verified spawn safety ($\ge 280\text{px}$ from player).
 - **Threat-Budget Encounter Spawner (`EncounterDirector`)**: Scales difficulty by assigning numerical threat budgets across hostiles while enforcing squad composition constraints (maximum 2 Marksman snipers per room, mandatory frontline escorts) and non-overlapping safe spawn sampling ($\ge 48\text{px}$ unit separation).
 - **Deterministic Seeded PRNG (`LevelDirector`)**: High-performance Mulberry32 pseudo-random number generator enabling 100% reproducible room seeds, daily challenges, and milestone boss synthesis on every 5th room (Sector 1: Goliath-01, Sector 2: Chrono-Weaver, Sector 3: Vektor-Prime, Sector 4: Chrono-Zenith).
-- **Endless Survival Mode (`EndlessDirector` & `ApexColosseumTemplate`)**: Upon defeating Chrono-Zenith in Room 20, a golden exit gate opens (`"ENDLESS GATE"`). Stepping into the gate seamlessly warps the operative into an infinite tactical arena:
+- **Endless Survival Mode (`EndlessDirector` & `ApexColosseumTemplate`)**: Upon defeating Chrono-Zenith in Room 20, the Mission Accomplished overlay presents dual options: **Endless Protocol** (<kbd>E</kbd> / <kbd>Space</kbd> / click) to enter the endless gauntlet, or **Expedition Reset** (<kbd>R</kbd> / <kbd>Shift+R</kbd> / click) to restart at Room 1. Choosing Endless Protocol deploys the operative directly into the infinite tactical Apex Colosseum:
   - **Full Augmentation Loadout**: Automatically installs all 7 upgrades (`extended-cylinder`, `speed-loader`, `reactive-shield`, `kinetic-stride`, `chrono-burst`, `phase-deflector`, `overcharge-dash`), tops shields off to maximum capacity (3 shields), and loads cylinder to 8 rounds.
   - **Climbing Threat Budget**: Threat budget steadily scales upward ($50 + \lfloor \text{ticks}/120 \rfloor \times 5$), spawning mixed hostile squads according to dynamic threat costs.
   - **Fair Distant Spatial Sampling**: Enemies only spawn at distant coordinates ($\ge 350\text{px}$ from player, $\ge 48\text{px}$ from other units, completely outside obstacle collision boundaries) to eliminate cheap, unavoidable deaths.
@@ -152,11 +152,12 @@ Powered by a decoupled data-driven architecture (`UpgradePipeline`, `UpgradeRegi
 |---|---|
 | <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> | Move (Smoothly accelerates time to 100%) |
 | <kbd>Mouse</kbd> | 360° Hardware Aim Reticle (Does not advance time) |
-| <kbd>Left Click</kbd> | Fire Revolver (+6 simulation ticks) / Resume from Pause / Select Upgrade Card / Select Defeat Card |
+| <kbd>Left Click</kbd> | Fire Revolver (+6 simulation ticks) / Resume from Pause / Select Upgrade Card / Select Defeat or Victory Card |
 | <kbd>Space</kbd> / <kbd>Shift</kbd> | Overcharge Dash (+12 tick burst, 480 px/s sprint, deflection frames) |
+| <kbd>E</kbd> / <kbd>Space</kbd> | Select Endless Protocol on Campaign Victory Screen |
 | <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> | Select Tactical Augmentation during Post-Boss Draft |
-| <kbd>R</kbd> | Reload Revolver / Checkpoint Rollback on Defeat |
-| <kbd>Shift</kbd> + <kbd>R</kbd> | Quick Restart Current Room / Full Expedition Reset on Defeat |
+| <kbd>R</kbd> | Reload Revolver / Checkpoint Rollback on Defeat / Reset Expedition on Victory Screen |
+| <kbd>Shift</kbd> + <kbd>R</kbd> | Quick Restart Current Room / Full Expedition Reset on Defeat or Victory Screen |
 | <kbd>Esc</kbd> / <kbd>P</kbd> | Toggle Tactical Pause & Controls Matrix |
 | <kbd>M</kbd> | Toggle Audio Mute |
 
@@ -238,7 +239,7 @@ npm run preview
 
 ### Continuous Integration & Cloudflare Pages Hosting
 
-- **GitHub Actions**: Automated CI (`.github/workflows/ci.yml`) runs on all pull requests and pushes to `main`. It validates dependencies, TypeScript compilation, Vite production build, and all 511 Vitest unit & integration tests under Node 26.
+- **GitHub Actions**: Automated CI (`.github/workflows/ci.yml`) runs on all pull requests and pushes to `main`. It validates dependencies, TypeScript compilation, Vite production build, and all 690 Vitest unit & integration tests under Node 26.
 - **Cloudflare Pages Hosting**:
   1. In the [Cloudflare Dashboard](https://dash.cloudflare.com/), go to **Workers & Pages** > **Create application** > **Pages** > **Connect to Git**.
   2. Select the `k-electron/chronoshot` repository.
@@ -305,13 +306,16 @@ chronoshot/
 │   │   └── vector.ts
 │   ├── ui/                       # Minimalist HUD, tactical reticle, boss & enemy renderers
 │   │   ├── BossTelemetryHUD.ts
+│   │   ├── ChronoAnchorRenderer.ts
 │   │   ├── CylinderHUD.ts
+│   │   ├── DefeatHUD.ts
 │   │   ├── EndlessTelemetryHUD.ts
 │   │   ├── EnemyRenderer.ts
 │   │   ├── Reticle.ts
 │   │   ├── theme.ts
 │   │   ├── TimeHUD.ts
-│   │   └── UpgradeDraftHUD.ts
+│   │   ├── UpgradeDraftHUD.ts
+│   │   └── VictoryHUD.ts
 │   ├── upgrades/                 # Roguelike upgrade registry & stat pipeline
 │   │   ├── definitions/
 │   │   ├── UpgradeDefinition.ts

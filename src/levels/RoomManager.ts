@@ -5,20 +5,21 @@
  * room transitions, boss encounter detection, and overall mission victory state:
  * - Locks exit portal until all active enemies in the current room are eliminated
  * - Detects player entrance into the exit portal to trigger room progression
- * - Manages sequential transition across 19 rooms spanning Sector 1, Zone 2, Sector 3, and Sector 4
- * - Identifies milestone boss rooms (Room 5: Goliath-01, Room 10: Chrono-Weaver, Room 15: Vektor-Prime)
- * - Displays the final Mission Accomplished victory screen upon room 19 completion
- * - Renders dynamic portal animations (locked hazard ring vs. radiant cyan vortex)
+ * - Manages sequential transition across 20 rooms spanning Sector 1, Zone 2, Sector 3, and Sector 4
+ * - Identifies milestone boss rooms (Room 5: Goliath-01, Room 10: Chrono-Weaver, Room 15: Vektor-Prime, Room 20: Chrono-Zenith)
+ * - Suppresses floor portals in boss rooms and Endless Survival Mode in favor of direct combat transitions
+ * - Displays the modular Mission Accomplished victory screen upon Room 20 final boss destruction
+ * - Renders dynamic portal animations (locked hazard ring vs. radiant cyan vortex) in standard tactical rooms
  */
 
 import { vecDistance, Vector2D } from "../math/vector";
-import { getUIFont, UITheme } from "../ui/theme";
 import { truncateText } from "../ui/textUtils";
 import { createStandardRoomSequence, RoomConfig } from "./Room";
 import { LevelDirector } from "./LevelDirector";
 import { EndlessDirector } from "./EndlessDirector";
 import { ApexColosseumTemplate } from "./templates/ApexColosseumTemplate";
 import { computeRollbackTarget, RollbackTarget } from "./RollbackCalculator";
+import { VictoryHUD } from "../ui/VictoryHUD";
 
 /**
  * Creates the dynamic Apex Colosseum room for Endless Survival Mode.
@@ -69,10 +70,11 @@ export class RoomManager {
   }
 
   /**
-   * Returns whether the current room has unlocked a radiant golden portal (Room 20 completion).
+   * Returns whether the current room has unlocked a golden portal.
+   * @deprecated Floor portals are suppressed in Room 20 and boss rooms.
    */
   public isGoldenPortal(): boolean {
-    return this.getCurrentRoom().roomNumber === 20 && this.exitUnlocked;
+    return false;
   }
 
   /**
@@ -273,11 +275,16 @@ export class RoomManager {
 
   /**
    * Renders the Exit Portal on the canvas with animated state feedback.
+   * Suppressed in boss rooms and Endless Survival Mode.
    */
   public renderPortal(
     ctx: CanvasRenderingContext2D,
     wallDeltaTime: number = 0.016
   ): void {
+    if (this.isBossRoom() || this.endlessDirector !== undefined) {
+      return;
+    }
+
     this.portalAnimationTimer += wallDeltaTime;
     const portal = this.getCurrentRoom().exitPortal;
 
@@ -285,22 +292,15 @@ export class RoomManager {
     ctx.translate(portal.x, portal.y);
 
     if (this.exitUnlocked) {
-      const isGolden = this.isGoldenPortal();
-      // Unlocked: Radiant pulsing energy vortex (Golden for Room 20, Cyan for others)
+      // Unlocked: Radiant pulsing cyan energy vortex
       const pulse = Math.sin(this.portalAnimationTimer * 4) * 3;
       const r = Math.max(1, portal.radius + pulse);
 
       // Outer radial glow
       const grad = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 1.5);
-      if (isGolden) {
-        grad.addColorStop(0, "rgba(255, 215, 0, 0.55)");
-        grad.addColorStop(0.5, "rgba(255, 170, 0, 0.30)");
-        grad.addColorStop(1, "rgba(255, 215, 0, 0)");
-      } else {
-        grad.addColorStop(0, "rgba(0, 240, 255, 0.45)");
-        grad.addColorStop(0.5, "rgba(0, 255, 170, 0.25)");
-        grad.addColorStop(1, "rgba(0, 240, 255, 0)");
-      }
+      grad.addColorStop(0, "rgba(0, 240, 255, 0.45)");
+      grad.addColorStop(0.5, "rgba(0, 255, 170, 0.25)");
+      grad.addColorStop(1, "rgba(0, 240, 255, 0)");
       ctx.fillStyle = grad;
       ctx.beginPath();
       ctx.arc(0, 0, r * 1.5, 0, Math.PI * 2);
@@ -309,7 +309,7 @@ export class RoomManager {
       // Spinning vortex ring
       ctx.rotate(this.portalAnimationTimer * 2.5);
       ctx.lineWidth = 3;
-      ctx.strokeStyle = isGolden ? "#ffd700" : "#00f0ff";
+      ctx.strokeStyle = "#00f0ff";
       ctx.setLineDash([8, 6]);
       ctx.beginPath();
       ctx.arc(0, 0, r, 0, Math.PI * 2);
@@ -317,7 +317,7 @@ export class RoomManager {
 
       // Radiant white core
       ctx.setLineDash([]);
-      ctx.fillStyle = isGolden ? "#fffde0" : "#ffffff";
+      ctx.fillStyle = "#ffffff";
       ctx.beginPath();
       ctx.arc(0, 0, portal.radius * 0.35, 0, Math.PI * 2);
       ctx.fill();
@@ -327,8 +327,8 @@ export class RoomManager {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.font = "900 11px monospace";
-      ctx.fillStyle = isGolden ? "#ffd700" : "#00f0ff";
-      ctx.fillText(isGolden ? "ENDLESS GATE" : "EXIT GATE", 0, portal.radius + 18);
+      ctx.fillStyle = "#00f0ff";
+      ctx.fillText("EXIT GATE", 0, portal.radius + 18);
     } else {
       // Locked: Dim crimson barrier with lock indicator
       const pulse = Math.sin(this.portalAnimationTimer * 2) * 0.15;
@@ -413,72 +413,9 @@ export class RoomManager {
   public renderGameVictory(
     ctx: CanvasRenderingContext2D,
     width: number,
-    height: number
+    height: number,
+    hoveredCardIndex: number | null = null
   ): void {
-    ctx.save();
-    ctx.fillStyle = "rgba(7, 10, 15, 0.92)";
-    ctx.fillRect(0, 0, width, height);
-
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-
-    // Minimalist hairline frame
-    ctx.strokeStyle = UITheme.colors.panelBorder;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(60, 60, width - 120, height - 120);
-
-    // Accent corner tabs
-    const cornerSize = 14;
-    ctx.strokeStyle = UITheme.colors.cyan;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    // Top-left
-    ctx.moveTo(60, 60 + cornerSize);
-    ctx.lineTo(60, 60);
-    ctx.lineTo(60 + cornerSize, 60);
-    // Top-right
-    ctx.moveTo(width - 60 - cornerSize, 60);
-    ctx.lineTo(width - 60, 60);
-    ctx.lineTo(width - 60, 60 + cornerSize);
-    // Bottom-left
-    ctx.moveTo(60, height - 60 - cornerSize);
-    ctx.lineTo(60, height - 60);
-    ctx.lineTo(60 + cornerSize, height - 60);
-    // Bottom-right
-    ctx.moveTo(width - 60 - cornerSize, height - 60);
-    ctx.lineTo(width - 60, height - 60);
-    ctx.lineTo(width - 60, height - 60 - cornerSize);
-    ctx.stroke();
-
-    // Title
-    ctx.font = getUIFont(34, "800");
-    ctx.fillStyle = UITheme.colors.cyan;
-    ctx.fillText("MISSION ACCOMPLISHED", width / 2, height / 2 - 75);
-
-    // Subtitle
-    ctx.font = getUIFont(13, "600");
-    ctx.fillStyle = UITheme.colors.textPrimary;
-    ctx.fillText("ALL 20 TACTICAL PROTOCOLS CONQUERED", width / 2, height / 2 - 20);
-
-    // Protocol checkmarks
-    ctx.font = getUIFont(11, "600");
-    ctx.fillStyle = UITheme.colors.green;
-    ctx.fillText(
-      "✓ Goliath-01 Defeated    |    ✓ Chrono-Weaver Neutralized",
-      width / 2,
-      height / 2 + 20
-    );
-    ctx.fillText(
-      "✓ Vektor-Prime Obliterated    |    ✓ Chrono-Zenith Overthrown",
-      width / 2,
-      height / 2 + 42
-    );
-
-    // Reset prompt
-    ctx.font = getUIFont(12, "bold");
-    ctx.fillStyle = UITheme.colors.textPrimary;
-    ctx.fillText("PRESS [R] TO PLAY AGAIN", width / 2, height / 2 + 90);
-
-    ctx.restore();
+    VictoryHUD.render(ctx, width, height, hoveredCardIndex);
   }
 }
