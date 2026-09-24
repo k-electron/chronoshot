@@ -127,6 +127,28 @@ describe("LevelDirector & PRNG", () => {
       expect(boss?.blueprint?.id).toBe("chrono-zenith");
     });
 
+    it("places Room 20 Chrono-Zenith at width - 350 clear of redoubt pillars", () => {
+      const director = new LevelDirector({ seed: 123 });
+      const room20 = director.generateRoom(20);
+      const boss = room20.enemies.find((e) => e.type === "boss");
+      expect(boss).toBeDefined();
+      expect(boss?.x).toBe(960 - 350); // 610
+      expect(boss?.y).toBe(320);
+
+      // Verify no overlap with any obstacles
+      const bossRadius = 28;
+      for (const obs of room20.obstacles) {
+        const min = obs.bounds.min;
+        const max = obs.bounds.max;
+        const clampedX = Math.max(min.x, Math.min(boss!.x, max.x));
+        const clampedY = Math.max(min.y, Math.min(boss!.y, max.y));
+        const dx = boss!.x - clampedX;
+        const dy = boss!.y - clampedY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        expect(dist).toBeGreaterThan(bossRadius);
+      }
+    });
+
     it("respects explicit custom boss blueprint in constructor config", () => {
       const director = new LevelDirector({ bossBlueprint: GOLIATH_01_BLUEPRINT });
       const room10 = director.generateRoom(10);

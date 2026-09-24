@@ -155,7 +155,7 @@ export class LevelDirector {
     const bossConfig: EnemyConfig = {
       id: bossId,
       type: "boss",
-      x: this.arenaWidth - 200,
+      x: roomNumber === 20 ? this.arenaWidth - 350 : this.arenaWidth - 200,
       y: this.arenaHeight / 2,
       maxShields: blueprint.phases[0]?.maxShields ?? 4,
       fireCadenceTicks: 60,

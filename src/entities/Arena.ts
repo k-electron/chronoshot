@@ -21,7 +21,7 @@ import { Reticle } from "../ui/Reticle";
 import { ChronoAnchorRenderer } from "../ui/ChronoAnchorRenderer";
 import { getUIFont, UITheme } from "../ui/theme";
 import { TimeHUD } from "../ui/TimeHUD";
-import { Enemy } from "./Enemy";
+import { Enemy, EnemyConfig } from "./Enemy";
 import { EnemyRenderer } from "../ui/EnemyRenderer";
 import { BossTelemetryHUD } from "../ui/BossTelemetryHUD";
 import { EndlessTelemetryHUD } from "../ui/EndlessTelemetryHUD";
@@ -192,6 +192,22 @@ export class Arena {
         this.checkpointLoadouts.set(room.roomNumber, [...this.player.upgradePipeline.getActiveIds()]);
       }
     }
+  }
+
+  /**
+   * Dynamically constructs and registers an active enemy combat unit into the arena roster.
+   */
+  public spawnEnemy(config: EnemyConfig): Enemy {
+    const enemy = new Enemy(config);
+    if (enemy.phaseController) {
+      enemy.phaseController.transitionContextExtras = {
+        arena: this,
+        particles: this.particles,
+        soundSynth: this.soundSynth,
+      };
+    }
+    this.enemies.push(enemy);
+    return enemy;
   }
 
   /**
@@ -434,6 +450,13 @@ export class Arena {
       }
     );
 
+    // Global player elimination check (for non-bullet lethal hazards)
+    if (this.status === "playing" && !this.player.isAlive) {
+      this.soundSynth?.playShatter(this.timeGovernor.getTimeScale());
+      this.particles.emitShatter(this.player.position, 22, "#00f0ff", 240);
+      this.status = "defeat";
+    }
+
     // Evaluate room clearance / exit portal status
     this.checkVictoryCondition();
 
@@ -581,6 +604,13 @@ export class Arena {
 
     // Check enemy elimination status
     this.checkVictoryCondition();
+
+    // Global player elimination check (for non-bullet lethal damage e.g. Cataclysm Overload shockwaves)
+    if (this.status === "playing" && !this.player.isAlive) {
+      this.soundSynth?.playShatter(this.timeGovernor.getTimeScale());
+      this.particles.emitShatter(this.player.position, 22, "#00f0ff", 240);
+      this.status = "defeat";
+    }
 
     // 6. Check exit portal stepping if room manager is active
     if (

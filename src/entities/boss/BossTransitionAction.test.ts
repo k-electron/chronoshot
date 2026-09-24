@@ -423,5 +423,66 @@ describe("BossTransitionAction", () => {
       expect(result.damageDealt).toBe(1);
       expect(takeDamageSpy).toHaveBeenCalledWith(1);
     });
+
+    it("triggers arena defeat state and shatter feedback when Cataclysm Pulse deals lethal damage", () => {
+      const pulse = createCataclysmPulse({ particleCount: 20, damage: 1 });
+      const emitShatterSpy = vi.fn();
+      const playShatterSpy = vi.fn();
+      const mockArena: any = { status: "playing" };
+      let playerAlive = true;
+      const mockPlayer: any = {
+        position: vec2(150, 320),
+        get isAlive() {
+          return playerAlive;
+        },
+        takeDamage: vi.fn().mockImplementation(() => {
+          playerAlive = false;
+          return { absorbed: false, eliminated: true, remainingShields: 0 };
+        }),
+      };
+
+      const ctx: BossTransitionContext = {
+        bossPosition: vec2(700, 320),
+        currentPhase: 0,
+        nextPhase: 1,
+        player: mockPlayer,
+        arena: mockArena,
+        obstacles: [],
+        particles: { emitShatter: emitShatterSpy } as any,
+        soundSynth: { playShatter: playShatterSpy } as any,
+      };
+
+      const result = pulse(ctx);
+      expect(result.occluded).toBe(false);
+      expect(result.damageDealt).toBe(1);
+      expect(mockArena.status).toBe("defeat");
+      expect(emitShatterSpy).toHaveBeenCalledWith(mockPlayer.position, 22, "#00f0ff", 240);
+      expect(playShatterSpy).toHaveBeenCalledWith(1.0);
+    });
+
+    it("triggers shield deflection/break feedback when player absorbs Cataclysm Pulse", () => {
+      const pulse = createCataclysmPulse({ particleCount: 20, damage: 1 });
+      const emitShieldBreakSpy = vi.fn();
+      const playShieldBreakSpy = vi.fn();
+      const mockPlayer: any = {
+        position: vec2(150, 320),
+        isAlive: true,
+        takeDamage: vi.fn().mockReturnValue({ absorbed: true, eliminated: false, remainingShields: 0 }),
+      };
+
+      const ctx: BossTransitionContext = {
+        bossPosition: vec2(700, 320),
+        currentPhase: 0,
+        nextPhase: 1,
+        player: mockPlayer,
+        obstacles: [],
+        particles: { emitShieldBreak: emitShieldBreakSpy, emitShatter: vi.fn() } as any,
+        soundSynth: { playShieldBreak: playShieldBreakSpy } as any,
+      };
+
+      pulse(ctx);
+      expect(emitShieldBreakSpy).toHaveBeenCalledWith(mockPlayer.position, 16);
+      expect(playShieldBreakSpy).toHaveBeenCalledWith(1.0);
+    });
   });
 });

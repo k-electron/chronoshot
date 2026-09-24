@@ -11,6 +11,7 @@
 import { rayIntersectsAABB } from "../../math/collision";
 import { vecDistance, vecScale, vecSub, Vector2D } from "../../math/vector";
 import { Obstacle } from "../Obstacle";
+import { Enemy } from "../Enemy";
 import { BossTransitionContext } from "./BossPhaseController";
 
 /**
@@ -194,7 +195,8 @@ export function createMinionEscortSpawn(
         }
       } else if (Array.isArray(ctx.arena.enemies)) {
         for (const item of resolved) {
-          ctx.arena.enemies.push(item);
+          const enemy = item instanceof Enemy ? item : new Enemy(item);
+          ctx.arena.enemies.push(enemy);
         }
       }
     }
@@ -361,7 +363,43 @@ export function createCataclysmPulse(
     }
 
     // Exposed in open line of sight: inflict damage on player
-    player.takeDamage(damage);
+    const damageResult = player.takeDamage(damage);
+
+    if (damageResult?.absorbed) {
+      if (damageResult.deflected) {
+        if (ctx.particles && typeof ctx.particles.emitShieldSparks === "function") {
+          ctx.particles.emitShieldSparks(player.position, { x: 0, y: -1 }, 8);
+        }
+        if (ctx.soundSynth && typeof ctx.soundSynth.playShieldDeflect === "function") {
+          ctx.soundSynth.playShieldDeflect(1.0);
+        }
+      } else if (damageResult.remainingShields === 0) {
+        if (ctx.particles && typeof ctx.particles.emitShieldBreak === "function") {
+          ctx.particles.emitShieldBreak(player.position, 16);
+        }
+        if (ctx.soundSynth && typeof ctx.soundSynth.playShieldBreak === "function") {
+          ctx.soundSynth.playShieldBreak(1.0);
+        }
+      } else {
+        if (ctx.particles && typeof ctx.particles.emitShieldSparks === "function") {
+          ctx.particles.emitShieldSparks(player.position, { x: 0, y: -1 }, 8);
+        }
+        if (ctx.soundSynth && typeof ctx.soundSynth.playShieldDeflect === "function") {
+          ctx.soundSynth.playShieldDeflect(1.0);
+        }
+      }
+    } else if (damageResult?.eliminated || !player.isAlive) {
+      if (ctx.particles && typeof ctx.particles.emitShatter === "function") {
+        ctx.particles.emitShatter(player.position, 22, "#00f0ff", 240);
+      }
+      if (ctx.soundSynth && typeof ctx.soundSynth.playShatter === "function") {
+        ctx.soundSynth.playShatter(1.0);
+      }
+      if (ctx.arena) {
+        ctx.arena.status = "defeat";
+      }
+    }
+
     return { occluded: false, damageDealt: damage };
   }) as CataclysmPulseAction;
 

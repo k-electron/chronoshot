@@ -4,7 +4,7 @@ import { vec2 } from "../math/vector";
 import { Enemy } from "./Enemy";
 import { createObstacle, createPillar } from "./Obstacle";
 import { Player } from "./Player";
-import { CHRONO_WEAVER_BLUEPRINT, createBossPhaseController } from "./boss/BossBlueprint";
+import { CHRONO_WEAVER_BLUEPRINT, CHRONO_ZENITH_BLUEPRINT, createBossPhaseController } from "./boss/BossBlueprint";
 import { BossPhaseController } from "./boss/BossPhaseController";
 
 describe("Enemy Tactical AI & Archetypes", () => {
@@ -484,6 +484,47 @@ describe("Enemy - Boss Archetype (Goliath-01)", () => {
       // Phase 2 discharges 12-pellet radial nova
       const novaProjectiles = boss.discharge();
       expect(novaProjectiles).toHaveLength(12);
+    });
+
+    it("scales Chrono-Zenith speed across phases (45 -> 95 -> 105 -> 125 px/s)", () => {
+      const boss = new Enemy({
+        id: "boss-zenith-speed",
+        type: "boss",
+        x: 500,
+        y: 300,
+        blueprint: CHRONO_ZENITH_BLUEPRINT,
+      });
+
+      expect(boss.speed).toBe(45);
+
+      // Phase 0 -> Phase 1 (5 shields)
+      for (let i = 0; i < 5; i++) {
+        boss.takeDamage(1);
+      }
+      expect(boss.phaseController?.currentPhaseIndex).toBe(1);
+      // During overload channel, speed is 0
+      expect(boss.speed).toBe(0);
+      // Elapse 75 overload ticks
+      boss.phaseController?.update(75, boss.position);
+      expect(boss.speed).toBe(95);
+
+      // Phase 1 -> Phase 2 (3 shields)
+      for (let i = 0; i < 3; i++) {
+        boss.takeDamage(1);
+      }
+      expect(boss.phaseController?.currentPhaseIndex).toBe(2);
+      expect(boss.speed).toBe(0);
+      boss.phaseController?.update(65, boss.position);
+      expect(boss.speed).toBe(105);
+
+      // Phase 2 -> Phase 3 (2 shields)
+      for (let i = 0; i < 2; i++) {
+        boss.takeDamage(1);
+      }
+      expect(boss.phaseController?.currentPhaseIndex).toBe(3);
+      expect(boss.speed).toBe(0);
+      boss.phaseController?.update(60, boss.position);
+      expect(boss.speed).toBe(125);
     });
 
     it("reset() resets BossPhaseController to phase 0 with pristine shields", () => {

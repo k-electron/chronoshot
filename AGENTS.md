@@ -30,7 +30,7 @@ ChronoShot is deliberately engineered without heavy third-party game engines (no
   - **Action Tick Bursts & Anchored Real-Time Reload**:
     - Fire weapon: `+6` simulation ticks (instantaneous recoil burst).
     - Reload weapon: Smooth multi-frame real-time channel (`1.00x` speed) spanning 30 simulation ticks (15 with Speed Loader) while player locomotion is anchored (`velocity = 0`) with 360-degree aiming freedom, sequential chamber loading, and emergency Dash breakout with partial ammo retention.
-- **`Arena`**: Coordinates entities (`Player`, `Enemy`, `Obstacle`, `Projectile`, `ParticleSystem`), collision passes, and room progression.
+- **`Arena`**: Coordinates entities (`Player`, `Enemy`, `Obstacle`, `Projectile`, `ParticleSystem`), dynamic entity instantiation (`spawnEnemy`), collision passes, and room progression with unified player elimination lifecycle checks.
 
 ### 2. Continuous Collision Detection (CCD) Ballistics & Shield Durability
 - High-velocity projectiles must never tunnel through obstacles or hitboxes during discrete tick jumps.
