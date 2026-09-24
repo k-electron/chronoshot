@@ -429,9 +429,14 @@ describe("RoomManager Tactical Puzzle Progression", () => {
       300
     );
     expect(ctx.fillText).toHaveBeenCalledWith(
-      "✓ Goliath-01 Defeated  |  ✓ Chrono-Weaver Neutralized  |  ✓ Vektor-Prime Obliterated  |  ✓ Chrono-Zenith Overthrown",
+      "✓ Goliath-01 Defeated    |    ✓ Chrono-Weaver Neutralized",
       480,
-      350
+      340
+    );
+    expect(ctx.fillText).toHaveBeenCalledWith(
+      "✓ Vektor-Prime Obliterated    |    ✓ Chrono-Zenith Overthrown",
+      480,
+      362
     );
   });
 

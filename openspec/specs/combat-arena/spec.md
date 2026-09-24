@@ -48,7 +48,7 @@ The arena SHALL support distinct enemy archetypes including Pistol Grunt, Shotgu
 - **THEN** it halts movement, projects a charging red sightline laser for 30 ticks, and discharges a high-velocity precision bullet at a 110-tick cadence
 
 ### Requirement: One-Hit Lethality and Instant Room Reset
-The arena SHALL enforce instant lethal elimination for unshielded combat units upon projectile impact or environmental/shockwave damage, enforce hit-count shield durability for shielded units before exposing them to lethal damage, and present an interactive defeat screen upon player elimination that presents a single centered reset card in Sector 1 (Rooms 1–5) or dual interactive cards in later sectors supporting cascading boss checkpoint rollbacks or full run resets. When the player unit is eliminated by any damage source, the arena SHALL synchronize elimination state by emitting player shatter particles, halting combat, and activating the defeat interface.
+The arena SHALL enforce instant lethal elimination for unshielded combat units upon projectile impact or environmental/shockwave damage, enforce hit-count shield durability for shielded units before exposing them to lethal damage, and present an interactive defeat screen upon player elimination that presents a single centered reset card in Sector 1 (Rooms 1–5) or dual interactive cards in later sectors supporting cascading boss checkpoint rollbacks or full run resets with multi-line bounded text formatting that prevents text from overflowing card boundaries. When the player unit is eliminated by any damage source, the arena SHALL synchronize elimination state by emitting player shatter particles, halting combat, and activating the defeat interface.
 
 #### Scenario: Player struck by projectile
 - **WHEN** an enemy projectile impacts the player hitbox with zero remaining shields
@@ -72,19 +72,19 @@ The arena SHALL enforce instant lethal elimination for unshielded combat units u
 
 #### Scenario: Player eliminated in Sector 1
 - **WHEN** the player suffers lethal damage in Rooms 1 through 5 (including during the Goliath-01 boss encounter)
-- **THEN** the player shatters, the arena enters defeat state displaying a single centered interactive reset card, and triggering reset (via [R], [Shift+R], or clicking the card) respawns the player at Room 1 with 0 augmentations
+- **THEN** the player shatters, the arena enters defeat state displaying a single centered interactive reset card with bounded multi-line text that does not overflow the card width, and triggering reset (via [R], [Shift+R], or clicking the card) respawns the player at Room 1 with 0 augmentations
 
 #### Scenario: Player eliminated in Sector 2
 - **WHEN** the player suffers lethal damage in Rooms 6 through 10 (including during the Chrono-Weaver boss encounter)
-- **THEN** triggering Rollback respawns the player at the beginning of Room 5 (Goliath-01) with their Room 5 entry loadout (0 augmentations)
+- **THEN** triggering Rollback respawns the player at the beginning of Room 5 (Goliath-01) with their Room 5 entry loadout (0 augmentations), rendered with bounded multi-line description text contained within the card rectangle
 
 #### Scenario: Player eliminated in Sector 3
 - **WHEN** the player suffers lethal damage in Rooms 11 through 15 (including during the Vektor-Prime boss encounter)
-- **THEN** triggering Rollback respawns the player at the beginning of Room 10 (Chrono-Weaver) with their Room 10 entry loadout (1 augmentation)
+- **THEN** triggering Rollback respawns the player at the beginning of Room 10 (Chrono-Weaver) with their Room 10 entry loadout (1 augmentation), rendered with bounded multi-line description text contained within the card rectangle
 
 #### Scenario: Player eliminated in Sector 4
 - **WHEN** the player suffers lethal damage in Rooms 16 through 20 (including during the Chrono-Zenith boss encounter)
-- **THEN** triggering Rollback respawns the player at the beginning of Room 15 (Vektor-Prime) with their Room 15 entry loadout (2 augmentations)
+- **THEN** triggering Rollback respawns the player at the beginning of Room 15 (Vektor-Prime) with their Room 15 entry loadout (2 augmentations), rendered with bounded multi-line description text contained within the card rectangle
 
 #### Scenario: Cascading drop-down on repeated defeat
 - **WHEN** a player who rolled back to a previous boss dies again in that boss room or subsequent rooms
@@ -141,7 +141,7 @@ The combat arena SHALL render an in-canvas precision hardware reticle aligned wi
 - **THEN** in-canvas reticle rendering is suppressed, and visible native cursor styling (`default` or `pointer`) is restored on the canvas
 
 ### Requirement: Simulation Pause and Minimalist Control Card
-The combat arena SHALL support a toggleable pause state triggered by the Escape key that suspends physics simulation and displays an in-canvas minimalist control card, while hiding control listings during active combat except for an unobtrusive pause hint.
+The combat arena SHALL support a toggleable pause state triggered by the Escape key that suspends physics simulation and displays an in-canvas minimalist control card, while hiding control listings during active combat except for an unobtrusive pause hint positioned below top-right time telemetry on a distinct vertical baseline to prevent baseline text collision.
 
 #### Scenario: Pausing the simulation
 - **WHEN** the player presses the Escape key during active gameplay
@@ -153,7 +153,7 @@ The combat arena SHALL support a toggleable pause state triggered by the Escape 
 
 #### Scenario: Minimalist HUD during active play
 - **WHEN** the game is in active combat mode
-- **THEN** all control hints are hidden from the primary display with the exception of a subtle corner pause key indicator
+- **THEN** all control hints are hidden from the primary display with the exception of a subtle corner pause key indicator rendered below the time telemetry gauge without vertical baseline overlap
 
 ### Requirement: Enemy Pathing and Intelligent Navigation
 The combat arena SHALL navigate mobile enemy units through obstacle geometry using a 40px grid A* pathfinding algorithm when line-of-sight or physical navigation clearance to the player is obstructed, evaluate physical navigation clearance with respect to surface contact normals to allow departure from obstacle bounds, apply anti-freeze fallback locomotion when pathfinding returns no waypoints, and transition to direct vector pursuit only when both unobstructed optical sightline and physical chassis clearance are established.

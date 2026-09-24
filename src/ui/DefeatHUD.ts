@@ -11,6 +11,7 @@
  */
 
 import { RollbackTarget } from "../levels/RollbackCalculator";
+import { wrapTextLines } from "./textUtils";
 import { getUIFont, UITheme } from "./theme";
 
 export interface DefeatCardRect {
@@ -81,6 +82,26 @@ export function computeDefeatLayout(
       { x: startX + cardW + gap, y: cardY, width: cardW, height: cardH },
     ],
   };
+}
+/**
+ * Formats defeat card description text across up to two balanced lines.
+ * If the string contains a parenthetical suffix (e.g. "(0 Augmentations)"),
+ * it splits cleanly before the parenthesis to ensure balanced presentation
+ * within 280px card bounds.
+ */
+export function formatDescriptionLines(
+  ctx: CanvasRenderingContext2D,
+  desc: string,
+  maxWidth = 240
+): string[] {
+  if (!desc) return [];
+  const parenIdx = desc.indexOf(" (");
+  if (parenIdx !== -1) {
+    const line1 = desc.substring(0, parenIdx).trim();
+    const line2 = desc.substring(parenIdx).trim();
+    return [line1, line2];
+  }
+  return wrapTextLines(ctx, desc, maxWidth, 2);
 }
 
 export class DefeatHUD {
@@ -263,7 +284,17 @@ export class DefeatHUD {
     // Description
     ctx.font = getUIFont(10, "600");
     ctx.fillStyle = UITheme.colors.textSecondary;
-    ctx.fillText(data.rollbackTarget.loadoutDescription, midX, rect.y + 116);
+    const rollbackDescLines = formatDescriptionLines(
+      ctx,
+      data.rollbackTarget.loadoutDescription,
+      rect.width - 40
+    );
+    if (rollbackDescLines.length === 1) {
+      ctx.fillText(rollbackDescLines[0], midX, rect.y + 116);
+    } else if (rollbackDescLines.length >= 2) {
+      ctx.fillText(rollbackDescLines[0], midX, rect.y + 110);
+      ctx.fillText(rollbackDescLines[1], midX, rect.y + 126);
+    }
 
     // Action Prompt
     ctx.font = getUIFont(11, "bold");
@@ -326,7 +357,13 @@ export class DefeatHUD {
     // Description
     ctx.font = getUIFont(10, "600");
     ctx.fillStyle = UITheme.colors.textSecondary;
-    ctx.fillText(description, midX, rect.y + 116);
+    const resetDescLines = formatDescriptionLines(ctx, description, rect.width - 40);
+    if (resetDescLines.length === 1) {
+      ctx.fillText(resetDescLines[0], midX, rect.y + 116);
+    } else if (resetDescLines.length >= 2) {
+      ctx.fillText(resetDescLines[0], midX, rect.y + 110);
+      ctx.fillText(resetDescLines[1], midX, rect.y + 126);
+    }
 
     // Action Prompt
     ctx.font = getUIFont(11, "bold");

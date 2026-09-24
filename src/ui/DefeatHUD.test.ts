@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { computeDefeatLayout, DefeatHUD, DefeatRenderData } from "./DefeatHUD";
+import {
+  computeDefeatLayout,
+  DefeatHUD,
+  DefeatRenderData,
+  formatDescriptionLines,
+} from "./DefeatHUD";
 
 function createMockContext(): CanvasRenderingContext2D {
   return {
@@ -166,5 +171,77 @@ describe("DefeatHUD", () => {
 
     expect(() => DefeatHUD.render(ctx, data, 960, 640)).not.toThrow();
     expect(ctx.fillText).toHaveBeenCalled();
+  });
+
+  describe("formatDescriptionLines", () => {
+    it("splits strings with parenthetical augmentation suffixes into two lines", () => {
+      const ctx = createMockContext();
+      const lines = formatDescriptionLines(
+        ctx,
+        "Restores Sector 1 entry loadout (0 Augmentations)"
+      );
+      expect(lines).toEqual([
+        "Restores Sector 1 entry loadout",
+        "(0 Augmentations)",
+      ]);
+    });
+
+    it("splits Sector 1 reset description into two lines", () => {
+      const ctx = createMockContext();
+      const lines = formatDescriptionLines(
+        ctx,
+        "Restart expedition from Room 01 (0 Augmentations)"
+      );
+      expect(lines).toEqual([
+        "Restart expedition from Room 01",
+        "(0 Augmentations)",
+      ]);
+    });
+
+    it("returns single line or wraps text without parentheticals", () => {
+      const ctx = createMockContext();
+      const lines = formatDescriptionLines(
+        ctx,
+        "Abandon run & clear augmentations"
+      );
+      expect(lines).toEqual(["Abandon run & clear augmentations"]);
+    });
+
+    it("handles empty string gracefully", () => {
+      const ctx = createMockContext();
+      expect(formatDescriptionLines(ctx, "")).toEqual([]);
+    });
+  });
+
+  it("renders two-line descriptions for rollback and reset cards", () => {
+    const ctx = createMockContext();
+    const data: DefeatRenderData = {
+      roomNumber: 8,
+      totalRooms: 20,
+      tier: "TIER 2",
+      roomTitle: "KILLBOX ENCLOSURE",
+      rollbackTarget: {
+        roomNumber: 5,
+        roomIndex: 4,
+        bossName: "GOLIATH-01",
+        loadoutDescription: "Restores Sector 1 entry loadout (0 Augmentations)",
+        requiredAugmentationCount: 0,
+      },
+      isEndless: false,
+      hoveredCardIndex: 0,
+    };
+
+    DefeatHUD.render(ctx, data, 960, 640);
+
+    expect(ctx.fillText).toHaveBeenCalledWith(
+      "Restores Sector 1 entry loadout",
+      expect.any(Number),
+      110 + 290
+    );
+    expect(ctx.fillText).toHaveBeenCalledWith(
+      "(0 Augmentations)",
+      expect.any(Number),
+      126 + 290
+    );
   });
 });

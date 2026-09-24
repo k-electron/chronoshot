@@ -10,6 +10,7 @@
  */
 
 import type { UpgradeDefinition } from "../upgrades/UpgradeDefinition";
+import { truncateText, wrapTextLines } from "./textUtils";
 import { getUIFont, UITheme } from "./theme";
 
 export type { UpgradeDefinition };
@@ -145,8 +146,8 @@ export function getCardAt(
 }
 
 /**
- * Word-wraps text within a given maximum width and renders it line by line.
- * Gracefully tolerates mock contexts where measureText may not be implemented.
+ * Word-wraps text within a given maximum width and renders it line by line up to maxLines.
+ * If lines exceed maxLines, the final line is truncated with an ellipsis.
  */
 export function wrapText(
   ctx: CanvasRenderingContext2D,
@@ -154,36 +155,13 @@ export function wrapText(
   x: number,
   y: number,
   maxWidth: number,
-  lineHeight: number
+  lineHeight: number,
+  maxLines: number = 5
 ): void {
   if (!text) return;
-  const words = text.split(" ");
-  let line = "";
-  let curY = y;
-
-  const measure = (str: string): number => {
-    if (typeof ctx.measureText === "function") {
-      const metrics = ctx.measureText(str);
-      if (metrics && typeof metrics.width === "number") {
-        return metrics.width;
-      }
-    }
-    return str.length * 6;
-  };
-
-  for (let n = 0; n < words.length; n++) {
-    const testLine = line + words[n] + " ";
-    const testWidth = measure(testLine);
-    if (testWidth > maxWidth && n > 0) {
-      ctx.fillText(line.trimEnd(), x, curY);
-      line = words[n] + " ";
-      curY += lineHeight;
-    } else {
-      line = testLine;
-    }
-  }
-  if (line.length > 0) {
-    ctx.fillText(line.trimEnd(), x, curY);
+  const lines = wrapTextLines(ctx, text, maxWidth, maxLines);
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], x, y + i * lineHeight);
   }
 }
 
@@ -195,7 +173,8 @@ export function renderUpgradeDraft(
   draftOptions: UpgradeDefinition[],
   arenaWidth: number,
   arenaHeight: number,
-  hoveredIndex: number | null = null
+  hoveredIndex: number | null = null,
+  sectorNumber: number = 1
 ): void {
   ctx.save();
 
@@ -213,7 +192,11 @@ export function renderUpgradeDraft(
   // Subhead
   ctx.font = getUIFont(12, "600");
   ctx.fillStyle = UITheme.colors.textSecondary;
-  ctx.fillText("SECTOR 1 BOSS NEUTRALIZED — SELECT 1 COMBAT SYSTEM UPGRADE", arenaWidth / 2, 95);
+  ctx.fillText(
+    `SECTOR ${sectorNumber} BOSS NEUTRALIZED — SELECT 1 COMBAT SYSTEM UPGRADE`,
+    arenaWidth / 2,
+    95
+  );
 
   const cardCount = draftOptions.length;
   if (cardCount === 0) {
@@ -266,7 +249,9 @@ export function renderUpgradeDraft(
     ctx.textBaseline = "middle";
     ctx.font = getUIFont(cardW < 220 ? 8 : 9, "bold");
     ctx.fillStyle = UITheme.colors.textMuted;
-    ctx.fillText(card.archetype, badgeX + badgeW + 8, badgeY + badgeH / 2);
+    const maxArchetypeW = Math.max(20, cardW - 2 * pad - badgeW - 8);
+    const archetypeText = truncateText(ctx, card.archetype, maxArchetypeW);
+    ctx.fillText(archetypeText, badgeX + badgeW + 8, badgeY + badgeH / 2);
 
     // Title
     ctx.textAlign = "left";
@@ -298,7 +283,7 @@ export function renderUpgradeDraft(
     ctx.textBaseline = "top";
     ctx.font = getUIFont(cardW < 220 ? 9 : 10, "normal");
     ctx.fillStyle = UITheme.colors.textSecondary;
-    wrapText(ctx, card.description, cx + pad, cardY + 155, cardW - 2 * pad, 16);
+    wrapText(ctx, card.description, cx + pad, cardY + 150, cardW - 2 * pad, 15, 5);
 
     // Select button
     const btnH = 28;
@@ -339,13 +324,14 @@ export function renderUpgradeDraft(
   ctx.font = getUIFont(11, "600");
   ctx.fillStyle = UITheme.colors.textMuted;
 
-  let footerPrompt = "PRESS [1], [2], OR [3] OR CLICK A CARD TO INSTALL AND ADVANCE TO ZONE 2";
+  const nextSector = sectorNumber + 1;
+  let footerPrompt = `PRESS [1], [2], OR [3] OR CLICK A CARD TO INSTALL AND ADVANCE TO ZONE ${nextSector}`;
   if (cardCount === 1) {
     footerPrompt = "PRESS [1] OR CLICK THE CARD TO INSTALL AND ADVANCE";
   } else if (cardCount === 2) {
-    footerPrompt = "PRESS [1] OR [2] OR CLICK A CARD TO INSTALL AND ADVANCE";
+    footerPrompt = `PRESS [1] OR [2] OR CLICK A CARD TO INSTALL AND ADVANCE TO ZONE ${nextSector}`;
   } else if (cardCount === 4) {
-    footerPrompt = "PRESS [1], [2], [3], OR [4] OR CLICK A CARD TO INSTALL AND ADVANCE";
+    footerPrompt = `PRESS [1], [2], [3], OR [4] OR CLICK A CARD TO INSTALL AND ADVANCE TO ZONE ${nextSector}`;
   } else if (cardCount > 4) {
     footerPrompt = `PRESS [1] - [${cardCount}] OR CLICK A CARD TO INSTALL AND ADVANCE`;
   }
@@ -381,9 +367,10 @@ export class UpgradeDraftHUD {
     draftOptions: UpgradeDefinition[],
     arenaWidth: number,
     arenaHeight: number,
-    hoveredIndex: number | null = null
+    hoveredIndex: number | null = null,
+    sectorNumber: number = 1
   ): void {
-    renderUpgradeDraft(ctx, draftOptions, arenaWidth, arenaHeight, hoveredIndex);
+    renderUpgradeDraft(ctx, draftOptions, arenaWidth, arenaHeight, hoveredIndex, sectorNumber);
   }
 
   public computeCardLayout(
@@ -409,8 +396,9 @@ export class UpgradeDraftHUD {
     draftOptions: UpgradeDefinition[],
     arenaWidth: number,
     arenaHeight: number,
-    hoveredIndex: number | null = null
+    hoveredIndex: number | null = null,
+    sectorNumber: number = 1
   ): void {
-    renderUpgradeDraft(ctx, draftOptions, arenaWidth, arenaHeight, hoveredIndex);
+    renderUpgradeDraft(ctx, draftOptions, arenaWidth, arenaHeight, hoveredIndex, sectorNumber);
   }
 }

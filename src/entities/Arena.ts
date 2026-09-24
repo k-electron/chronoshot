@@ -878,7 +878,7 @@ export class Arena {
 
     // Room Progression Header
     if (this.roomManager) {
-      this.roomManager.renderRoomHeader(ctx, this.width);
+      this.roomManager.renderRoomHeader(ctx, this.width, !!activeBoss);
     }
 
     // 8. In-Canvas Precision Reticle & Pause States
@@ -892,7 +892,7 @@ export class Arena {
         ctx.textBaseline = "top";
         ctx.font = getUIFont(10, "600");
         ctx.fillStyle = UITheme.colors.textMuted;
-        ctx.fillText("[ESC] PAUSE", this.width - 24, 46);
+        ctx.fillText("[ESC] PAUSE", this.width - 24, 66);
         ctx.restore();
       }
 
@@ -973,8 +973,8 @@ export class Arena {
         ctx.textBaseline = "middle";
 
         ctx.beginPath();
-        ctx.moveTo(this.width / 2 - 160, this.height / 2 - 50);
-        ctx.lineTo(this.width / 2 + 160, this.height / 2 - 50);
+        ctx.moveTo(this.width / 2 - 200, this.height / 2 - 50);
+        ctx.lineTo(this.width / 2 + 200, this.height / 2 - 50);
         ctx.strokeStyle = UITheme.colors.cyanDim;
         ctx.lineWidth = 1;
         ctx.stroke();
@@ -992,8 +992,8 @@ export class Arena {
         ctx.fillText("STEP INTO EXIT GATE OR PRESS [R] TO RESTART", this.width / 2, this.height / 2 + 52);
 
         ctx.beginPath();
-        ctx.moveTo(this.width / 2 - 160, this.height / 2 + 80);
-        ctx.lineTo(this.width / 2 + 160, this.height / 2 + 80);
+        ctx.moveTo(this.width / 2 - 200, this.height / 2 + 80);
+        ctx.lineTo(this.width / 2 + 200, this.height / 2 + 80);
         ctx.strokeStyle = UITheme.colors.cyanDim;
         ctx.lineWidth = 1;
         ctx.stroke();
@@ -1197,7 +1197,9 @@ export class Arena {
     hoveredIndex: number | null = this.hoveredUpgradeCardIndex
   ): void {
     const draftCards = this.getDraftOptions();
-    UpgradeDraftHUD.render(ctx, draftCards, this.width, this.height, hoveredIndex);
+    const currentRoom = this.roomManager?.getCurrentRoom()?.roomNumber ?? 5;
+    const sectorNumber = Math.max(1, Math.ceil(currentRoom / 5));
+    UpgradeDraftHUD.render(ctx, draftCards, this.width, this.height, hoveredIndex, sectorNumber);
   }
 
   /**

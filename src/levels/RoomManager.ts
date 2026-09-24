@@ -13,6 +13,7 @@
 
 import { vecDistance, Vector2D } from "../math/vector";
 import { getUIFont, UITheme } from "../ui/theme";
+import { truncateText } from "../ui/textUtils";
 import { createStandardRoomSequence, RoomConfig } from "./Room";
 import { LevelDirector } from "./LevelDirector";
 import { EndlessDirector } from "./EndlessDirector";
@@ -364,7 +365,11 @@ export class RoomManager {
   /**
    * Renders the Room Title, Subtitle, and Tactical Tip anchored cleanly in the top-left corner.
    */
-  public renderRoomHeader(ctx: CanvasRenderingContext2D, _width: number): void {
+  public renderRoomHeader(
+    ctx: CanvasRenderingContext2D,
+    _width: number,
+    isBossActive: boolean = false
+  ): void {
     const room = this.getCurrentRoom();
     ctx.save();
     ctx.textAlign = "left";
@@ -372,19 +377,18 @@ export class RoomManager {
 
     const x = 24;
     const y = 20;
+    const maxTitleWidth = isBossActive ? 230 : (this.endlessDirector ? 255 : 720);
+    const maxTipWidth = isBossActive || this.endlessDirector ? 220 : 720;
 
     if (this.endlessDirector) {
       ctx.font = "bold 11px monospace";
       ctx.fillStyle = "#00f0ff";
-      ctx.fillText(`${room.title.toUpperCase()}`, x, y);
+      ctx.fillText(truncateText(ctx, room.title.toUpperCase(), maxTitleWidth), x, y);
 
       ctx.font = "10px monospace";
       ctx.fillStyle = "#64748b";
-      ctx.fillText(
-        `THREAT: ${this.endlessDirector.getThreatBudget()} // SURVIVED: ${this.endlessDirector.getSurvivalTimeFormatted()} // KILLS: ${this.endlessDirector.getKills()}`,
-        x,
-        y + 18
-      );
+      const subtitle = room.subtitle ? room.subtitle.toUpperCase() : "SURVIVAL THREAT MATRIX";
+      ctx.fillText(truncateText(ctx, subtitle, maxTipWidth), x, y + 18);
       ctx.restore();
       return;
     }
@@ -392,16 +396,13 @@ export class RoomManager {
     // Room title badge
     ctx.font = "bold 11px monospace";
     ctx.fillStyle = "#00f0ff";
-    ctx.fillText(
-      `${room.title.toUpperCase()}  [${room.roomNumber}/${this.rooms.length}]`,
-      x,
-      y
-    );
+    const titleText = `${room.title.toUpperCase()}  [${room.roomNumber}/${this.rooms.length}]`;
+    ctx.fillText(truncateText(ctx, titleText, maxTitleWidth), x, y);
 
     // Subtitle & tactical guidance
     ctx.font = "10px monospace";
     ctx.fillStyle = "#64748b";
-    ctx.fillText(room.tacticalTip, x, y + 18);
+    ctx.fillText(truncateText(ctx, room.tacticalTip, maxTipWidth), x, y + 18);
 
     ctx.restore();
   }
@@ -463,9 +464,14 @@ export class RoomManager {
     ctx.font = getUIFont(11, "600");
     ctx.fillStyle = UITheme.colors.green;
     ctx.fillText(
-      "✓ Goliath-01 Defeated  |  ✓ Chrono-Weaver Neutralized  |  ✓ Vektor-Prime Obliterated  |  ✓ Chrono-Zenith Overthrown",
+      "✓ Goliath-01 Defeated    |    ✓ Chrono-Weaver Neutralized",
       width / 2,
-      height / 2 + 30
+      height / 2 + 20
+    );
+    ctx.fillText(
+      "✓ Vektor-Prime Obliterated    |    ✓ Chrono-Zenith Overthrown",
+      width / 2,
+      height / 2 + 42
     );
 
     // Reset prompt
