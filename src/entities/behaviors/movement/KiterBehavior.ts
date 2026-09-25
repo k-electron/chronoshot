@@ -37,6 +37,11 @@ export class KiterBehavior implements MovementBehavior {
   private activeTangent: Vector2D = { x: 0, y: 0 };
   private tangentLockTicks: number = 0;
 
+  // Intentional-stop-aware movement watchdog state
+  public stallTicks: number = 0;
+  private lastWatchedPos: Vector2D = { x: 0, y: 0 };
+  private watchdogInitialized: boolean = false;
+
   constructor(
     minDistOrConfig?: number | KiterConfig,
     maxDist: number = 520,
@@ -69,6 +74,7 @@ export class KiterBehavior implements MovementBehavior {
     if (!target.isAlive || ctx.speed <= 0) {
       this.resultVelocity.x = 0;
       this.resultVelocity.y = 0;
+      this.resetWatchdog(ctx.position);
       return this.resultVelocity;
     }
 
@@ -202,12 +208,18 @@ export class KiterBehavior implements MovementBehavior {
         this.currentWaypointIndex = 0;
         this.resultVelocity.x = 0;
         this.resultVelocity.y = 0;
+        this.resetWatchdog(ctx.position);
         return this.resultVelocity;
       }
     }
 
-    // 2. Blocked line-of-sight or obstructed advance: 40px tile grid A* pathfinding
+    // 2. Blocked line-of-sight or obstructed advance: 20px tile grid A* pathfinding
     this.repathCooldownTicks -= deltaTicks;
+
+    const isStalled = this.updateWatchdog(ctx, target, deltaTicks);
+    if (isStalled) {
+      this.repathCooldownTicks = 0;
+    }
 
     if (
       this.repathCooldownTicks <= 0 ||
@@ -251,6 +263,29 @@ export class KiterBehavior implements MovementBehavior {
       this.currentPath = path;
       this.currentWaypointIndex = 0;
       this.repathCooldownTicks = this.repathIntervalTicks;
+
+      if (isStalled && path.length === 0) {
+        // Trigger breakout tangent slide along obstacle
+        let breakoutNormal: Vector2D | null = null;
+        for (const obs of obstacles) {
+          const contact = testCircleAABB(
+            ctx.position,
+            ctx.radius + 4,
+            obs.bounds.min,
+            obs.bounds.max
+          );
+          if (contact && contact.collided) {
+            breakoutNormal = contact.normal;
+            break;
+          }
+        }
+        if (breakoutNormal) {
+          const t = { x: -breakoutNormal.y, y: breakoutNormal.x };
+          this.activeTangent.x = t.x;
+          this.activeTangent.y = t.y;
+          this.tangentLockTicks = 8;
+        }
+      }
     }
 
     if (
@@ -264,6 +299,16 @@ export class KiterBehavior implements MovementBehavior {
 
       if (distToWaypoint < this.arrivalRadius) {
         this.currentWaypointIndex++;
+      } else {
+        // Swept-circle waypoint shortcut lookahead:
+        // Validate forward chords using continuous Minkowski swept-circle raycasting
+        for (let i = this.currentPath.length - 1; i > this.currentWaypointIndex; i--) {
+          const candidateWp = this.currentPath[i];
+          if (hasNavigationClearance(ctx.position, candidateWp, ctx.radius, obstacles)) {
+            this.currentWaypointIndex = i;
+            break;
+          }
+        }
       }
 
       if (this.currentWaypointIndex < this.currentPath.length) {
@@ -423,6 +468,111 @@ export class KiterBehavior implements MovementBehavior {
     this.activeTangent.x = 0;
     this.activeTangent.y = 0;
     this.tangentLockTicks = 0;
+    this.stallTicks = 0;
+    this.watchdogInitialized = false;
+  }
+
+  public resetWatchdog(pos?: Vector2D): void {
+    this.stallTicks = 0;
+    if (pos) {
+      this.lastWatchedPos.x = pos.x;
+      this.lastWatchedPos.y = pos.y;
+    }
+  }
+
+  private updateWatchdog(
+    ctx: MovementContext,
+    target: CombatUnit,
+    deltaTicks: number
+  ): boolean {
+    if (!this.watchdogInitialized) {
+      this.lastWatchedPos.x = ctx.position.x;
+      this.lastWatchedPos.y = ctx.position.y;
+      this.watchdogInitialized = true;
+      this.stallTicks = 0;
+      return false;
+    }
+
+    // Intentional stop detection:
+    // Reset watchdog during intentional halts
+    const isIntentionalStop =
+      ctx.speed <= 0 ||
+      ctx.isChargingLaser === true ||
+      ctx.isOverloading === true ||
+      (ctx.stutterTimerTicks !== undefined && ctx.stutterTimerTicks > 0);
+
+    if (isIntentionalStop) {
+      this.stallTicks = 0;
+      this.lastWatchedPos.x = ctx.position.x;
+      this.lastWatchedPos.y = ctx.position.y;
+      return false;
+    }
+
+    // Kiter sweet-spot range holding exemption:
+    if (ctx.hasLineOfSight) {
+      const distToTarget = Math.hypot(
+        target.position.x - ctx.position.x,
+        target.position.y - ctx.position.y
+      );
+      if (distToTarget >= this.minDist && distToTarget <= this.maxDist) {
+        this.stallTicks = 0;
+        this.lastWatchedPos.x = ctx.position.x;
+        this.lastWatchedPos.y = ctx.position.y;
+        return false;
+      }
+    }
+
+    // Check displacement from lastWatchedPos
+    const disp = Math.hypot(
+      ctx.position.x - this.lastWatchedPos.x,
+      ctx.position.y - this.lastWatchedPos.y
+    );
+
+    if (disp >= 1.5) {
+      // Made progress: reset stall timer and update watched position
+      this.stallTicks = 0;
+      this.lastWatchedPos.x = ctx.position.x;
+      this.lastWatchedPos.y = ctx.position.y;
+      return false;
+    } else {
+      this.stallTicks += deltaTicks;
+      if (this.stallTicks >= 12) {
+        // Stall detected!
+        this.stallTicks = 0;
+        this.lastWatchedPos.x = ctx.position.x;
+        this.lastWatchedPos.y = ctx.position.y;
+        return true;
+      }
+      return false;
+    }
+  }
+
+  /**
+   * Smooths path chords using continuous Minkowski swept-circle raycasting to shortcut intermediate waypoints.
+   */
+  public smoothPath(
+    path: Vector2D[],
+    radius: number,
+    obstacles: Obstacle[]
+  ): Vector2D[] {
+    if (path.length <= 2) return path;
+
+    const smoothed: Vector2D[] = [path[0]];
+    let currentIdx = 0;
+
+    while (currentIdx < path.length - 1) {
+      let nextIdx = currentIdx + 1;
+      for (let testIdx = path.length - 1; testIdx > currentIdx + 1; testIdx--) {
+        if (hasNavigationClearance(path[currentIdx], path[testIdx], radius, obstacles)) {
+          nextIdx = testIdx;
+          break;
+        }
+      }
+      smoothed.push(path[nextIdx]);
+      currentIdx = nextIdx;
+    }
+
+    return smoothed;
   }
 
   private getOrCreatePathfinder(

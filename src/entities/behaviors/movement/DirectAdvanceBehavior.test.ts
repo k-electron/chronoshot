@@ -629,4 +629,60 @@ describe("DirectAdvanceBehavior", () => {
       expect(behavior.stallTicks).toBe(0);
     });
   });
+
+  describe("Swept-Circle Waypoint Shortcutting & Path Smoothing", () => {
+    it("smoothPath removes intermediate redundant waypoints along clear chords", () => {
+      const behavior = new DirectAdvanceBehavior();
+      const rawPath = [
+        vec2(100, 100),
+        vec2(120, 100),
+        vec2(140, 100),
+        vec2(160, 100),
+        vec2(180, 100),
+        vec2(200, 100),
+      ];
+
+      const smoothed = behavior.smoothPath(rawPath, 15, []);
+      expect(smoothed).toHaveLength(2);
+      expect(smoothed[0]).toEqual(vec2(100, 100));
+      expect(smoothed[1]).toEqual(vec2(200, 100));
+    });
+
+    it("smoothPath preserves waypoints around obstacles when swept clearance is blocked", () => {
+      const behavior = new DirectAdvanceBehavior();
+      const pillar = createObstacle("pillar", 140, 90, 40, 40);
+      const rawPath = [
+        vec2(100, 100),
+        vec2(120, 70),
+        vec2(160, 60),
+        vec2(200, 70),
+        vec2(220, 100),
+      ];
+
+      const smoothed = behavior.smoothPath(rawPath, 15, [pillar]);
+      expect(smoothed.length).toBeGreaterThan(2);
+    });
+
+    it("shortcuts directly to forward waypoint when continuous swept-circle clearance is unobstructed", () => {
+      const behavior = new DirectAdvanceBehavior(18, 20);
+      // Unit at (100, 100) heading towards wp0 at (100, 150) (dist 50 > arrivalRadius 18)
+      // wp1 is at (200, 100). The path from (100, 100) to (200, 100) is completely clear.
+      behavior.currentPath = [vec2(100, 150), vec2(200, 100)];
+      behavior.currentWaypointIndex = 0;
+      behavior.repathCooldownTicks = 15;
+
+      const ctx = createMockContext({
+        position: vec2(100, 100),
+        radius: 15,
+        speed: 100,
+        hasLineOfSight: false,
+      });
+      const target = createMockTarget(300, 100);
+
+      behavior.update(ctx, target, [], 1);
+      // Should have shortcutted to wp1 (index 1) via swept clearance
+      expect(behavior.currentWaypointIndex).toBe(1);
+    });
+  });
 });
+

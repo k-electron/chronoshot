@@ -351,4 +351,80 @@ describe("KiterBehavior", () => {
       expect(vel.y).toBeCloseTo(0);
     });
   });
+
+  describe("Intentional-Stop Movement Watchdog & Swept Lookahead", () => {
+    it("accumulates stall ticks when commanded velocity is nonzero but displacement < 1.5px", () => {
+      const kiter = new KiterBehavior(100, 200);
+      const wall = createObstacle("wall-front", 150, 150, 30, 100);
+      const mockPf = new GridPathfinder(960, 640, 20);
+      mockPf.findPath = () => [];
+
+      const ctx = createMockContext({
+        position: vec2(100, 200),
+        radius: 15,
+        speed: 80,
+        hasLineOfSight: false,
+      });
+      const target = createMockTarget(300, 200);
+
+      // Tick 1: initialize watchdog
+      kiter.update(ctx, target, [wall], 1, 1 / 60, mockPf);
+      expect(kiter.stallTicks).toBe(0);
+
+      // Tick 2: zero displacement, accumulates stall ticks
+      kiter.update(ctx, target, [wall], 5, 5 / 60, mockPf);
+      expect(kiter.stallTicks).toBe(5);
+
+      // Tick 3: reaches >= 12 ticks, triggers stall handling and resets stallTicks
+      kiter.repathCooldownTicks = 15;
+      kiter.update(ctx, target, [wall], 7, 7 / 60, mockPf);
+      expect(kiter.stallTicks).toBe(0);
+      expect(kiter.repathCooldownTicks).toBe(20); // Forced repath occurred
+    });
+
+    it("resets watchdog during intentional sweet spot holding and charging states", () => {
+      const kiter = new KiterBehavior(100, 300);
+      const ctx = createMockContext({
+        position: vec2(200, 200), // Distance 100 is within sweet spot [100, 300]
+        radius: 15,
+        speed: 80,
+        hasLineOfSight: true,
+      });
+      const target = createMockTarget(100, 200);
+
+      kiter.stallTicks = 5;
+      kiter.update(ctx, target, [], 1);
+      expect(kiter.stallTicks).toBe(0);
+
+      // Laser charge pause
+      const laserCtx = createMockContext({
+        position: vec2(50, 200),
+        radius: 15,
+        speed: 80,
+        hasLineOfSight: false,
+        isChargingLaser: true,
+      });
+      kiter.stallTicks = 5;
+      kiter.update(laserCtx, target, [], 1);
+      expect(kiter.stallTicks).toBe(0);
+    });
+
+    it("shortcuts waypoints using continuous swept-circle clearance in KiterBehavior", () => {
+      const kiter = new KiterBehavior(18, 20);
+      kiter.currentPath = [vec2(100, 160), vec2(200, 100)];
+      kiter.currentWaypointIndex = 0;
+      kiter.repathCooldownTicks = 15;
+
+      const ctx = createMockContext({
+        position: vec2(100, 100),
+        radius: 15,
+        speed: 80,
+        hasLineOfSight: false,
+      });
+      const target = createMockTarget(300, 100);
+
+      kiter.update(ctx, target, [], 1);
+      expect(kiter.currentWaypointIndex).toBe(1);
+    });
+  });
 });

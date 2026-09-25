@@ -113,7 +113,7 @@ npm run dev
    - Use mock Canvas 2D contexts (`createMockContext()`) with `vi.fn()` for rendering tests.
    - Use mock audio contexts to verify audio trigger calls without requiring real audio devices.
 3. **Keep Tests Fast & Deterministic**:
-   - The entire suite (690+ tests) runs in under 900ms. Avoid arbitrary `setTimeout` or wall-clock waits in tests.
+   - The entire suite (712+ tests) runs in under 900ms. Avoid arbitrary `setTimeout` or wall-clock waits in tests.
 
 ---
 
