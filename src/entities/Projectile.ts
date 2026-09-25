@@ -28,6 +28,7 @@ export interface CombatUnit {
   readonly position: Vector2D;
   readonly radius: number;
   readonly isAlive: boolean;
+  velocity?: Vector2D;
   shields?: number;
   maxShields?: number;
   takeDamage?(damage?: number): DamageResult;

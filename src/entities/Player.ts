@@ -230,7 +230,7 @@ export class Player implements CombatUnit {
    * Resolves collisions with solid obstacles, smoothly canceling perpendicular
    * velocity while retaining parallel sliding momentum.
    */
-  private resolveObstacleCollisions(obstacles: Obstacle[], maxIterations = 3): void {
+  public resolveObstacleCollisions(obstacles: Obstacle[], maxIterations = 3): void {
     for (let iter = 0; iter < maxIterations; iter++) {
       let hadCollision = false;
 

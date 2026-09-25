@@ -60,7 +60,8 @@ export class KiterBehavior implements MovementBehavior {
     obstacles: Obstacle[],
     deltaTicks: number = 1,
     _fixedDeltaTime: number = deltaTicks / 60,
-    pathfinder?: GridPathfinder
+    pathfinder?: GridPathfinder,
+    neighbors?: CombatUnit[]
   ): Vector2D {
     // If target is down or unit has no speed, halt immediately
     if (!target.isAlive || ctx.speed <= 0) {
@@ -68,6 +69,8 @@ export class KiterBehavior implements MovementBehavior {
       this.resultVelocity.y = 0;
       return this.resultVelocity;
     }
+
+    const activeNeighbors = neighbors ?? ctx.neighbors;
 
     // 1. Clear line-of-sight: distance-keeping kiting logic
     if (ctx.hasLineOfSight) {
@@ -91,18 +94,35 @@ export class KiterBehavior implements MovementBehavior {
           retreatDirY = Math.sin(angle);
         }
 
-        // Test if retreat path is physically clear of obstacles
+        // Test if retreat path is physically clear of obstacles and friendly units
         const retreatProbeDist = Math.min(40, ctx.radius * 2);
         const retreatProbe = vec2(
           ctx.position.x + retreatDirX * retreatProbeDist,
           ctx.position.y + retreatDirY * retreatProbeDist
         );
 
-        if (hasNavigationClearance(ctx.position, retreatProbe, ctx.radius, obstacles)) {
+        let isRetreatBlockedByNeighbor = false;
+        if (activeNeighbors) {
+          for (const n of activeNeighbors) {
+            if (!n.isAlive) continue;
+            const toNeighX = n.position.x - retreatProbe.x;
+            const toNeighY = n.position.y - retreatProbe.y;
+            if (Math.hypot(toNeighX, toNeighY) < ctx.radius + n.radius + 6) {
+              isRetreatBlockedByNeighbor = true;
+              break;
+            }
+          }
+        }
+
+        const isRetreatClear =
+          !isRetreatBlockedByNeighbor &&
+          hasNavigationClearance(ctx.position, retreatProbe, ctx.radius, obstacles);
+
+        if (isRetreatClear) {
           this.resultVelocity.x = retreatDirX * ctx.speed;
           this.resultVelocity.y = retreatDirY * ctx.speed;
         } else {
-          // Obstacle directly behind: probe lateral wall escape tangents
+          // Obstacle or neighbor directly behind: probe lateral wall/unit escape tangents
           const lateralCandidates: Vector2D[] = [
             { x: -retreatDirY, y: retreatDirX },
             { x: retreatDirY, y: -retreatDirX },
@@ -115,7 +135,24 @@ export class KiterBehavior implements MovementBehavior {
               ctx.position.x + lat.x * retreatProbeDist,
               ctx.position.y + lat.y * retreatProbeDist
             );
-            if (hasNavigationClearance(ctx.position, probe, ctx.radius, obstacles)) {
+
+            let isLatBlockedByNeighbor = false;
+            if (activeNeighbors) {
+              for (const n of activeNeighbors) {
+                if (!n.isAlive) continue;
+                const toNeighX = n.position.x - probe.x;
+                const toNeighY = n.position.y - probe.y;
+                if (Math.hypot(toNeighX, toNeighY) < ctx.radius + n.radius + 6) {
+                  isLatBlockedByNeighbor = true;
+                  break;
+                }
+              }
+            }
+
+            if (
+              !isLatBlockedByNeighbor &&
+              hasNavigationClearance(ctx.position, probe, ctx.radius, obstacles)
+            ) {
               const dX = probe.x - target.position.x;
               const dY = probe.y - target.position.y;
               const dSq = dX * dX + dY * dY;

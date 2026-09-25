@@ -366,6 +366,142 @@ export function testCircleAABB(
   };
 }
 
+export interface CircleCircleCollision {
+  collided: boolean;
+  normal: Vector2D;
+  depth: number;
+  contactPoint: Vector2D;
+}
+
+/**
+ * Tests collision between two circles.
+ * Computes penetration depth, contact normal pointing from c2 to c1 (away from c2),
+ * and contact point at the midpoint of the overlapping region.
+ *
+ * @param c1 Center of first circle
+ * @param r1 Radius of first circle
+ * @param c2 Center of second circle
+ * @param r2 Radius of second circle
+ * @returns CircleCircleCollision if overlapping, otherwise null.
+ */
+export function testCircleCircle(
+  c1: Vector2D,
+  r1: number,
+  c2: Vector2D,
+  r2: number
+): CircleCircleCollision | null {
+  const dx = c1.x - c2.x;
+  const dy = c1.y - c2.y;
+  const distSq = dx * dx + dy * dy;
+  const minSpacing = r1 + r2;
+
+  if (distSq >= minSpacing * minSpacing) {
+    return null;
+  }
+
+  const dist = Math.sqrt(distSq);
+  let normal: Vector2D;
+  let depth: number;
+
+  if (dist < 1e-6) {
+    // Coincident centers: use deterministic fallback normal to avoid NaN/div-by-zero
+    normal = vec2(1, 0);
+    depth = minSpacing;
+  } else {
+    normal = vec2(dx / dist, dy / dist);
+    depth = minSpacing - dist;
+  }
+
+  // Midpoint of the overlapping segment along the contact normal
+  const contactPoint = vec2(
+    c1.x - normal.x * (r1 - depth * 0.5),
+    c1.y - normal.y * (r1 - depth * 0.5)
+  );
+
+  return {
+    collided: true,
+    normal,
+    depth,
+    contactPoint,
+  };
+}
+
+export interface CircleCircleResolution {
+  displacementA: Vector2D;
+  displacementB: Vector2D;
+  depth: number;
+  normal: Vector2D;
+}
+
+/**
+ * Resolves positional overlap between two circular entities using mass weights.
+ * The contact normal points from B to A.
+ *
+ * @param posA Center position of circle A
+ * @param radiusA Radius of circle A
+ * @param weightA Mass displacement weight for circle A (e.g. 0.5 for equal mass, 0 for immovable)
+ * @param posB Center position of circle B
+ * @param radiusB Radius of circle B
+ * @param weightB Mass displacement weight for circle B (e.g. 0.5 for equal mass, 1.0 for immovable A)
+ * @returns Object with displacement vectors, depth, and normal (pointing from B to A), or null if not overlapping.
+ */
+export function resolveCircleCircleCollision(
+  posA: Vector2D,
+  radiusA: number,
+  weightA: number,
+  posB: Vector2D,
+  radiusB: number,
+  weightB: number
+): CircleCircleResolution | null {
+  const col = testCircleCircle(posA, radiusA, posB, radiusB);
+  if (!col) {
+    return null;
+  }
+
+  const displacementA = vecScale(col.normal, col.depth * weightA);
+  const displacementB = vecScale(col.normal, -col.depth * weightB);
+
+  return {
+    displacementA,
+    displacementB,
+    depth: col.depth,
+    normal: col.normal,
+  };
+}
+
+/**
+ * Applies an inelastic impulse along the contact normal to cancel inward relative velocity
+ * while preserving tangential sliding velocity.
+ *
+ * @param velA Velocity vector of entity A (mutated in place)
+ * @param weightA Impulse weight for entity A (e.g. 0.5 for equal mass, 0 for immovable)
+ * @param velB Velocity vector of entity B (mutated in place)
+ * @param weightB Impulse weight for entity B (e.g. 0.5 for equal mass, 1.0 for immovable A)
+ * @param normal Contact normal pointing from B to A
+ */
+export function applyInelasticCircleImpulse(
+  velA: Vector2D,
+  weightA: number,
+  velB: Vector2D,
+  weightB: number,
+  normal: Vector2D
+): void {
+  const rvx = velA.x - velB.x;
+  const rvy = velA.y - velB.y;
+  const velAlongNormal = rvx * normal.x + rvy * normal.y;
+
+  if (velAlongNormal < 0) {
+    if (weightA > 0) {
+      velA.x -= normal.x * velAlongNormal * weightA;
+      velA.y -= normal.y * velAlongNormal * weightA;
+    }
+    if (weightB > 0) {
+      velB.x += normal.x * velAlongNormal * weightB;
+      velB.y += normal.y * velAlongNormal * weightB;
+    }
+  }
+}
+
 /**
  * Checks whether an entity with a circular hitbox of the given radius can
  * navigate in a straight line from `from` to `to` without colliding with obstacles.

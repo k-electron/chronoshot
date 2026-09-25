@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyInelasticCircleImpulse,
   circleIntersectsSegment,
   closestPointOnSegment,
   hasNavigationClearance,
   rayIntersectsAABB,
   rayIntersectsCircle,
   rayIntersectsSegment,
+  resolveCircleCircleCollision,
   testCircleAABB,
+  testCircleCircle,
 } from "./collision";
 import { vec2 } from "./vector";
 
@@ -196,6 +199,286 @@ describe("Collision Mathematics", () => {
       const to = vec2(50, 50);
 
       expect(hasNavigationClearance(from, to, 16, [obstacle])).toBe(true);
+    });
+  });
+
+  describe("testCircleCircle", () => {
+    it("returns null when circles are completely separated", () => {
+      const c1 = vec2(0, 0);
+      const r1 = 10;
+      const c2 = vec2(30, 0);
+      const r2 = 10;
+
+      expect(testCircleCircle(c1, r1, c2, r2)).toBeNull();
+    });
+
+    it("returns null when circles are exactly touching at their perimeter", () => {
+      const c1 = vec2(0, 0);
+      const r1 = 10;
+      const c2 = vec2(20, 0);
+      const r2 = 10;
+
+      // Distance is exactly r1 + r2 = 20, no overlap
+      expect(testCircleCircle(c1, r1, c2, r2)).toBeNull();
+    });
+
+    it("detects horizontal overlap and computes correct depth, normal, and contact point", () => {
+      // c1 is at x=16, c2 is at x=0. Distance is 16.
+      // r1 = 10, r2 = 10, minSpacing = 20. Overlap depth = 4.
+      const c1 = vec2(16, 0);
+      const r1 = 10;
+      const c2 = vec2(0, 0);
+      const r2 = 10;
+
+      const hit = testCircleCircle(c1, r1, c2, r2);
+      expect(hit).not.toBeNull();
+      expect(hit!.collided).toBe(true);
+      expect(hit!.depth).toBeCloseTo(4);
+      // Normal points from c2 to c1 (away from c2)
+      expect(hit!.normal.x).toBeCloseTo(1);
+      expect(hit!.normal.y).toBeCloseTo(0);
+      // Overlap region spans x=6 to x=10, midpoint is x=8
+      expect(hit!.contactPoint.x).toBeCloseTo(8);
+      expect(hit!.contactPoint.y).toBeCloseTo(0);
+    });
+
+    it("detects vertical overlap with unequal radii", () => {
+      // c1 is at (0, 14), r1 = 8. Surface extends from y=6 to y=22.
+      // c2 is at (0, 0), r2 = 12. Surface extends from y=-12 to y=12.
+      // Overlap region spans y=6 to y=12, midpoint is y=9.
+      const c1 = vec2(0, 14);
+      const r1 = 8;
+      const c2 = vec2(0, 0);
+      const r2 = 12;
+
+      const hit = testCircleCircle(c1, r1, c2, r2);
+      expect(hit).not.toBeNull();
+      expect(hit!.collided).toBe(true);
+      expect(hit!.depth).toBeCloseTo(6); // (8 + 12) - 14 = 6
+      expect(hit!.normal.x).toBeCloseTo(0);
+      expect(hit!.normal.y).toBeCloseTo(1);
+      expect(hit!.contactPoint.x).toBeCloseTo(0);
+      expect(hit!.contactPoint.y).toBeCloseTo(9);
+    });
+
+    it("detects diagonal overlap and normal orientation", () => {
+      // 3-4-5 triangle: dx = 30, dy = 40, dist = 50
+      // r1 = 30, r2 = 30, minSpacing = 60, depth = 10
+      const c1 = vec2(30, 40);
+      const r1 = 30;
+      const c2 = vec2(0, 0);
+      const r2 = 30;
+
+      const hit = testCircleCircle(c1, r1, c2, r2);
+      expect(hit).not.toBeNull();
+      expect(hit!.collided).toBe(true);
+      expect(hit!.depth).toBeCloseTo(10);
+      expect(hit!.normal.x).toBeCloseTo(0.6);
+      expect(hit!.normal.y).toBeCloseTo(0.8);
+      // Midpoint along normal: (0, 0) + (0.6, 0.8) * (30 - 5) = (15, 20)
+      expect(hit!.contactPoint.x).toBeCloseTo(15);
+      expect(hit!.contactPoint.y).toBeCloseTo(20);
+    });
+
+    it("resolves coincident circles deterministically without NaN", () => {
+      // Identical coordinates
+      const c1 = vec2(100, 200);
+      const r1 = 15;
+      const c2 = vec2(100, 200);
+      const r2 = 25;
+
+      const hit = testCircleCircle(c1, r1, c2, r2);
+      expect(hit).not.toBeNull();
+      expect(hit!.collided).toBe(true);
+      expect(hit!.depth).toBeCloseTo(40);
+      expect(Number.isNaN(hit!.depth)).toBe(false);
+      expect(Number.isNaN(hit!.normal.x)).toBe(false);
+      expect(Number.isNaN(hit!.normal.y)).toBe(false);
+      expect(Number.isNaN(hit!.contactPoint.x)).toBe(false);
+      expect(Number.isNaN(hit!.contactPoint.y)).toBe(false);
+      expect(hit!.normal.x).toBe(1);
+      expect(hit!.normal.y).toBe(0);
+    });
+
+    it("handles nearly coincident centers below epsilon smoothly", () => {
+      const c1 = vec2(100 + 1e-7, 100);
+      const r1 = 10;
+      const c2 = vec2(100, 100);
+      const r2 = 10;
+
+      const hit = testCircleCircle(c1, r1, c2, r2);
+      expect(hit).not.toBeNull();
+      expect(hit!.collided).toBe(true);
+      expect(hit!.normal.x).toBe(1);
+      expect(hit!.normal.y).toBe(0);
+      expect(hit!.depth).toBeCloseTo(20);
+      expect(Number.isNaN(hit!.contactPoint.x)).toBe(false);
+    });
+  });
+
+  describe("resolveCircleCircleCollision", () => {
+    it("returns null when circles do not collide", () => {
+      const posA = vec2(0, 0);
+      const posB = vec2(100, 0);
+      expect(resolveCircleCircleCollision(posA, 10, 0.5, posB, 10, 0.5)).toBeNull();
+    });
+
+    it("applies equal mass distribution (0.5 / 0.5)", () => {
+      const posA = vec2(16, 0);
+      const posB = vec2(0, 0);
+      const rA = 10;
+      const rB = 10;
+      // Overlap depth = 4, normal points from B to A: (1, 0)
+      const res = resolveCircleCircleCollision(posA, rA, 0.5, posB, rB, 0.5);
+
+      expect(res).not.toBeNull();
+      expect(res!.depth).toBeCloseTo(4);
+      expect(res!.normal.x).toBeCloseTo(1);
+      expect(res!.normal.y).toBeCloseTo(0);
+
+      // displacementA = normal * depth * 0.5 = (2, 0)
+      expect(res!.displacementA.x).toBeCloseTo(2);
+      expect(res!.displacementA.y).toBeCloseTo(0);
+
+      // displacementB = -normal * depth * 0.5 = (-2, 0)
+      expect(res!.displacementB.x).toBeCloseTo(-2);
+      expect(res!.displacementB.y).toBeCloseTo(0);
+
+      // Verify separated positions have distance >= minSpacing (18 - (-2) = 20)
+      const newPosA = { x: posA.x + res!.displacementA.x, y: posA.y + res!.displacementA.y };
+      const newPosB = { x: posB.x + res!.displacementB.x, y: posB.y + res!.displacementB.y };
+      const dist = Math.hypot(newPosA.x - newPosB.x, newPosA.y - newPosB.y);
+      expect(dist).toBeCloseTo(20);
+    });
+
+    it("handles immovable entity A (0 / 1.0)", () => {
+      const posA = vec2(16, 0);
+      const posB = vec2(0, 0);
+      const rA = 10;
+      const rB = 10;
+      const res = resolveCircleCircleCollision(posA, rA, 0.0, posB, rB, 1.0);
+
+      expect(res).not.toBeNull();
+      // Entity A takes 0 displacement
+      expect(res!.displacementA.x).toBeCloseTo(0);
+      expect(res!.displacementA.y).toBeCloseTo(0);
+
+      // Entity B takes 100% displacement away from A
+      expect(res!.displacementB.x).toBeCloseTo(-4);
+      expect(res!.displacementB.y).toBeCloseTo(0);
+
+      const newPosA = { x: posA.x + res!.displacementA.x, y: posA.y + res!.displacementA.y };
+      const newPosB = { x: posB.x + res!.displacementB.x, y: posB.y + res!.displacementB.y };
+      expect(newPosA.x).toBeCloseTo(16);
+      expect(newPosB.x).toBeCloseTo(-4);
+      expect(newPosA.x - newPosB.x).toBeCloseTo(20);
+    });
+
+    it("handles immovable entity B (1.0 / 0)", () => {
+      const posA = vec2(16, 0);
+      const posB = vec2(0, 0);
+      const rA = 10;
+      const rB = 10;
+      const res = resolveCircleCircleCollision(posA, rA, 1.0, posB, rB, 0.0);
+
+      expect(res).not.toBeNull();
+      // Entity A takes 100% displacement away from B
+      expect(res!.displacementA.x).toBeCloseTo(4);
+      expect(res!.displacementA.y).toBeCloseTo(0);
+
+      // Entity B takes 0 displacement
+      expect(res!.displacementB.x).toBeCloseTo(0);
+      expect(res!.displacementB.y).toBeCloseTo(0);
+
+      const newPosA = { x: posA.x + res!.displacementA.x, y: posA.y + res!.displacementA.y };
+      const newPosB = { x: posB.x + res!.displacementB.x, y: posB.y + res!.displacementB.y };
+      expect(newPosA.x).toBeCloseTo(20);
+      expect(newPosB.x).toBeCloseTo(0);
+      expect(newPosA.x - newPosB.x).toBeCloseTo(20);
+    });
+  });
+
+  describe("applyInelasticCircleImpulse", () => {
+    it("cancels inward relative normal velocity for equal masses", () => {
+      // Normal points from B to A: (1, 0)
+      const normal = vec2(1, 0);
+      const velA = vec2(-10, 0); // Moving left (toward B)
+      const velB = vec2(10, 0);  // Moving right (toward A)
+
+      applyInelasticCircleImpulse(velA, 0.5, velB, 0.5, normal);
+
+      expect(velA.x).toBeCloseTo(0);
+      expect(velA.y).toBeCloseTo(0);
+      expect(velB.x).toBeCloseTo(0);
+      expect(velB.y).toBeCloseTo(0);
+    });
+
+    it("preserves tangential sliding velocity completely", () => {
+      const normal = vec2(1, 0);
+      const velA = vec2(-10, 25);
+      const velB = vec2(10, -15);
+
+      applyInelasticCircleImpulse(velA, 0.5, velB, 0.5, normal);
+
+      // Normal components (x) canceled
+      expect(velA.x).toBeCloseTo(0);
+      expect(velB.x).toBeCloseTo(0);
+      // Tangential components (y) preserved
+      expect(velA.y).toBeCloseTo(25);
+      expect(velB.y).toBeCloseTo(-15);
+    });
+
+    it("cancels relative velocity into an immovable entity A (0 / 1.0)", () => {
+      const normal = vec2(1, 0);
+      const velA = vec2(0, 0);
+      const velB = vec2(20, 10); // B moving into A
+
+      applyInelasticCircleImpulse(velA, 0, velB, 1.0, normal);
+
+      expect(velA.x).toBeCloseTo(0);
+      expect(velA.y).toBeCloseTo(0);
+      expect(velB.x).toBeCloseTo(0);
+      expect(velB.y).toBeCloseTo(10); // Tangential preserved
+    });
+
+    it("cancels relative velocity into an immovable entity B (1.0 / 0)", () => {
+      const normal = vec2(1, 0);
+      const velA = vec2(-20, 15); // A moving into B
+      const velB = vec2(0, 0);
+
+      applyInelasticCircleImpulse(velA, 1.0, velB, 0, normal);
+
+      expect(velA.x).toBeCloseTo(0);
+      expect(velA.y).toBeCloseTo(15); // Tangential preserved
+      expect(velB.x).toBeCloseTo(0);
+      expect(velB.y).toBeCloseTo(0);
+    });
+
+    it("ignores separating velocities where velAlongNormal > 0", () => {
+      const normal = vec2(1, 0);
+      const velA = vec2(15, 5);  // A moving right (away from B)
+      const velB = vec2(-10, -5); // B moving left (away from A)
+
+      applyInelasticCircleImpulse(velA, 0.5, velB, 0.5, normal);
+
+      // Velocities should remain completely unchanged
+      expect(velA.x).toBeCloseTo(15);
+      expect(velA.y).toBeCloseTo(5);
+      expect(velB.x).toBeCloseTo(-10);
+      expect(velB.y).toBeCloseTo(-5);
+    });
+
+    it("ignores parallel tangential motion where velAlongNormal == 0", () => {
+      const normal = vec2(1, 0);
+      const velA = vec2(0, 20);
+      const velB = vec2(0, -20);
+
+      applyInelasticCircleImpulse(velA, 0.5, velB, 0.5, normal);
+
+      expect(velA.x).toBeCloseTo(0);
+      expect(velA.y).toBeCloseTo(20);
+      expect(velB.x).toBeCloseTo(0);
+      expect(velB.y).toBeCloseTo(-20);
     });
   });
 });
