@@ -15,7 +15,20 @@ import { TimeGovernor } from "../engine/TimeGovernor";
 import { createRoom20, RoomConfig } from "../levels/Room";
 import { createEndlessSurvivalRoom, RoomManager } from "../levels/RoomManager";
 import { EndlessDirector, MaterializingUnit } from "../levels/EndlessDirector";
-import { vec2, vecLength, vecNormalize, Vector2D } from "../math/vector";
+import {
+  applyInelasticCircleImpulse,
+  resolveCircleCircleCollision,
+  testCircleAABB,
+} from "../math/collision";
+import {
+  vec2,
+  vecDot,
+  vecLength,
+  vecNormalize,
+  vecScale,
+  vecSub,
+  Vector2D,
+} from "../math/vector";
 import { CylinderHUD } from "../ui/CylinderHUD";
 import { Reticle } from "../ui/Reticle";
 import { ChronoAnchorRenderer } from "../ui/ChronoAnchorRenderer";
@@ -28,7 +41,8 @@ import { EndlessTelemetryHUD } from "../ui/EndlessTelemetryHUD";
 import { createObstacle, createPillar, Obstacle } from "./Obstacle";
 import { ParticleSystem } from "./ParticleSystem";
 import { Player } from "./Player";
-import { Projectile } from "./Projectile";
+import { CombatUnit, Projectile } from "./Projectile";
+import { resolveSafeSpawnPosition } from "./boss/BossTransitionAction";
 import { UpgradeDefinition } from "../upgrades/UpgradeDefinition";
 import { DEFAULT_UPGRADE_REGISTRY } from "../upgrades/UpgradeRegistry";
 import { extendedCylinder } from "../upgrades/definitions/extendedCylinder";
@@ -158,6 +172,8 @@ export class Arena {
         fireCadenceTicks: 55,
       }),
     ];
+
+    this.resolveUnitCollisions(3);
   }
 
   /**
@@ -195,13 +211,46 @@ export class Arena {
         this.checkpointLoadouts.set(room.roomNumber, [...this.player.upgradePipeline.getActiveIds()]);
       }
     }
+
+    // Ensure starter positions are cleanly separated
+    this.resolveUnitCollisions(3);
   }
 
   /**
    * Dynamically constructs and registers an active enemy combat unit into the arena roster.
    */
   public spawnEnemy(config: EnemyConfig): Enemy {
-    const enemy = new Enemy(config);
+    let spawnX = config.x;
+    let spawnY = config.y;
+
+    if (this.obstacles.length > 0) {
+      const radius = config.radius ?? 15;
+      const existingUnits: CombatUnit[] = [];
+      if (this.player.isAlive) {
+        existingUnits.push(this.player);
+      }
+      for (const e of this.enemies) {
+        if (e.isAlive) {
+          existingUnits.push(e);
+        }
+      }
+      const safePos = resolveSafeSpawnPosition(
+        { x: config.x, y: config.y },
+        radius,
+        this.obstacles,
+        existingUnits,
+        { width: this.width, height: this.height }
+      );
+      spawnX = safePos.x;
+      spawnY = safePos.y;
+    }
+
+    const finalConfig: EnemyConfig =
+      spawnX !== config.x || spawnY !== config.y
+        ? { ...config, x: spawnX, y: spawnY }
+        : config;
+
+    const enemy = new Enemy(finalConfig);
     if (enemy.phaseController) {
       enemy.phaseController.transitionContextExtras = {
         arena: this,
@@ -210,6 +259,7 @@ export class Arena {
       };
     }
     this.enemies.push(enemy);
+    this.resolveUnitCollisions(3);
     return enemy;
   }
 
@@ -617,7 +667,14 @@ export class Arena {
     for (const enemy of [...this.enemies]) {
       if (enemy.isAlive) {
         const wasCharging = enemy.isChargingLaser;
-        const enemyBullets = enemy.update(this.player, this.obstacles, 1, fixedDt);
+        const enemyBullets = enemy.update(
+          this.player,
+          this.obstacles,
+          1,
+          fixedDt,
+          undefined,
+          this.enemies
+        );
         if (!wasCharging && enemy.isChargingLaser) {
           this.soundSynth?.playSniperCharge(this.timeGovernor.getTimeScale());
         }
@@ -627,6 +684,9 @@ export class Arena {
         }
       }
     }
+
+    // Resolve unit-unit circular collisions, obstacle relaxation, and boundary clamping
+    this.resolveUnitCollisions(3);
 
     // 4. Update Projectiles with Continuous Collision Detection
     for (const bullet of this.projectiles) {
@@ -1391,4 +1451,254 @@ export class Arena {
 
     ctx.restore();
   }
+
+  /**
+   * Resolves physical unit spatial occupancy using multi-pass constraint relaxation:
+   * 1. Unit-Unit circle overlap resolution with mass hierarchy and inelastic velocity damping.
+   * 2. Overcharge Dash kinetic shove against regular enemies, smooth hull deflection around bosses.
+   * 3. Unit-Obstacle collision resolution against arena obstacles.
+   * 4. Arena perimeter boundary clamping.
+   *
+   * @param iterations Number of relaxation iterations (default: 3)
+   */
+  public resolveUnitCollisions(iterations = 3): void {
+    resolveUnitCollisions(
+      this.player,
+      this.enemies,
+      this.obstacles,
+      { width: this.width, height: this.height },
+      iterations
+    );
+  }
 }
+
+/**
+ * Resolves physical unit spatial occupancy using multi-pass constraint relaxation:
+ * 1. Unit-Unit circle overlap resolution with mass hierarchy and inelastic velocity damping.
+ * 2. Overcharge Dash kinetic shove against regular enemies, smooth hull deflection around bosses.
+ * 3. Unit-Obstacle collision resolution against arena obstacles.
+ * 4. Arena perimeter boundary clamping.
+ *
+ * @param player Active player instance
+ * @param enemies Active enemy roster
+ * @param obstacles Arena solid obstacles
+ * @param bounds Arena dimensions { width, height }
+ * @param iterations Relaxation iteration count (default: 3)
+ */
+export function resolveUnitCollisions(
+  player: Player,
+  enemies: Enemy[],
+  obstacles: Obstacle[],
+  bounds: { width: number; height: number },
+  iterations = 3
+): void {
+  const units: (Player | Enemy)[] = [];
+  if (player.isAlive) {
+    units.push(player);
+  }
+  for (const enemy of enemies) {
+    if (enemy.isAlive) {
+      units.push(enemy);
+    }
+  }
+
+  if (units.length <= 1 && obstacles.length === 0) {
+    return;
+  }
+
+  for (let iter = 0; iter < iterations; iter++) {
+    // 1. Unit-Unit circle resolution
+    for (let i = 0; i < units.length; i++) {
+      for (let j = i + 1; j < units.length; j++) {
+        const A = units[i];
+        const B = units[j];
+
+        const dx = A.position.x - B.position.x;
+        const dy = A.position.y - B.position.y;
+        const minDist = A.radius + B.radius;
+
+        if (dx * dx + dy * dy >= minDist * minDist) {
+          continue;
+        }
+
+        const aIsBoss = (A as any).isBoss === true;
+        const bIsBoss = (B as any).isBoss === true;
+
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const normBA = dist > 1e-6 ? vec2(dx / dist, dy / dist) : vec2(1, 0);
+        const normAB = vecScale(normBA, -1);
+
+        const aBlocked = isUnitBacked(A.position, A.radius, normBA, obstacles, bounds.width, bounds.height);
+        const bBlocked = isUnitBacked(B.position, B.radius, normAB, obstacles, bounds.width, bounds.height);
+
+        let weightA = 0.5;
+        let weightB = 0.5;
+
+        if (aIsBoss && !bIsBoss) {
+          weightA = 0;
+          weightB = 1.0;
+        } else if (bIsBoss && !aIsBoss) {
+          weightA = 1.0;
+          weightB = 0;
+        } else if (aIsBoss && bIsBoss) {
+          weightA = 0.5;
+          weightB = 0.5;
+        } else if (bBlocked && !aBlocked) {
+          weightA = 1.0;
+          weightB = 0;
+        } else if (aBlocked && !bBlocked) {
+          weightA = 0;
+          weightB = 1.0;
+        } else if (player.dashActiveTicks > 0) {
+          if (A === player) {
+            weightA = 0.1;
+            weightB = 0.9;
+          } else if (B === player) {
+            weightA = 0.9;
+            weightB = 0.1;
+          } else {
+            weightA = 0.5;
+            weightB = 0.5;
+          }
+        }
+
+        const collision = resolveCircleCircleCollision(
+          A.position,
+          A.radius,
+          weightA,
+          B.position,
+          B.radius,
+          weightB
+        );
+
+        if (collision) {
+          A.position.x += collision.displacementA.x;
+          A.position.y += collision.displacementA.y;
+          B.position.x += collision.displacementB.x;
+          B.position.y += collision.displacementB.y;
+
+          applyInelasticCircleImpulse(
+            A.velocity,
+            weightA,
+            B.velocity,
+            weightB,
+            collision.normal
+          );
+
+          // If player is dashing against a regular enemy: impart a shove impulse to the enemy's velocity along the collision normal and dash tangent.
+          if (player.dashActiveTicks > 0 && iter === 0) {
+            const isAPlayer = A === player;
+            const isBPlayer = B === player;
+            if (isAPlayer || isBPlayer) {
+              const enemy = (isAPlayer ? B : A) as Enemy;
+              if (!enemy.isBoss) {
+                // Normal pointing outward from player to enemy
+                // collision.normal points from B to A
+                const toEnemy = isAPlayer
+                  ? vecScale(collision.normal, -1)
+                  : collision.normal;
+
+                const pSpeed = vecLength(player.velocity);
+                const pDir = pSpeed > 1e-4 ? vecScale(player.velocity, 1 / pSpeed) : toEnemy;
+
+                // Tangent component of dash velocity relative to contact normal
+                const normalComp = vecDot(pDir, toEnemy);
+                const tangentVec = vecSub(pDir, vecScale(toEnemy, normalComp));
+                const tangentLen = vecLength(tangentVec);
+                const tangentDir = tangentLen > 1e-4 ? vecScale(tangentVec, 1 / tangentLen) : vec2(0, 0);
+
+                const shoveSpeed = Math.max(pSpeed * 0.75, 240);
+                const shoveNormal = vecScale(toEnemy, shoveSpeed * 0.8);
+                const shoveTangent = vecScale(tangentDir, shoveSpeed * 0.5);
+
+                enemy.velocity.x += shoveNormal.x + shoveTangent.x;
+                enemy.velocity.y += shoveNormal.y + shoveTangent.y;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Unit-Obstacle resolution
+    if (player.isAlive) {
+      player.resolveObstacleCollisions(obstacles);
+    }
+    for (const e of enemies) {
+      if (e.isAlive) {
+        e.resolveObstacleCollisions(obstacles);
+      }
+    }
+
+    // 3. Boundary clamping
+    if (player.isAlive) {
+      clampUnitToBounds(player, bounds.width, bounds.height);
+    }
+    for (const e of enemies) {
+      if (e.isAlive) {
+        clampUnitToBounds(e, bounds.width, bounds.height);
+      }
+    }
+  }
+}
+
+/**
+ * Checks whether a unit circle is resting against an arena boundary or solid obstacle
+ * in the direction of the applied displacement normal.
+ */
+function isUnitBacked(
+  pos: Vector2D,
+  radius: number,
+  pushDir: Vector2D,
+  obstacles: Obstacle[],
+  width: number,
+  height: number
+): boolean {
+  // Arena perimeter bounds
+  if (pos.x <= radius + 1 && pushDir.x < -0.1) return true;
+  if (pos.x >= width - radius - 1 && pushDir.x > 0.1) return true;
+  if (pos.y <= radius + 1 && pushDir.y < -0.1) return true;
+  if (pos.y >= height - radius - 1 && pushDir.y > 0.1) return true;
+
+  // Obstacle AABB barriers
+  for (const obs of obstacles) {
+    const contact = testCircleAABB(pos, radius + 1, obs.bounds.min, obs.bounds.max);
+    if (contact && contact.collided) {
+      if (vecDot(pushDir, contact.normal) < -0.1) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Clamps a combat unit within the arena perimeter boundaries.
+ */
+function clampUnitToBounds(
+  unit: Player | Enemy,
+  width: number,
+  height: number
+): void {
+  const minX = unit.radius;
+  const maxX = width - unit.radius;
+  const minY = unit.radius;
+  const maxY = height - unit.radius;
+
+  if (unit.position.x < minX) {
+    unit.position.x = minX;
+    unit.velocity.x = Math.max(0, unit.velocity.x);
+  } else if (unit.position.x > maxX) {
+    unit.position.x = maxX;
+    unit.velocity.x = Math.min(0, unit.velocity.x);
+  }
+
+  if (unit.position.y < minY) {
+    unit.position.y = minY;
+    unit.velocity.y = Math.max(0, unit.velocity.y);
+  } else if (unit.position.y > maxY) {
+    unit.position.y = maxY;
+    unit.velocity.y = Math.min(0, unit.velocity.y);
+  }
+}
+

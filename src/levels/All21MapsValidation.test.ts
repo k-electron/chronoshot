@@ -104,6 +104,27 @@ describe("All 21 Maps Comprehensive Validation Suite", () => {
           }
         });
       }
+
+      if (room.enemies.length >= 2) {
+        it(`Room ${room.roomNumber} (${room.title}): every pair of hostiles maintains mutual center-to-center clearance (dist >= rI + rJ)`, () => {
+          for (let i = 0; i < room.enemies.length; i++) {
+            for (let j = i + 1; j < room.enemies.length; j++) {
+              const enemyI = room.enemies[i];
+              const enemyJ = room.enemies[j];
+              const radiusI = enemyI.radius ?? 15;
+              const radiusJ = enemyJ.radius ?? 15;
+              const enemyPosI = vec2(enemyI.x, enemyI.y);
+              const enemyPosJ = vec2(enemyJ.x, enemyJ.y);
+              const dist = vecDistance(enemyPosI, enemyPosJ);
+
+              expect(
+                dist,
+                `Room ${room.roomNumber} hostile pair '${enemyI.id}' and '${enemyJ.id}' overlap: dist=${dist.toFixed(1)}px < min=${radiusI + radiusJ}px`
+              ).toBeGreaterThanOrEqual(radiusI + radiusJ);
+            }
+          }
+        });
+      }
     }
   });
 
@@ -204,8 +225,15 @@ describe("All 21 Maps Comprehensive Validation Suite", () => {
               distToPlayer >= (enemy.movement as any).minDist &&
               distToPlayer <= (enemy.movement as any).maxDist;
 
+            const isArrivedAtPlayer =
+              distToPlayer <= enemy.radius + arena.player.radius + 4;
+
             const isLegitimateHold =
-              isFiringStutter || isChargingLaser || isOverloading || isKiterInSweetSpot;
+              isFiringStutter ||
+              isChargingLaser ||
+              isOverloading ||
+              isKiterInSweetSpot ||
+              isArrivedAtPlayer;
 
             if (speed < 1e-3 && !isLegitimateHold) {
               consecutiveZeroTicks[i]++;

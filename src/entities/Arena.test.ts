@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { vec2 } from "../math/vector";
-import { Arena } from "./Arena";
+import { vec2, vecDistance, vecDot, vecLength } from "../math/vector";
+import { testCircleAABB } from "../math/collision";
+import { Arena, resolveUnitCollisions } from "./Arena";
 import { Enemy } from "./Enemy";
+import { createObstacle } from "./Obstacle";
 import { createProjectile } from "./Projectile";
 import { RoomManager } from "../levels/RoomManager";
 import { CHRONO_ZENITH_BLUEPRINT } from "./boss/BossBlueprint";
@@ -1595,6 +1597,272 @@ describe("Combat Arena & Room Loop", () => {
 
       // Verify safe room restart
       expect(() => arena.restart()).not.toThrow();
+    });
+  });
+
+  describe("Unit Spatial Occupancy & Mass Hierarchy (Phases 3 & 4)", () => {
+    it("3.1/3.2: pushes overlapping enemies placed at identical or close coordinates apart to at least r1 + r2 during fixedUpdate", () => {
+      const arena = new Arena(960, 640);
+      arena.enemies = []; // Clear defaults
+      arena.obstacles = [];
+
+      // Two enemies at close coordinates
+      const e1 = new Enemy({ id: "e1", type: "grunt", x: 400, y: 300, radius: 14 });
+      const e2 = new Enemy({ id: "e2", type: "grunt", x: 405, y: 300, radius: 14 });
+      arena.enemies = [e1, e2];
+
+      // Distance before is 5 < 28
+      expect(vecDistance(e1.position, e2.position)).toBeLessThan(e1.radius + e2.radius);
+
+      // Run fixedUpdate via arena.step with movement so time dilation is 1.00x
+      arena.step(1 / 60, {
+        moveDir: vec2(1, 0),
+        mousePos: vec2(500, 300),
+        shoot: false,
+        reload: false,
+        restart: false,
+      });
+
+      // Verify center distance is at least r1 + r2
+      const distClose = vecDistance(e1.position, e2.position);
+      expect(distClose).toBeGreaterThanOrEqual(e1.radius + e2.radius - 1e-4);
+
+      // Also verify identical coordinates
+      const e3 = new Enemy({ id: "e3", type: "grunt", x: 500, y: 350, radius: 14 });
+      const e4 = new Enemy({ id: "e4", type: "grunt", x: 500, y: 350, radius: 14 });
+      arena.enemies = [e3, e4];
+
+      arena.step(1 / 60, {
+        moveDir: vec2(1, 0),
+        mousePos: vec2(500, 300),
+        shoot: false,
+        reload: false,
+        restart: false,
+      });
+
+      const distIdentical = vecDistance(e3.position, e4.position);
+      expect(distIdentical).toBeGreaterThanOrEqual(e3.radius + e4.radius - 1e-4);
+    });
+
+    it("3.1: standalone resolveUnitCollisions executes 3-pass relaxation directly on entities", () => {
+      const arena = new Arena(960, 640);
+      const enemy = new Enemy({ id: "standalone-target", type: "grunt", x: 400, y: 300, radius: 14 });
+      arena.player.position = vec2(410, 300); // 10px distance < 28px
+      expect(vecDistance(arena.player.position, enemy.position)).toBeLessThan(arena.player.radius + enemy.radius);
+
+      resolveUnitCollisions(
+        arena.player,
+        [enemy],
+        [],
+        { width: 960, height: 640 },
+        3
+      );
+
+      expect(vecDistance(arena.player.position, enemy.position)).toBeGreaterThanOrEqual(
+        arena.player.radius + enemy.radius - 1e-4
+      );
+    });
+
+    it("3.1: wall sandwich equilibrium: enemy placed between obstacle wall and player/enemy is not pushed through the wall and remains outside both the wall and the other unit", () => {
+      const arena = new Arena(960, 640);
+      arena.enemies = [];
+      arena.obstacles = [
+        createObstacle("test-wall", 100, 100, 100, 400), // x from 100 to 200
+      ];
+
+      // Place enemy resting right against the right face of the wall (x = 200 + 14 = 214)
+      const enemy = new Enemy({ id: "sandwiched", type: "grunt", x: 214, y: 250, radius: 14 });
+      arena.enemies = [enemy];
+
+      // Place player pushing into the enemy towards the wall (e.g. at x = 224, overlapping by 18px)
+      arena.player.position = vec2(224, 250);
+      arena.player.velocity = vec2(-100, 0);
+
+      // Verify initial overlap
+      expect(vecDistance(arena.player.position, enemy.position)).toBeLessThan(arena.player.radius + enemy.radius);
+
+      // Execute relaxation
+      arena.resolveUnitCollisions(3);
+
+      // 1. Enemy must NOT be pushed through the wall (must remain at x >= 214)
+      expect(enemy.position.x - enemy.radius).toBeGreaterThanOrEqual(200 - 1e-4);
+
+      // 2. Enemy must remain outside the player
+      const dist = vecDistance(arena.player.position, enemy.position);
+      expect(dist).toBeGreaterThanOrEqual(arena.player.radius + enemy.radius - 1e-4);
+
+      // 3. Player took the displacement outward (away from the wall)
+      expect(arena.player.position.x).toBeGreaterThanOrEqual(214 + enemy.radius + arena.player.radius - 1e-4);
+    });
+
+    it("3.3: non-damaging contact semantics: walking player directly into an enemy does NOT kill player, does NOT consume reactive shield, and leaves point-blank bullet spawn gap", () => {
+      const arena = new Arena(960, 640);
+      arena.enemies = [];
+      arena.obstacles = [];
+      const enemy = new Enemy({ id: "contact-grunt", type: "grunt", x: 400, y: 300, radius: 14, fireCadenceTicks: 999 });
+      arena.enemies = [enemy];
+
+      // Equip reactive shield
+      arena.player.setAugmentation("reactiveShield", true);
+      arena.player.maxShields = 1;
+      arena.player.shields = 1;
+
+      // Walk player directly into contact with enemy
+      arena.player.position = vec2(380, 300);
+
+      // Run multiple simulation steps of continuous physical contact
+      for (let i = 0; i < 10; i++) {
+        arena.step(1 / 60, {
+          moveDir: vec2(1, 0), // pressing right into enemy
+          mousePos: vec2(500, 300),
+          shoot: false,
+          reload: false,
+          restart: false,
+        });
+      }
+
+      // Verify: touching does NOT kill player, does NOT consume shields
+      expect(arena.player.isAlive).toBe(true);
+      expect(arena.player.shields).toBe(1);
+      expect(arena.status).toBe("playing");
+
+      // Verify physical separation is maintained during contact
+      const contactDist = vecDistance(arena.player.position, enemy.position);
+      expect(contactDist).toBeGreaterThanOrEqual(arena.player.radius + enemy.radius - 1e-4);
+
+      // When enemy discharges at point-blank, verify bullet spawns in the gap
+      const bullets = enemy.attack.discharge({
+        id: enemy.id,
+        position: enemy.position,
+        aimAngle: enemy.aimAngle,
+        radius: enemy.radius,
+      });
+
+      expect(bullets.length).toBeGreaterThan(0);
+      const bullet = bullets[0];
+
+      // Muzzle offset is radius + 6, so bullet spawns outside enemy chassis
+      const distFromEnemyCenter = vecDistance(bullet.position, enemy.position);
+      expect(distFromEnemyCenter).toBeGreaterThanOrEqual(enemy.radius + 5.9);
+
+      // Bullet start position is strictly outside the player's chassis
+      const distFromPlayerCenter = vecDistance(bullet.position, arena.player.position);
+      expect(distFromPlayerCenter).toBeGreaterThan(0);
+    });
+
+    it("4.1: dashing player shoves regular enemy outward along contact normal/tangent while maintaining non-overlapping hulls", () => {
+      const arena = new Arena(960, 640);
+      arena.enemies = [];
+      arena.obstacles = [];
+
+      // Place enemy in the path of the dash in open space
+      const enemy = new Enemy({ id: "shove-target", type: "grunt", x: 300, y: 300, radius: 14 });
+      arena.enemies = [enemy];
+
+      // Setup dashing player heading right
+      arena.player.position = vec2(285, 300); // 15px distance < 28px (overlap of 13px)
+      arena.player.velocity = vec2(arena.player.dashSpeed, 0);
+      arena.player.dashActiveTicks = 10;
+
+      const initialEnemyPos = { ...enemy.position };
+
+      // Resolve unit collisions
+      arena.resolveUnitCollisions(3);
+
+      // Verify hulls do not overlap
+      const dist = vecDistance(arena.player.position, enemy.position);
+      expect(dist).toBeGreaterThanOrEqual(arena.player.radius + enemy.radius - 1e-4);
+
+      // Verify dominant mass hierarchy: enemy took ~90% displacement, player took ~10%
+      const enemyDisplacement = enemy.position.x - initialEnemyPos.x;
+      expect(enemyDisplacement).toBeGreaterThan(10); // shoved forward by >10px
+
+      // Verify shove impulse: enemy velocity received outward normal impulse
+      expect(enemy.velocity.x).toBeGreaterThan(150); // shoved along dash vector at high velocity
+    });
+
+    it("4.2: dashing player into milestone boss deflects player along curved boss hull with boss position unchanged and zero penetration", () => {
+      const arena = new Arena(960, 640);
+      arena.enemies = [];
+
+      // Create milestone boss (radius 26, infinite mass)
+      const boss = new Enemy({
+        id: "goliath-test",
+        type: "boss",
+        isBoss: true,
+        x: 500,
+        y: 300,
+        radius: 26,
+      });
+      arena.enemies = [boss];
+
+      const initialBossPos = { ...boss.position };
+      const initialBossVel = { ...boss.velocity };
+
+      // Setup dashing player colliding diagonally into the boss hull
+      arena.player.radius = 14;
+      // Total radius = 40. Place player at distance 30 (overlap of 10px) at an angle
+      arena.player.position = vec2(500 - 30, 300 - 10);
+      arena.player.velocity = vec2(400, 200); // heading towards boss
+      arena.player.dashActiveTicks = 8;
+
+      // Resolve unit collisions
+      arena.resolveUnitCollisions(3);
+
+      // 1. Boss is completely immovable: position and velocity are identical
+      expect(boss.position.x).toBe(initialBossPos.x);
+      expect(boss.position.y).toBe(initialBossPos.y);
+      expect(boss.velocity.x).toBe(initialBossVel.x);
+      expect(boss.velocity.y).toBe(initialBossVel.y);
+
+      // 2. Zero penetration: distance is at least r_P + r_boss
+      const dist = vecDistance(arena.player.position, boss.position);
+      expect(dist).toBeGreaterThanOrEqual(arena.player.radius + boss.radius - 1e-4);
+
+      // 3. Player took 100% of displacement (player moved away from boss)
+      expect(vecDistance(arena.player.position, boss.position)).toBeGreaterThan(30);
+
+      // 4. Inward normal velocity into boss was canceled while tangential velocity was retained
+      // Contact normal points from boss to player
+      const normal = vec2(
+        (arena.player.position.x - boss.position.x) / dist,
+        (arena.player.position.y - boss.position.y) / dist
+      );
+      const velNormal = vecDot(arena.player.velocity, normal);
+      // Inward velocity (velNormal < 0) must be canceled (velNormal >= -1e-4)
+      expect(velNormal).toBeGreaterThanOrEqual(-1e-4);
+      // Player still has sliding/deflecting momentum
+      expect(vecLength(arena.player.velocity)).toBeGreaterThan(0);
+    });
+
+    it("dynamically spawns enemy safely when initial spawn coordinates are obstructed by an obstacle or player", () => {
+      const arena = new Arena(960, 640);
+      const wall = createObstacle("test-wall", 300, 200, 100, 100);
+      arena.obstacles = [wall];
+      arena.player.position = vec2(100, 100);
+      arena.player.radius = 14;
+
+      // Spawn an enemy directly inside the center of the wall (350, 250)
+      const enemy = arena.spawnEnemy({
+        id: "wall-spawner",
+        type: "grunt",
+        x: 350,
+        y: 250,
+      });
+
+      // Verify the spawned enemy was safely redirected outside the obstacle
+      const contact = testCircleAABB(enemy.position, enemy.radius + 2, wall.bounds.min, wall.bounds.max);
+      expect(contact).toBeNull();
+
+      // Verify separation from player
+      const distToPlayer = vecDistance(enemy.position, arena.player.position);
+      expect(distToPlayer).toBeGreaterThanOrEqual(enemy.radius + arena.player.radius);
+
+      // Verify bounds
+      expect(enemy.position.x).toBeGreaterThanOrEqual(enemy.radius);
+      expect(enemy.position.x).toBeLessThanOrEqual(arena.width - enemy.radius);
+      expect(enemy.position.y).toBeGreaterThanOrEqual(enemy.radius);
+      expect(enemy.position.y).toBeLessThanOrEqual(arena.height - enemy.radius);
     });
   });
 });

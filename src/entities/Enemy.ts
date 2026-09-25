@@ -360,7 +360,8 @@ export class Enemy implements CombatUnit {
     obstacles: Obstacle[],
     deltaTicks: number = 1,
     fixedDeltaTime: number = deltaTicks / 60,
-    pathfinder?: GridPathfinder
+    pathfinder?: GridPathfinder,
+    neighbors?: CombatUnit[]
   ): Projectile[] {
     this.previousPosition = { ...this.position };
 
@@ -414,6 +415,10 @@ export class Enemy implements CombatUnit {
     } else if (this.isChargingLaser) {
       this.velocity = vec2(0, 0);
     } else {
+      const activeNeighbors = neighbors
+        ? neighbors.filter((n) => n !== this && n.isAlive)
+        : undefined;
+
       const movementCtx: MovementContext = {
         position: this.position,
         previousPosition: this.previousPosition,
@@ -422,6 +427,7 @@ export class Enemy implements CombatUnit {
         speed: this.speed,
         aimAngle: this.aimAngle,
         hasLineOfSight: this.hasLineOfSight,
+        neighbors: activeNeighbors,
       };
       this.velocity = this.movement.update(
         movementCtx,
@@ -429,7 +435,8 @@ export class Enemy implements CombatUnit {
         obstacles,
         deltaTicks,
         fixedDeltaTime,
-        pathfinder
+        pathfinder,
+        activeNeighbors
       );
     }
 

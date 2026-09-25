@@ -256,6 +256,38 @@ describe("KiterBehavior", () => {
       expect(vecLength(vel)).toBeCloseTo(80);
     });
 
+    it("retreats laterally when another friendly unit is directly behind it", () => {
+      const kiter = new KiterBehavior(340, 520);
+      // Target at (200, 200). Kiter at (300, 200), radius 14, speed 80.
+      // Target is too close (dist = 100 < minDist 340).
+      // Retreat vector points right (+1, 0) away from target.
+      const ctx = createMockContext({
+        position: vec2(300, 200),
+        radius: 14,
+        speed: 80,
+        hasLineOfSight: true,
+      });
+      const target = createMockTarget(200, 200);
+
+      // Friendly unit placed directly behind kiter at (330, 200), radius 14
+      // Retreat probe is at (328, 200). Distance to friendly unit is 2px (< 14 + 14 + 6 = 34px).
+      const friendlyBehind: CombatUnit = {
+        id: "friendly-blocker",
+        position: vec2(330, 200),
+        radius: 14,
+        isAlive: true,
+        kill: () => {},
+      };
+
+      // In open arena with no obstacles behind:
+      const vel = kiter.update(ctx, target, [], 1, 1 / 60, undefined, [friendlyBehind]);
+
+      // Straight retreat (+X) is blocked by friendly unit; kiter evaluates lateral escape tangents
+      expect(vel.x).toBe(0);
+      expect(Math.abs(vel.y)).toBeCloseTo(80);
+      expect(vecLength(vel)).toBeCloseTo(80);
+    });
+
     it("holds position when backwards retreat and both lateral escape directions are blocked (cul-de-sac)", () => {
       const kiter = new KiterBehavior(300, 500);
       // Box surrounding unit at (105, 200) on left, top, and bottom

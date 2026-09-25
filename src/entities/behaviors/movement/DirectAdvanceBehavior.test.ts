@@ -301,4 +301,175 @@ describe("DirectAdvanceBehavior", () => {
     expect(vel.x).toBeCloseTo(-120);
     expect(vel.y).toBeCloseTo(0);
   });
+
+  it("halts forward velocity when at or within surface arrival distance (radius_self + radius_target + 2px)", () => {
+    const behavior = new DirectAdvanceBehavior();
+    const ctx = createMockContext({
+      position: vec2(100, 100),
+      radius: 15,
+      speed: 120,
+      hasLineOfSight: true,
+    });
+    // Target radius = 12. arrivalDist = 15 + 12 + 2 = 29px
+    const targetAtArrival = createMockTarget(129, 100); // distance = 29px exactly
+    const velAtArrival = behavior.update(ctx, targetAtArrival, [], 1);
+    expect(velAtArrival.x).toBe(0);
+    expect(velAtArrival.y).toBe(0);
+
+    const targetInsideArrival = createMockTarget(120, 100); // distance = 20px (< 29px)
+    const velInsideArrival = behavior.update(ctx, targetInsideArrival, [], 1);
+    expect(velInsideArrival.x).toBe(0);
+    expect(velInsideArrival.y).toBe(0);
+
+    const targetOutsideArrival = createMockTarget(135, 100); // distance = 35px (> 29px)
+    const velOutsideArrival = behavior.update(ctx, targetOutsideArrival, [], 1);
+    expect(velOutsideArrival.x).toBeCloseTo(120);
+    expect(velOutsideArrival.y).toBeCloseTo(0);
+  });
+
+  it("fans out laterally instead of collapsing into a single line when two units advance toward the same target", () => {
+    const behavior1 = new DirectAdvanceBehavior();
+    const behavior2 = new DirectAdvanceBehavior();
+
+    const target = createMockTarget(300, 200);
+
+    // Two units positioned 10px apart vertically (dist = 10 < R_sep = 64px)
+    const unit1: CombatUnit = {
+      id: "unit-1",
+      position: vec2(100, 195),
+      radius: 14,
+      isAlive: true,
+      velocity: vec2(0, 0),
+      kill: () => {},
+    };
+    const unit2: CombatUnit = {
+      id: "unit-2",
+      position: vec2(100, 205),
+      radius: 14,
+      isAlive: true,
+      velocity: vec2(0, 0),
+      kill: () => {},
+    };
+
+    const ctx1 = createMockContext({
+      position: unit1.position,
+      radius: 14,
+      speed: 100,
+      hasLineOfSight: true,
+    });
+    const ctx2 = createMockContext({
+      position: unit2.position,
+      radius: 14,
+      speed: 100,
+      hasLineOfSight: true,
+    });
+
+    // Without neighbors: both would converge toward y=200
+    const vel1NoFlock = behavior1.update(ctx1, target, [], 1);
+    const vel2NoFlock = behavior2.update(ctx2, target, [], 1);
+    expect(vel1NoFlock.y).toBeGreaterThan(0);
+    expect(vel2NoFlock.y).toBeLessThan(0);
+
+    // With neighbors: mutual repulsion pushes unit1 upward (-Y) and unit2 downward (+Y)
+    const vel1 = behavior1.update(ctx1, target, [], 1, 1 / 60, undefined, [unit2]);
+    const vel2 = behavior2.update(ctx2, target, [], 1, 1 / 60, undefined, [unit1]);
+
+    expect(vel1.y).toBeLessThan(0);
+    expect(vel2.y).toBeGreaterThan(0);
+    expect(vel2.y - vel1.y).toBeGreaterThan(20);
+    expect(vecLength(vel1)).toBeCloseTo(100);
+    expect(vecLength(vel2)).toBeCloseTo(100);
+  });
+
+  it("smoothly queues behind a lead unit without jittering into walls in a narrow corridor", () => {
+    const behavior = new DirectAdvanceBehavior();
+
+    // Horizontal corridor between y=180 and y=220 (40px wide corridor)
+    const wallTop = createObstacle("wall-top", 0, 140, 500, 40); // y: 140..180
+    const wallBottom = createObstacle("wall-bottom", 0, 220, 500, 40); // y: 220..260
+    const obstacles = [wallTop, wallBottom];
+
+    const target = createMockTarget(400, 200);
+
+    // Trailing unit at (100, 200), radius 15, speed 100
+    const ctx = createMockContext({
+      position: vec2(100, 200),
+      radius: 15,
+      speed: 100,
+      hasLineOfSight: true,
+    });
+
+    // 1. Stationary lead unit at standoff distance (dist = 36px <= r1 + r2 + 6 = 36px)
+    const stationaryLeadAtStandoff: CombatUnit = {
+      id: "lead-stationary",
+      position: vec2(136, 200),
+      radius: 15,
+      isAlive: true,
+      velocity: vec2(0, 0),
+      kill: () => {},
+    };
+
+    const velStandoff = behavior.update(
+      ctx,
+      target,
+      obstacles,
+      1,
+      1 / 60,
+      undefined,
+      [stationaryLeadAtStandoff]
+    );
+
+    // Should come to a complete stop: zero forward and zero lateral velocity
+    expect(velStandoff.x).toBe(0);
+    expect(velStandoff.y).toBe(0);
+
+    // 2. Slower moving lead unit ahead (moving at 30 px/s) at standoff distance
+    const movingLeadAtStandoff: CombatUnit = {
+      id: "lead-moving",
+      position: vec2(136, 200),
+      radius: 15,
+      isAlive: true,
+      velocity: vec2(30, 0),
+      kill: () => {},
+    };
+
+    const velMovingStandoff = behavior.update(
+      ctx,
+      target,
+      obstacles,
+      1,
+      1 / 60,
+      undefined,
+      [movingLeadAtStandoff]
+    );
+
+    // Should clamp forward velocity to match lead unit's 30 px/s with 0 lateral jitter
+    expect(velMovingStandoff.x).toBeCloseTo(30);
+    expect(velMovingStandoff.y).toBe(0);
+
+    // 3. Lead unit slightly further ahead (dist = 42px > standoff 36px but < trigger 46px)
+    const movingLeadApproaching: CombatUnit = {
+      id: "lead-approaching",
+      position: vec2(142, 200),
+      radius: 15,
+      isAlive: true,
+      velocity: vec2(20, 0),
+      kill: () => {},
+    };
+
+    const velDecelerating = behavior.update(
+      ctx,
+      target,
+      obstacles,
+      1,
+      1 / 60,
+      undefined,
+      [movingLeadApproaching]
+    );
+
+    // Should smoothly decelerate between lead speed (20) and max speed (100) with zero lateral jitter
+    expect(velDecelerating.x).toBeGreaterThan(20);
+    expect(velDecelerating.x).toBeLessThan(100);
+    expect(velDecelerating.y).toBe(0);
+  });
 });

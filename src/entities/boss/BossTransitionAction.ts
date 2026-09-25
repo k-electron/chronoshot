@@ -8,10 +8,11 @@
  * - Combinators for chaining multiple transition effects
  */
 
-import { rayIntersectsAABB } from "../../math/collision";
+import { rayIntersectsAABB, testCircleAABB } from "../../math/collision";
 import { vecDistance, vecScale, vecSub, Vector2D } from "../../math/vector";
 import { Obstacle } from "../Obstacle";
 import { Enemy } from "../Enemy";
+import { CombatUnit } from "../Projectile";
 import { BossTransitionContext } from "./BossPhaseController";
 
 /**
@@ -177,6 +178,107 @@ export function resolveEscortDefinitions(
   });
 }
 
+const DEFAULT_ENEMY_RADII: Record<string, number> = {
+  grunt: 15,
+  shotgun: 16,
+  stalker: 14,
+  warden: 16,
+  marksman: 14,
+  sniper: 14,
+  boss: 26,
+};
+
+function isPositionClear(
+  pos: Vector2D,
+  radius: number,
+  obstacles: readonly Obstacle[],
+  existingUnits: readonly CombatUnit[],
+  bounds: { width: number; height: number }
+): boolean {
+  const width = bounds?.width ?? 960;
+  const height = bounds?.height ?? 640;
+
+  if (
+    pos.x < radius ||
+    pos.x > width - radius ||
+    pos.y < radius ||
+    pos.y > height - radius
+  ) {
+    return false;
+  }
+
+  for (let i = 0; i < obstacles.length; i++) {
+    const obs = obstacles[i];
+    if (testCircleAABB(pos, radius + 2, obs.bounds.min, obs.bounds.max) !== null) {
+      return false;
+    }
+  }
+
+  for (let i = 0; i < existingUnits.length; i++) {
+    const unit = existingUnits[i];
+    if (!unit || unit.isAlive === false || !unit.position) continue;
+    const unitRadius = unit.radius ?? 15;
+    if (vecDistance(pos, unit.position) < radius + unitRadius) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Resolves a safe dynamic spawn position for a combat unit.
+ *
+ * Validates arena bounds, obstacle clearance (+2px margin), and active unit separation.
+ * If the candidate position is obstructed, performs a concentric radial search
+ * (radii 24, 48, 72, 96, 120 px across 16 angular increments) to locate the closest
+ * clear candidate. Falls back to bounds-clamped position if all candidates are blocked.
+ *
+ * @param candidate Proposed candidate coordinate
+ * @param radius Unit collision radius
+ * @param obstacles Arena solid obstacles
+ * @param existingUnits Active combat units
+ * @param bounds Arena dimensions
+ */
+export function resolveSafeSpawnPosition(
+  candidate: Vector2D,
+  radius: number,
+  obstacles: readonly Obstacle[] = [],
+  existingUnits: readonly CombatUnit[] = [],
+  bounds: { width: number; height: number } = { width: 960, height: 640 }
+): Vector2D {
+  const width = bounds?.width ?? 960;
+  const height = bounds?.height ?? 640;
+  const arenaBounds = { width, height };
+
+  if (isPositionClear(candidate, radius, obstacles, existingUnits, arenaBounds)) {
+    return { ...candidate };
+  }
+
+  const searchRadii = [24, 48, 72, 96, 120];
+  const angleIncrements = 16;
+  const angleStep = (Math.PI * 2) / angleIncrements;
+
+  for (const r of searchRadii) {
+    for (let k = 0; k < angleIncrements; k++) {
+      const angle = k * angleStep;
+      const probe: Vector2D = {
+        x: candidate.x + Math.cos(angle) * r,
+        y: candidate.y + Math.sin(angle) * r,
+      };
+
+      if (isPositionClear(probe, radius, obstacles, existingUnits, arenaBounds)) {
+        return probe;
+      }
+    }
+  }
+
+  return {
+    x: Math.max(radius, Math.min(candidate.x, width - radius)),
+    y: Math.max(radius, Math.min(candidate.y, height - radius)),
+  };
+}
+
 /**
  * Creates a composable escort minion spawn transition action.
  *
@@ -189,12 +291,35 @@ export function createMinionEscortSpawn(
     const resolved = resolveEscortDefinitions(ctx.bossPosition, minionConfigs);
 
     if (ctx.arena) {
-      if (typeof ctx.arena.spawnEnemy === "function") {
-        for (const item of resolved) {
-          ctx.arena.spawnEnemy(item);
+      const obstacles: readonly Obstacle[] = ctx.arena.obstacles ?? [];
+      const arenaBounds = {
+        width: ctx.arena.width ?? 960,
+        height: ctx.arena.height ?? 640,
+      };
+
+      for (const item of resolved) {
+        const radius = item.radius ?? (DEFAULT_ENEMY_RADII[item.type] ?? 15);
+        const existingUnits: CombatUnit[] = [];
+        if (ctx.arena.player) {
+          existingUnits.push(ctx.arena.player);
         }
-      } else if (Array.isArray(ctx.arena.enemies)) {
-        for (const item of resolved) {
+        if (Array.isArray(ctx.arena.enemies)) {
+          existingUnits.push(...ctx.arena.enemies);
+        }
+
+        const safePos = resolveSafeSpawnPosition(
+          { x: item.x, y: item.y },
+          radius,
+          obstacles,
+          existingUnits,
+          arenaBounds
+        );
+        item.x = safePos.x;
+        item.y = safePos.y;
+
+        if (typeof ctx.arena.spawnEnemy === "function") {
+          ctx.arena.spawnEnemy(item);
+        } else if (Array.isArray(ctx.arena.enemies)) {
           const enemy = item instanceof Enemy ? item : new Enemy(item);
           ctx.arena.enemies.push(enemy);
         }

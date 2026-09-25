@@ -21,6 +21,7 @@ export interface MovementContext {
   speed: number;
   aimAngle: number;
   hasLineOfSight: boolean;
+  neighbors?: CombatUnit[];
 }
 
 /**
@@ -36,6 +37,7 @@ export interface MovementBehavior {
    * @param deltaTicks Fixed simulation ticks elapsed (default: 1)
    * @param fixedDeltaTime Simulation delta time in seconds (default: deltaTicks / 60)
    * @param pathfinder Optional shared GridPathfinder instance
+   * @param neighbors Optional array of neighboring active combat units
    * @returns Desired velocity vector for this tick
    */
   update(
@@ -44,7 +46,8 @@ export interface MovementBehavior {
     obstacles: Obstacle[],
     deltaTicks: number,
     fixedDeltaTime: number,
-    pathfinder?: GridPathfinder
+    pathfinder?: GridPathfinder,
+    neighbors?: CombatUnit[]
   ): Vector2D;
 
   /**
