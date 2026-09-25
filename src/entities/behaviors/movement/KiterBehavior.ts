@@ -9,7 +9,7 @@
  */
 
 import { GridPathfinder } from "../../../engine/GridPathfinder";
-import { hasNavigationClearance } from "../../../math/collision";
+import { hasNavigationClearance, testCircleAABB } from "../../../math/collision";
 import { vec2, Vector2D } from "../../../math/vector";
 import { Obstacle } from "../../Obstacle";
 import { CombatUnit } from "../../Projectile";
@@ -34,6 +34,8 @@ export class KiterBehavior implements MovementBehavior {
 
   private defaultPathfinder?: GridPathfinder;
   private readonly resultVelocity: Vector2D = { x: 0, y: 0 };
+  private activeTangent: Vector2D = { x: 0, y: 0 };
+  private tangentLockTicks: number = 0;
 
   constructor(
     minDistOrConfig?: number | KiterConfig,
@@ -283,6 +285,9 @@ export class KiterBehavior implements MovementBehavior {
 
     // 3. Fallback locomotion when A* yields an empty path or path is exhausted
     if (ctx.hasLineOfSight) {
+      this.activeTangent.x = 0;
+      this.activeTangent.y = 0;
+      this.tangentLockTicks = 0;
       // Advance directly toward target
       const dx = target.position.x - ctx.position.x;
       const dy = target.position.y - ctx.position.y;
@@ -296,19 +301,113 @@ export class KiterBehavior implements MovementBehavior {
         this.resultVelocity.y = 0;
       }
     } else {
-      // Steer toward nearest walkable cell to target
-      const pf = pathfinder ?? this.getOrCreatePathfinder(obstacles, ctx.radius);
-      const fallbackGoal = pf.findNearestWalkable(target.position) ?? target.position;
-      const dx = fallbackGoal.x - ctx.position.x;
-      const dy = fallbackGoal.y - ctx.position.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      // Find obstacle in contact or close proximity
+      let contactObstacle: Obstacle | null = null;
+      let contactNormal: Vector2D | null = null;
+      let deepestPenetration = -Infinity;
 
-      if (dist > 1e-6) {
-        this.resultVelocity.x = (dx / dist) * ctx.speed;
-        this.resultVelocity.y = (dy / dist) * ctx.speed;
+      for (const obs of obstacles) {
+        const contact = testCircleAABB(
+          ctx.position,
+          ctx.radius + 3,
+          obs.bounds.min,
+          obs.bounds.max
+        );
+        if (contact && contact.collided) {
+          if (contact.depth > deepestPenetration) {
+            deepestPenetration = contact.depth;
+            contactObstacle = obs;
+            contactNormal = contact.normal;
+          }
+        }
+      }
+
+      if (contactObstacle && contactNormal) {
+        const dx = target.position.x - ctx.position.x;
+        const dy = target.position.y - ctx.position.y;
+        const dist = Math.hypot(dx, dy);
+        const goalDirX = dist > 1e-6 ? dx / dist : 0;
+        const goalDirY = dist > 1e-6 ? dy / dist : 0;
+
+        const t1 = { x: -contactNormal.y, y: contactNormal.x };
+        const t2 = { x: contactNormal.y, y: -contactNormal.x };
+
+        const score1 = goalDirX * t1.x + goalDirY * t1.y;
+        const score2 = goalDirX * t2.x + goalDirY * t2.y;
+
+        const bestTangent = score1 >= score2 ? t1 : t2;
+        const bestScore = Math.max(score1, score2);
+        const otherTangent = score1 >= score2 ? t2 : t1;
+
+        this.tangentLockTicks = Math.max(0, this.tangentLockTicks - deltaTicks);
+
+        const checkObstructed = (t: Vector2D): boolean => {
+          const probeDist = ctx.radius + 4;
+          const px = ctx.position.x + t.x * probeDist;
+          const py = ctx.position.y + t.y * probeDist;
+          for (const obs of obstacles) {
+            const hit = testCircleAABB(
+              { x: px, y: py },
+              ctx.radius * 0.8,
+              obs.bounds.min,
+              obs.bounds.max
+            );
+            if (hit && hit.collided) {
+              return true;
+            }
+          }
+          return false;
+        };
+
+        const hasActiveTangent =
+          this.activeTangent.x !== 0 || this.activeTangent.y !== 0;
+
+        if (!hasActiveTangent) {
+          if (!checkObstructed(bestTangent)) {
+            this.activeTangent.x = bestTangent.x;
+            this.activeTangent.y = bestTangent.y;
+          } else {
+            this.activeTangent.x = otherTangent.x;
+            this.activeTangent.y = otherTangent.y;
+          }
+          this.tangentLockTicks = 8;
+        } else {
+          if (checkObstructed(this.activeTangent)) {
+            this.activeTangent.x = otherTangent.x;
+            this.activeTangent.y = otherTangent.y;
+            this.tangentLockTicks = 8;
+          } else if (this.tangentLockTicks === 0) {
+            const currentScore =
+              goalDirX * this.activeTangent.x + goalDirY * this.activeTangent.y;
+            if (bestScore > currentScore + 0.25 && !checkObstructed(bestTangent)) {
+              this.activeTangent.x = bestTangent.x;
+              this.activeTangent.y = bestTangent.y;
+              this.tangentLockTicks = 8;
+            }
+          }
+        }
+
+        this.resultVelocity.x = this.activeTangent.x * ctx.speed;
+        this.resultVelocity.y = this.activeTangent.y * ctx.speed;
       } else {
-        this.resultVelocity.x = 0;
-        this.resultVelocity.y = 0;
+        this.activeTangent.x = 0;
+        this.activeTangent.y = 0;
+        this.tangentLockTicks = 0;
+
+        // Steer toward nearest walkable cell to target
+        const pf = pathfinder ?? this.getOrCreatePathfinder(obstacles, ctx.radius);
+        const fallbackGoal = pf.findNearestWalkable(target.position) ?? target.position;
+        const dx = fallbackGoal.x - ctx.position.x;
+        const dy = fallbackGoal.y - ctx.position.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist > 1e-6) {
+          this.resultVelocity.x = (dx / dist) * ctx.speed;
+          this.resultVelocity.y = (dy / dist) * ctx.speed;
+        } else {
+          this.resultVelocity.x = 0;
+          this.resultVelocity.y = 0;
+        }
       }
     }
 
@@ -321,6 +420,9 @@ export class KiterBehavior implements MovementBehavior {
     this.repathCooldownTicks = 0;
     this.resultVelocity.x = 0;
     this.resultVelocity.y = 0;
+    this.activeTangent.x = 0;
+    this.activeTangent.y = 0;
+    this.tangentLockTicks = 0;
   }
 
   private getOrCreatePathfinder(
@@ -328,7 +430,7 @@ export class KiterBehavior implements MovementBehavior {
     clearanceRadius: number
   ): GridPathfinder {
     if (!this.defaultPathfinder) {
-      this.defaultPathfinder = new GridPathfinder(960, 640, 40);
+      this.defaultPathfinder = new GridPathfinder(960, 640, 20);
     }
     this.defaultPathfinder.updateObstacles(obstacles, clearanceRadius);
     return this.defaultPathfinder;

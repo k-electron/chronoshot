@@ -29,6 +29,15 @@ export class DirectAdvanceBehavior implements MovementBehavior {
   private readonly scratchDir: Vector2D = { x: 0, y: 0 };
   private readonly scratchProbe: Vector2D = { x: 0, y: 0 };
 
+  // Tangent fallback state
+  private activeTangent: Vector2D = { x: 0, y: 0 };
+  private tangentLockTicks: number = 0;
+
+  // Intentional-stop-aware movement watchdog state
+  public stallTicks: number = 0;
+  private lastWatchedPos: Vector2D = { x: 0, y: 0 };
+  private watchdogInitialized: boolean = false;
+
   constructor(arrivalRadius: number = 18, repathIntervalTicks: number = 20) {
     this.arrivalRadius = arrivalRadius;
     this.repathIntervalTicks = repathIntervalTicks;
@@ -47,6 +56,7 @@ export class DirectAdvanceBehavior implements MovementBehavior {
     if (!target.isAlive || ctx.speed <= 0) {
       this.resultVelocity.x = 0;
       this.resultVelocity.y = 0;
+      this.resetWatchdog(ctx.position);
       return this.resultVelocity;
     }
 
@@ -60,11 +70,19 @@ export class DirectAdvanceBehavior implements MovementBehavior {
     if (hasClearance) {
       this.currentPath = [];
       this.currentWaypointIndex = 0;
+      this.activeTangent.x = 0;
+      this.activeTangent.y = 0;
+      this.tangentLockTicks = 0;
       return this.steerDirectly(ctx, target, obstacles, activeNeighbors);
     }
 
-    // 2. Blocked line-of-sight or obstructed physical clearance: 40px tile grid A* pathfinding
+    // 2. Blocked line-of-sight or obstructed physical clearance: 20px tile grid A* pathfinding
     this.repathCooldownTicks -= deltaTicks;
+
+    const isStalled = this.updateWatchdog(ctx, target, deltaTicks);
+    if (isStalled) {
+      this.repathCooldownTicks = 0;
+    }
 
     if (
       this.repathCooldownTicks <= 0 ||
@@ -108,6 +126,29 @@ export class DirectAdvanceBehavior implements MovementBehavior {
       this.currentPath = path;
       this.currentWaypointIndex = 0;
       this.repathCooldownTicks = this.repathIntervalTicks;
+
+      if (isStalled && path.length === 0) {
+        // Trigger breakout tangent slide along obstacle
+        let breakoutNormal: Vector2D | null = null;
+        for (const obs of obstacles) {
+          const contact = testCircleAABB(
+            ctx.position,
+            ctx.radius + 4,
+            obs.bounds.min,
+            obs.bounds.max
+          );
+          if (contact && contact.collided) {
+            breakoutNormal = contact.normal;
+            break;
+          }
+        }
+        if (breakoutNormal) {
+          const t = { x: -breakoutNormal.y, y: breakoutNormal.x };
+          this.activeTangent.x = t.x;
+          this.activeTangent.y = t.y;
+          this.tangentLockTicks = 8;
+        }
+      }
     }
 
     if (
@@ -141,22 +182,121 @@ export class DirectAdvanceBehavior implements MovementBehavior {
     }
 
     // 3. Fallback locomotion when A* yields an empty path or path is exhausted
-    if (ctx.hasLineOfSight) {
-      return this.steerDirectly(ctx, target, obstacles, activeNeighbors);
+    if (ctx.hasLineOfSight && hasNavigationClearance(ctx.position, target.position, ctx.radius, obstacles)) {
+      this.activeTangent.x = 0;
+      this.activeTangent.y = 0;
+      this.tangentLockTicks = 0;
+      this.steerDirectly(ctx, target, obstacles, activeNeighbors);
     } else {
-      // Optical LOS blocked: steer toward nearest walkable cell to target
-      const pf = pathfinder ?? this.getOrCreatePathfinder(obstacles, ctx.radius);
-      const fallbackGoal = pf.findNearestWalkable(target.position) ?? target.position;
-      const dx = fallbackGoal.x - ctx.position.x;
-      const dy = fallbackGoal.y - ctx.position.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      // Find obstacle in contact or close proximity (within radius + 3)
+      let contactObstacle: Obstacle | null = null;
+      let contactNormal: Vector2D | null = null;
+      let deepestPenetration = -Infinity;
 
-      if (dist > 1e-6) {
-        this.resultVelocity.x = (dx / dist) * ctx.speed;
-        this.resultVelocity.y = (dy / dist) * ctx.speed;
+      for (const obs of obstacles) {
+        const contact = testCircleAABB(
+          ctx.position,
+          ctx.radius + 3,
+          obs.bounds.min,
+          obs.bounds.max
+        );
+        if (contact && contact.collided) {
+          if (contact.depth > deepestPenetration) {
+            deepestPenetration = contact.depth;
+            contactObstacle = obs;
+            contactNormal = contact.normal;
+          }
+        }
+      }
+
+      if (contactObstacle && contactNormal) {
+        // Goal direction (towards target position)
+        const dx = target.position.x - ctx.position.x;
+        const dy = target.position.y - ctx.position.y;
+        const dist = Math.hypot(dx, dy);
+        const goalDirX = dist > 1e-6 ? dx / dist : 0;
+        const goalDirY = dist > 1e-6 ? dy / dist : 0;
+
+        // Tangent candidates: (-ny, nx) and (ny, -nx)
+        const t1 = { x: -contactNormal.y, y: contactNormal.x };
+        const t2 = { x: contactNormal.y, y: -contactNormal.x };
+
+        const score1 = goalDirX * t1.x + goalDirY * t1.y;
+        const score2 = goalDirX * t2.x + goalDirY * t2.y;
+
+        const bestTangent = score1 >= score2 ? t1 : t2;
+        const bestScore = Math.max(score1, score2);
+        const otherTangent = score1 >= score2 ? t2 : t1;
+
+        this.tangentLockTicks = Math.max(0, this.tangentLockTicks - deltaTicks);
+
+        const checkObstructed = (t: Vector2D): boolean => {
+          const probeDist = ctx.radius + 4;
+          const px = ctx.position.x + t.x * probeDist;
+          const py = ctx.position.y + t.y * probeDist;
+          for (const obs of obstacles) {
+            const hit = testCircleAABB(
+              { x: px, y: py },
+              ctx.radius * 0.8,
+              obs.bounds.min,
+              obs.bounds.max
+            );
+            if (hit && hit.collided) {
+              return true;
+            }
+          }
+          return false;
+        };
+
+        const hasActiveTangent =
+          this.activeTangent.x !== 0 || this.activeTangent.y !== 0;
+
+        if (!hasActiveTangent) {
+          if (!checkObstructed(bestTangent)) {
+            this.activeTangent.x = bestTangent.x;
+            this.activeTangent.y = bestTangent.y;
+          } else {
+            this.activeTangent.x = otherTangent.x;
+            this.activeTangent.y = otherTangent.y;
+          }
+          this.tangentLockTicks = 8;
+        } else {
+          if (checkObstructed(this.activeTangent)) {
+            this.activeTangent.x = otherTangent.x;
+            this.activeTangent.y = otherTangent.y;
+            this.tangentLockTicks = 8;
+          } else if (this.tangentLockTicks === 0) {
+            const currentScore =
+              goalDirX * this.activeTangent.x + goalDirY * this.activeTangent.y;
+            if (bestScore > currentScore + 0.25 && !checkObstructed(bestTangent)) {
+              this.activeTangent.x = bestTangent.x;
+              this.activeTangent.y = bestTangent.y;
+              this.tangentLockTicks = 8;
+            }
+          }
+        }
+
+        this.resultVelocity.x = this.activeTangent.x * ctx.speed;
+        this.resultVelocity.y = this.activeTangent.y * ctx.speed;
       } else {
-        this.resultVelocity.x = 0;
-        this.resultVelocity.y = 0;
+        // Optical LOS blocked, but no obstacle in contact: steer toward nearest walkable cell to target
+        this.activeTangent.x = 0;
+        this.activeTangent.y = 0;
+        this.tangentLockTicks = 0;
+
+        const pf = pathfinder ?? this.getOrCreatePathfinder(obstacles, ctx.radius);
+        const fallbackGoal = pf.findNearestWalkable(target.position) ?? target.position;
+        const dx = fallbackGoal.x - ctx.position.x;
+        const dy = fallbackGoal.y - ctx.position.y;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist > 1e-6) {
+          this.resultVelocity.x = (dx / dist) * ctx.speed;
+          this.resultVelocity.y = (dy / dist) * ctx.speed;
+        } else {
+          this.resultVelocity.x = 0;
+          this.resultVelocity.y = 0;
+        }
       }
     }
 
@@ -336,6 +476,84 @@ export class DirectAdvanceBehavior implements MovementBehavior {
     this.repathCooldownTicks = 0;
     this.resultVelocity.x = 0;
     this.resultVelocity.y = 0;
+    this.activeTangent.x = 0;
+    this.activeTangent.y = 0;
+    this.tangentLockTicks = 0;
+    this.stallTicks = 0;
+    this.watchdogInitialized = false;
+  }
+
+  public resetWatchdog(pos?: Vector2D): void {
+    this.stallTicks = 0;
+    if (pos) {
+      this.lastWatchedPos.x = pos.x;
+      this.lastWatchedPos.y = pos.y;
+    }
+  }
+
+  private updateWatchdog(
+    ctx: MovementContext,
+    target: CombatUnit,
+    deltaTicks: number
+  ): boolean {
+    if (!this.watchdogInitialized) {
+      this.lastWatchedPos.x = ctx.position.x;
+      this.lastWatchedPos.y = ctx.position.y;
+      this.watchdogInitialized = true;
+      this.stallTicks = 0;
+      return false;
+    }
+
+    // Intentional stop detection:
+    // Reset watchdog during intentional halts
+    const isIntentionalStop =
+      ctx.speed <= 0 ||
+      ctx.isChargingLaser === true ||
+      ctx.isOverloading === true ||
+      (ctx.stutterTimerTicks !== undefined && ctx.stutterTimerTicks > 0);
+
+    if (isIntentionalStop) {
+      this.stallTicks = 0;
+      this.lastWatchedPos.x = ctx.position.x;
+      this.lastWatchedPos.y = ctx.position.y;
+      return false;
+    }
+
+    // Surface arrival check
+    const distToTarget = Math.hypot(
+      target.position.x - ctx.position.x,
+      target.position.y - ctx.position.y
+    );
+    if (distToTarget <= ctx.radius + target.radius + 2) {
+      this.stallTicks = 0;
+      this.lastWatchedPos.x = ctx.position.x;
+      this.lastWatchedPos.y = ctx.position.y;
+      return false;
+    }
+
+    // Check displacement from lastWatchedPos
+    const disp = Math.hypot(
+      ctx.position.x - this.lastWatchedPos.x,
+      ctx.position.y - this.lastWatchedPos.y
+    );
+
+    if (disp >= 1.5) {
+      // Made progress: reset stall timer and update watched position
+      this.stallTicks = 0;
+      this.lastWatchedPos.x = ctx.position.x;
+      this.lastWatchedPos.y = ctx.position.y;
+      return false;
+    } else {
+      this.stallTicks += deltaTicks;
+      if (this.stallTicks >= 12) {
+        // Stall detected!
+        this.stallTicks = 0;
+        this.lastWatchedPos.x = ctx.position.x;
+        this.lastWatchedPos.y = ctx.position.y;
+        return true;
+      }
+      return false;
+    }
   }
 
   private getOrCreatePathfinder(
@@ -343,7 +561,7 @@ export class DirectAdvanceBehavior implements MovementBehavior {
     clearanceRadius: number
   ): GridPathfinder {
     if (!this.defaultPathfinder) {
-      this.defaultPathfinder = new GridPathfinder(960, 640, 40);
+      this.defaultPathfinder = new GridPathfinder(960, 640, 20);
     }
     this.defaultPathfinder.updateObstacles(obstacles, clearanceRadius);
     return this.defaultPathfinder;

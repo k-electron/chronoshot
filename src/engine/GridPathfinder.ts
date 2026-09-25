@@ -119,7 +119,7 @@ export class GridPathfinder {
    */
   private readonly grid: Uint8Array;
 
-  constructor(width: number = 960, height: number = 640, cellSize: number = 40) {
+  constructor(width: number = 960, height: number = 640, cellSize: number = 20) {
     this.width = width;
     this.height = height;
     this.cellSize = cellSize;
@@ -205,10 +205,12 @@ export class GridPathfinder {
       const maxX = ox + ow + radius;
       const maxY = oy + oh + radius;
 
-      const startGx = Math.max(0, Math.floor(minX / this.cellSize));
-      const endGx = Math.min(this.cols - 1, Math.floor((maxX - 1e-6) / this.cellSize));
-      const startGy = Math.max(0, Math.floor(minY / this.cellSize));
-      const endGy = Math.min(this.rows - 1, Math.floor((maxY - 1e-6) / this.cellSize));
+      // Cell-center containment: a cell (gx, gy) is blocked iff its center
+      // ((gx + 0.5) * C, (gy + 0.5) * C) falls within the inflated obstacle bounds.
+      const startGx = Math.max(0, Math.ceil((minX - 1e-6) / this.cellSize - 0.5));
+      const endGx = Math.min(this.cols - 1, Math.floor((maxX + 1e-6) / this.cellSize - 0.5));
+      const startGy = Math.max(0, Math.ceil((minY - 1e-6) / this.cellSize - 0.5));
+      const endGy = Math.min(this.rows - 1, Math.floor((maxY + 1e-6) / this.cellSize - 0.5));
 
       if (startGx > endGx || startGy > endGy) {
         continue;

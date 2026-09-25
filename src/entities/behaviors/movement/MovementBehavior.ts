@@ -22,6 +22,9 @@ export interface MovementContext {
   aimAngle: number;
   hasLineOfSight: boolean;
   neighbors?: CombatUnit[];
+  isChargingLaser?: boolean;
+  isOverloading?: boolean;
+  stutterTimerTicks?: number;
 }
 
 /**
