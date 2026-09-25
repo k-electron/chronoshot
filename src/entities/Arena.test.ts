@@ -1046,6 +1046,52 @@ describe("Combat Arena & Room Loop", () => {
       expect(arena.endlessDirector?.getKills()).toBeGreaterThanOrEqual(1);
     });
 
+    it("prunes dead enemies from the active roster during Endless Mode fixedUpdate", () => {
+      const arena = new Arena();
+      arena.startEndlessMode();
+
+      // Clear any dynamic spawns for clean test baseline
+      arena.enemies = [];
+
+      const livingEnemy = new Enemy({
+        id: "living-enemy",
+        type: "grunt",
+        x: 600,
+        y: 300,
+        radius: 15,
+        fireCadenceTicks: 100,
+      });
+
+      const deadEnemy = new Enemy({
+        id: "dead-enemy",
+        type: "grunt",
+        x: 650,
+        y: 300,
+        radius: 15,
+        fireCadenceTicks: 100,
+      });
+      deadEnemy.isAlive = false;
+
+      arena.enemies.push(livingEnemy, deadEnemy);
+      expect(arena.enemies).toHaveLength(2);
+
+      // Execute simulation step with movement so time advances
+      for (let i = 0; i < 3; i++) {
+        arena.step(0.016, {
+          moveDir: vec2(1, 0),
+          mousePos: vec2(500, 320),
+          shoot: false,
+          reload: false,
+          restart: false,
+        });
+      }
+
+      // Dead enemy must be pruned from arena.enemies in Endless Mode
+      expect(arena.enemies).not.toContain(deadEnemy);
+      expect(arena.enemies).toContain(livingEnemy);
+      expect(arena.enemies.every((e) => e.isAlive)).toBe(true);
+    });
+
     it("renders Cataclysm hazard aura and materialization telegraph without throwing", () => {
       const arena = new Arena();
       arena.startEndlessMode();

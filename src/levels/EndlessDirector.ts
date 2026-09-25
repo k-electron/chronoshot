@@ -215,17 +215,26 @@ export class EndlessDirector {
 
     // Check reinforcement capacity
     const activeLiving = livingEnemies.filter((e) => e.isAlive !== false);
-    let currentActiveCount = activeLiving.length + this.materializationQueue.length;
-    let currentActiveThreat = this.calculateActiveThreat(livingEnemies);
+    const readyThreat = readyToSpawn.reduce(
+      (sum, c) => sum + (THREAT_COSTS[c.type] ?? 10),
+      0
+    );
+    let currentActiveCount =
+      activeLiving.length + readyToSpawn.length + this.materializationQueue.length;
+    let currentActiveThreat = this.calculateActiveThreat(livingEnemies) + readyThreat;
     const targetBudget = this.getThreatBudget();
 
     // Spawn reinforcements if below budget and under unit cap
     const candidateTypes: EnemyType[] = ["marksman", "warden", "stalker", "shotgun", "grunt"];
 
-    // Count snipers/marksmen currently active or queued
+    // Count snipers/marksmen currently active, ready to spawn, or queued
+    const readySnipers = readyToSpawn.filter(
+      (c) => c.type === "marksman" || c.type === "sniper"
+    ).length;
     const currentSnipers =
       activeLiving.filter((e) => e.type === "marksman" || e.type === "sniper").length +
-      this.materializationQueue.filter((e) => e.type === "marksman" || e.type === "sniper").length;
+      this.materializationQueue.filter((e) => e.type === "marksman" || e.type === "sniper").length +
+      readySnipers;
     let snipersActive = currentSnipers;
 
     while (
@@ -261,6 +270,7 @@ export class EndlessDirector {
         ...activeLiving.map((e) =>
           e.position ? vec2(e.position.x, e.position.y) : vec2(e.x ?? 0, e.y ?? 0)
         ),
+        ...readyToSpawn.map((c) => vec2(c.x, c.y)),
         ...this.materializationQueue.map((m) => vec2(m.x, m.y)),
       ];
 

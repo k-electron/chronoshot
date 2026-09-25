@@ -1,36 +1,6 @@
-# Spec: Procedural Levels
+# Spec Delta: Procedural Levels
 
-## Purpose
-
-Defines the composable room layout geometry templates, hand-crafted tactical encounter progressions, campaign milestone boss sequences, endless survival mode protocol with dynamic reinforcement spawning, and developer playtest bypass hooks.
-
-## Requirements
-
-### Requirement: Composable Cover and Geometry Layout Templates
-The level generation system SHALL provide modular layout templates defining geometric obstacle arrangements (perimeter barriers, tactical cover pillars, bunker enclosures, flank corridors) alongside verified player spawn coordinates, exit portal anchors, and safe enemy spawn regions, ensuring all transit corridors maintain passable physical clearance and enemy spawn coordinates reside in open space.
-
-#### Scenario: Instantiating a geometry layout template
-- **WHEN** a room layout template is requested for room generation
-- **THEN** it generates a set of perimeter walls and interior obstacle bounds with non-overlapping clearance zones for combat units and navigable transit corridors maintaining at least 48 pixels of clearance between adjacent obstacles
-
-#### Scenario: Validating spawn separation distance
-- **WHEN** enemy spawn regions and player spawn positions are evaluated in a template
-- **THEN** the layout ensures a minimum Euclidean distance of 280 pixels between player spawn and any enemy spawn region to prevent immediate spawn-kill crossfires
-
-#### Scenario: Safe hostile spawn positioning in fixed rooms
-- **WHEN** fixed campaign rooms (Rooms 1 through 20) and Endless Mode initialize enemy positions
-- **THEN** every initial enemy spawn point is strictly positioned outside all obstacle hitboxes with verified clearance, ensuring no combat unit materializes inside solid geometry
-
-### Requirement: Dynamic RoomManager Integration and Endless Mode
-The combat progression system SHALL support sequential room lifecycle management across the 20-room campaign and seamless handoff into Endless Survival Mode upon campaign victory.
-
-#### Scenario: Generating next room on demand
-- **WHEN** the player enters an unlocked exit portal in campaign mode
-- **THEN** the room manager advances sequentially to the subsequent hand-built room in the 20-room sequence and loads it seamlessly into the combat arena
-
-#### Scenario: Preserving standard campaign sequence
-- **WHEN** room manager is initialized
-- **THEN** the manager defaults to the 20-room hand-built campaign sequence with verified milestone boss encounters
+## MODIFIED Requirements
 
 ### Requirement: Multi-Sector Campaign Sequence and Sector Milestone Bosses
 The level progression system SHALL provide a hand-built 20-room campaign sequence spanning Sector 1, Zone 2, Sector 3, and Sector 4, integrating distinct milestone bosses and progressive tactical squad compositions culminating in the Room 20 final boss encounter, while room victory screens format milestone completions and dual interactive progression choices across multi-line bounds that fit within the viewport frame.
@@ -108,18 +78,3 @@ The combat progression system SHALL support unlocking a continuous Endless Survi
 #### Scenario: Eliminated hostile unit collection pruning
 - **WHEN** enemies are eliminated in Endless Mode
 - **THEN** the arena purges non-living enemy instances from the active enemy roster at the end of each simulation step, preventing unbounded memory growth and iteration overhead
-
-### Requirement: Campaign Victory Playtest Bypass
-The game initialization system SHALL support a URL playtest parameter (`?skip`) that initializes the combat arena directly into the post-Zenith campaign victory state with completed Room 20 status, active victory overlay, pre-Zenith loadout, and pre-boss checkpoint snapshots, allowing seamless verification of Endless Protocol transitions and expedition resets without replaying Rooms 1–20.
-
-#### Scenario: Initializing combat arena with playtest bypass
-- **WHEN** the game is loaded with the `?skip` URL query parameter
-- **THEN** the combat arena initializes directly into the post-Zenith victory state with Room 20 completed (`roomManager.isGameCompleted() === true`), active Mission Accomplished overlay, pre-Zenith loadout (Extended Cylinder, Speed Loader, Reactive Shield), and fully interactive victory cards
-
-#### Scenario: Selecting Endless Protocol from playtest bypass
-- **WHEN** the operative activates Card 0 (Endless Protocol) from the bypass victory screen via `[E]`, `[Space]`, or mouse click
-- **THEN** the combat arena transitions seamlessly into Endless Survival Mode in the Apex Colosseum, equips all 7 combat augmentations, restores shields to 3, sets ammo capacity to 8 rounds, and begins dynamic reinforcement wave spawning matching a natural campaign completion run
-
-#### Scenario: Selecting Expedition Reset from playtest bypass
-- **WHEN** the operative activates Card 1 (Expedition Reset) from the bypass victory screen via `[R]`, `[Shift+R]`, or mouse click
-- **THEN** the combat arena resets progression back to Room 1 with a clean starter loadout (0 augmentations, 6 rounds, 0 shields) matching a natural reset

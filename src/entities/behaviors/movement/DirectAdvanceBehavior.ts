@@ -162,6 +162,16 @@ export class DirectAdvanceBehavior implements MovementBehavior {
 
       if (distToWaypoint < this.arrivalRadius) {
         this.currentWaypointIndex++;
+      } else {
+        // Swept-circle waypoint shortcut lookahead:
+        // Validate forward chords using continuous Minkowski swept-circle raycasting
+        for (let i = this.currentPath.length - 1; i > this.currentWaypointIndex; i--) {
+          const candidateWp = this.currentPath[i];
+          if (hasNavigationClearance(ctx.position, candidateWp, ctx.radius, obstacles)) {
+            this.currentWaypointIndex = i;
+            break;
+          }
+        }
       }
 
       if (this.currentWaypointIndex < this.currentPath.length) {
@@ -554,6 +564,34 @@ export class DirectAdvanceBehavior implements MovementBehavior {
       }
       return false;
     }
+  }
+
+  /**
+   * Smooths path chords using continuous Minkowski swept-circle raycasting to shortcut intermediate waypoints.
+   */
+  public smoothPath(
+    path: Vector2D[],
+    radius: number,
+    obstacles: Obstacle[]
+  ): Vector2D[] {
+    if (path.length <= 2) return path;
+
+    const smoothed: Vector2D[] = [path[0]];
+    let currentIdx = 0;
+
+    while (currentIdx < path.length - 1) {
+      let nextIdx = currentIdx + 1;
+      for (let testIdx = path.length - 1; testIdx > currentIdx + 1; testIdx--) {
+        if (hasNavigationClearance(path[currentIdx], path[testIdx], radius, obstacles)) {
+          nextIdx = testIdx;
+          break;
+        }
+      }
+      smoothed.push(path[nextIdx]);
+      currentIdx = nextIdx;
+    }
+
+    return smoothed;
   }
 
   private getOrCreatePathfinder(

@@ -798,6 +798,11 @@ export class Arena {
         }
       }
     }
+
+    // 7. Prune eliminated enemies in Endless Mode to prevent unbounded array accumulation
+    if (this.endlessDirector) {
+      this.enemies = this.enemies.filter((e) => e.isAlive);
+    }
   }
 
   private checkVictoryCondition(): void {

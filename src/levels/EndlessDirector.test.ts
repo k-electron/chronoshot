@@ -186,5 +186,46 @@ describe("EndlessDirector Threat Budget & Dynamic Spawner", () => {
       const threat = director.calculateActiveThreat(living);
       expect(threat).toBe(45);
     });
+
+    it("maintains strict 8-unit concurrent limit and at most 2 snipers under rapid kill churn", () => {
+      const director = new EndlessDirector({ baseThreatBudget: 500 });
+      const obstacles = ApexColosseumTemplate.buildObstacles(960, 640);
+      const playerPos = vec2(480, 320);
+
+      let livingEnemies: { type: any; x: number; y: number; isAlive: boolean }[] = [];
+
+      for (let tick = 0; tick < 180; tick++) {
+        const ready = director.update(playerPos, livingEnemies, obstacles, 1);
+        for (const spawned of ready) {
+          livingEnemies.push({
+            type: spawned.type,
+            x: spawned.x,
+            y: spawned.y,
+            isAlive: true,
+          });
+        }
+
+        const activeLiving = livingEnemies.filter((e) => e.isAlive);
+        const queued = director.getMaterializationQueue();
+        const totalConcurrent = activeLiving.length + queued.length;
+        expect(totalConcurrent).toBeLessThanOrEqual(8);
+
+        const livingSnipers = activeLiving.filter(
+          (e) => e.type === "marksman" || e.type === "sniper"
+        ).length;
+        const queuedSnipers = queued.filter(
+          (u) => u.type === "marksman" || u.type === "sniper"
+        ).length;
+        expect(livingSnipers + queuedSnipers).toBeLessThanOrEqual(2);
+
+        // Simulate rapid kill churn: kill 1 enemy periodically
+        if (tick % 5 === 0 && activeLiving.length > 0) {
+          activeLiving[0].isAlive = false;
+          director.recordKill();
+        }
+        livingEnemies = livingEnemies.filter((e) => e.isAlive);
+      }
+    });
   });
 });
+

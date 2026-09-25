@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg)](https://vitejs.dev/)
-[![Tests](https://img.shields.io/badge/Tests-690%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-712%20passing-brightgreen.svg)]()
 
 ---
 
@@ -43,7 +43,7 @@
 
 Every step you take accelerates global time. When you stop, time slows to a **5% micro-creep**, allowing you to read bullet trajectories, weave through crossfires, and line up precision shots. But choose your moments wisely—reloading costs **30 simulation ticks**, advancing in-flight bullets and enemy patrols while you're vulnerable unless you take cover.
 
-Conquer **Sector 1**, eliminate the colossal **Goliath-01** boss, draft powerful tactical augmentations in freeze-frame triumph, and push through the escalated baseline of **Zone 2** in pure, high-stakes permadeath runs.
+Fight through 20 handcrafted combat protocols across four distinct sectors, overcome 4 multi-phase milestone bosses (Goliath-01, Chrono-Weaver, Vektor-Prime, and Chrono-Zenith), draft powerful tactical augmentations in freeze-frame triumph, and conquer the supreme Zero Sovereign before unlocking the infinite Endless Survival Mode in the Apex Colosseum.
 
 ---
 
@@ -74,7 +74,7 @@ Hostiles are differentiated across mobility, shields, weapon cadence, ballistic 
 - **Marksman Sniper (Crimson 4-Point Star)**: 80 px/s long-range sniper that kites players, halts movement to project a charging red targeting laser for 30 ticks, and discharges hyper-velocity rounds (850 px/s) at a 110-tick cadence.
 - **Goliath-01 Aegis Colossus (Sector 1 Boss - Octagonal Titan)**: Driven by the modular `BossPhaseController` and declarative `BossBlueprint` system. Phase 1 (AEGIS FORTRESS) deploys 4-hit multi-layer shields with pinpoint heavy slugs at 55 px/s; upon shield depletion, emits an expanding radial particle shockwave and triggers Phase 2 (OVERDRIVE RAM) surging forward at 95 px/s with a 3-way scatter shot.
 - **Chrono-Weaver (Milestone Boss Archetype - Temporal Anchor)**: Dual-phase boss combining long-range kiting laser beams in Phase 1 with 12-pellet 360-degree rotating radial novae (`RadialNovaBehavior`, supporting both omnidirectional single rings and twin counter-rotating novae) and Stalker escort summons in Phase 2.
-- **Vektor-Prime (Milestone Boss Archetype - Phase Sovereign)**: High-tier 3-phase milestone boss encountered at Room 15. Begins in Phase 1 (AEGIS OVERLORD) as a 5-shield fortress with heavy dual-slug suppression at 50-tick cadence; upon reaching 3 shields, triggers a 20-particle cyan shockwave, summons 2 Grunt escorts, and initiates Phase 2 (TEMPORAL DISRUPTOR) kiting at 100 px/s with alternating telegraphed laser beams and 3-pellet fan spreads; at 0 shields, triggers another shockwave and unleashes Phase 3 (OVERDRIVE APEX) charging at 140 px/s with 16-pellet rotating 360-degree radial novae.
+- **Vektor-Prime (Milestone Boss Archetype - Phase Sovereign)**: High-tier 3-phase milestone boss encountered at Room 15. Begins in Phase 1 (FORTRESS AEGIS) advancing at 50 px/s as a 5-shield fortress with pinpoint heavy slugs at 50-tick cadence with 2 initial Grunts; upon depleting its 5 shields, emits a 36-particle violet shockwave, summons 1 Shotgun Guard + 1 Stalker escort, and initiates Phase 2 (PHASE WARP) maintaining standoff distance (280–460px) at 85 px/s with 3 shields while alternating 25-tick charging laser beams and 3-pellet fan spreads; upon depleting those 3 shields, triggers a 48-particle crimson shockwave, summons 2 high-speed Stalkers, and unleashes Phase 3 (SINGULARITY NOVA) advancing at 115 px/s with continuous 16-pellet rotating radial novae at 65-tick cadence.
 - **Chrono-Zenith (Room 20 Final Milestone Boss - Zero Sovereign)**: The supreme 4-phase encounter awaiting at Room 20 inside the fortified `ApexRedoubtTemplate`. Features escalating combat forms, speed acceleration, escort summons, and telegraphed **Cataclysm Overload** invulnerability channels (75/65/60 ticks) culminating in lethal arena-wide shockwave pulses that can only be survived by breaking line-of-sight behind tactical bunker pillars:
   - **Phase 1: CITADEL BASTION** (5 shields, 45 px/s, alternating heavy slugs and 3-pellet fan spread with 2 Grunt escorts)
   - **Phase 2: TEMPORAL WARP** (3 shields, 75-tick Cataclysm Overload channel, 95 px/s standoff sniper kiter with 1 Shotgun Guard + 1 Stalker escort)
@@ -95,10 +95,10 @@ Powered by a decoupled data-driven architecture (`UpgradePipeline`, `UpgradeRegi
   - **Phase Deflector**: Grants +2 hit-count shield buffers per combat room for enduring intense crossfires.
   - **Overcharge Dash**: Grants a tactical dash impulse (<kbd>Space</kbd> or <kbd>Shift</kbd>) queuing a +12 simulation tick burst, 480 px/s velocity sprint, deflection frames that safely bounce enemy projectiles off kinetic shielding, and a 90-tick cooldown.
 
-### 7. 40px Grid A* Pathfinding & Intelligent Navigation
-- Discrete $24 \times 16$ tile-grid A* pathfinder with obstacle clearance inflation ($16\text{px}$) navigates complex wall and pillar layouts with zero corner snagging.
-- **Line-of-Sight String Pulling**: When line-of-sight to the player is obstructed, units follow A* waypoints; once line-of-sight is re-established, units transition to smooth direct-vector steering (rushers close distance, kiters retreat).
-- Smooth wall-sliding collision physics prevents units from sticking or clipping into barrier edges.
+### 7. 20px Grid A* Pathfinding & Intelligent Navigation
+- Discrete $48 \times 32$ tile-grid A* pathfinder with cell-center obstacle containment at the unit's true blueprint radius navigates complex wall and pillar layouts with zero corner snagging, featuring dual-sided endpoint snapping (`findNearestWalkable`) to prevent deadlocks when starting adjacent to obstacles.
+- **Physical Clearance Decoupling & Swept Shortcuts**: When optical sightlines are clear, AI evaluates continuous swept-circle navigation clearance (`hasNavigationClearance`) before switching to direct-vector steering. Contact checks filter by contact normal dot product ($\vec{dir} \cdot \hat{n} \ge -0.05$), ensuring units departing or sliding along obstacle boundaries do not suffer false-positive clearance failure. Waypoint shortcuts and sightline transitions are strictly validated with continuous Minkowski swept-circle raycasts.
+- **Anti-Freeze Fallback & Intentional-Stop Watchdog**: If A* returns an empty path, mobile units fall back to goal-aligned obstacle tangent deflection with directional hysteresis to guarantee units never freeze at zero velocity. An intentional-stop-aware movement watchdog tracks spatial displacement over 12 ticks; if displacement is under 1.5px while commanding nonzero desired velocity (and not intentionally held by fire stutter, charging laser, boss overload, or kiter range holding), it triggers an immediate A* repath and tangent breakout slide.
 
 ### 8. Hit-Count Shield Durability System
 - Shield barriers absorb discrete projectile impacts, directly interfacing with the player's cylinder economy.
@@ -237,7 +237,7 @@ npm run preview
 
 ### Continuous Integration & Cloudflare Pages Hosting
 
-- **GitHub Actions**: Automated CI (`.github/workflows/ci.yml`) runs on all pull requests and pushes to `main`. It validates dependencies, TypeScript compilation, Vite production build, and all 690 Vitest unit & integration tests under Node 26.
+- **GitHub Actions**: Automated CI (`.github/workflows/ci.yml`) runs on all pull requests and pushes to `main`. It validates dependencies, TypeScript compilation, Vite production build, and all 712 Vitest unit & integration tests under Node 26.
 - **Cloudflare Pages Hosting**:
   1. In the [Cloudflare Dashboard](https://dash.cloudflare.com/), go to **Workers & Pages** > **Create application** > **Pages** > **Connect to Git**.
   2. Select the `k-electron/chronoshot` repository.
