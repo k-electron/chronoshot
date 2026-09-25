@@ -472,4 +472,161 @@ describe("DirectAdvanceBehavior", () => {
     expect(velDecelerating.x).toBeLessThan(100);
     expect(velDecelerating.y).toBe(0);
   });
+
+  describe("Anti-Grind Tangent Fallback & Movement Watchdog", () => {
+    it("deflects velocity along goal-aligned obstacle tangent when optical LOS is blocked and A* yields no path", () => {
+      const behavior = new DirectAdvanceBehavior();
+      // Wall directly beneath unit at y in [115, 200]
+      const wall = createObstacle("wall-south", 50, 115, 200, 85);
+      const mockPf = new GridPathfinder(960, 640, 20);
+      mockPf.findPath = () => []; // No path found
+
+      // Unit at (100, 100), radius 15. Distance to wall top (115) is 15px (in contact)
+      const ctx = createMockContext({
+        position: vec2(100, 100),
+        radius: 15,
+        speed: 100,
+        hasLineOfSight: false,
+      });
+      // Target at (300, 200) -> goal direction has positive X (+200) and positive Y (+100)
+      const target = createMockTarget(300, 200);
+
+      const vel = behavior.update(ctx, target, [wall], 1, 1 / 60, mockPf);
+
+      // Contact normal is (0, -1). Tangents: (+1, 0) and (-1, 0).
+      // Goal direction has dx > 0, so goal-aligned tangent is (+1, 0).
+      // Unit must slide along +X at speed 100 with 0 Y velocity!
+      expect(vel.x).toBeCloseTo(100);
+      expect(vel.y).toBeCloseTo(0);
+    });
+
+    it("applies directional hysteresis and switches tangents when active tangent is obstructed ahead", () => {
+      const behavior = new DirectAdvanceBehavior();
+      // Horizontal wall at bottom
+      const wallBottom = createObstacle("wall-bottom", 50, 115, 200, 85);
+      // Blocking obstacle directly ahead along +X (at x = 125..160)
+      const wallEast = createObstacle("wall-east", 125, 50, 40, 65);
+
+      const mockPf = new GridPathfinder(960, 640, 20);
+      mockPf.findPath = () => [];
+
+      const ctx = createMockContext({
+        position: vec2(100, 100),
+        radius: 15,
+        speed: 100,
+        hasLineOfSight: false,
+      });
+      // Target to the right (+X)
+      const target = createMockTarget(300, 100);
+
+      const vel = behavior.update(
+        ctx,
+        target,
+        [wallBottom, wallEast],
+        1,
+        1 / 60,
+        mockPf
+      );
+
+      // Even though target is to the east (+X), wallEast obstructs +X ahead.
+      // Unit must deflect along the open reverse tangent (-X)
+      expect(vel.x).toBeCloseTo(-100);
+      expect(vel.y).toBeCloseTo(0);
+    });
+
+    it("detects movement stalls when displacement < 1.5px over 12 ticks during commanded velocity", () => {
+      const behavior = new DirectAdvanceBehavior();
+      const wall = createObstacle("blocking-wall", 120, 50, 40, 100);
+      const mockPf = new GridPathfinder(960, 640, 20);
+      mockPf.findPath = () => [];
+
+      const ctx = createMockContext({
+        position: vec2(100, 100),
+        radius: 15,
+        speed: 100,
+        hasLineOfSight: false,
+      });
+      const target = createMockTarget(300, 100);
+
+      // Tick 1: Initialize watchdog
+      behavior.update(ctx, target, [wall], 1, 1 / 60, mockPf);
+      expect(behavior.stallTicks).toBe(0);
+
+      // Simulate 10 ticks without displacement (total 10 ticks < 12)
+      for (let t = 0; t < 10; t++) {
+        behavior.update(ctx, target, [wall], 1, 1 / 60, mockPf);
+      }
+      expect(behavior.stallTicks).toBe(10);
+
+      // Advance 2 more ticks (total 12 ticks) -> triggers stall detection and resets stallTicks
+      behavior.update(ctx, target, [wall], 2, 2 / 60, mockPf);
+      expect(behavior.stallTicks).toBe(0);
+      expect(behavior.repathCooldownTicks).toBe(20); // Forced repath occurred
+    });
+
+    it("resets watchdog stall counter during intentional pauses (laser charge, fire stutter, overload, zero speed)", () => {
+      const behavior = new DirectAdvanceBehavior();
+      const wall = createObstacle("wall", 120, 50, 40, 100);
+      const mockPf = new GridPathfinder(960, 640, 20);
+      mockPf.findPath = () => [];
+
+      const target = createMockTarget(300, 100);
+
+      // Accumulate 8 stall ticks
+      const movingCtx = createMockContext({
+        position: vec2(100, 100),
+        radius: 15,
+        speed: 100,
+        hasLineOfSight: false,
+      });
+      behavior.update(movingCtx, target, [wall], 1, 1 / 60, mockPf);
+      for (let t = 0; t < 7; t++) {
+        behavior.update(movingCtx, target, [wall], 1, 1 / 60, mockPf);
+      }
+      expect(behavior.stallTicks).toBe(7);
+
+      // 1. Weapon fire stutter pause: stallTicks must reset to 0
+      const stutterCtx = createMockContext({
+        position: vec2(100, 100),
+        radius: 15,
+        speed: 100,
+        hasLineOfSight: false,
+        stutterTimerTicks: 6,
+      });
+      behavior.update(stutterCtx, target, [wall], 1, 1 / 60, mockPf);
+      expect(behavior.stallTicks).toBe(0);
+
+      // 2. Laser charge pause: stallTicks must remain 0
+      const laserCtx = createMockContext({
+        position: vec2(100, 100),
+        radius: 15,
+        speed: 100,
+        hasLineOfSight: false,
+        isChargingLaser: true,
+      });
+      behavior.update(laserCtx, target, [wall], 1, 1 / 60, mockPf);
+      expect(behavior.stallTicks).toBe(0);
+
+      // 3. Cataclysm Overload pause: stallTicks must remain 0
+      const overloadCtx = createMockContext({
+        position: vec2(100, 100),
+        radius: 15,
+        speed: 100,
+        hasLineOfSight: false,
+        isOverloading: true,
+      });
+      behavior.update(overloadCtx, target, [wall], 1, 1 / 60, mockPf);
+      expect(behavior.stallTicks).toBe(0);
+
+      // 4. Zero speed: stallTicks must remain 0
+      const zeroSpeedCtx = createMockContext({
+        position: vec2(100, 100),
+        radius: 15,
+        speed: 0,
+        hasLineOfSight: false,
+      });
+      behavior.update(zeroSpeedCtx, target, [wall], 1, 1 / 60, mockPf);
+      expect(behavior.stallTicks).toBe(0);
+    });
+  });
 });

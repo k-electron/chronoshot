@@ -410,10 +410,13 @@ export class Enemy implements CombatUnit {
     // 5. Movement AI delegated to movement behavior
     if (this.isOverloading) {
       this.velocity = vec2(0, 0);
+      (this.movement as any).resetWatchdog?.(this.position);
     } else if (this.stutterTimerTicks > 0 && !this.runAndGun) {
       this.velocity = vec2(0, 0);
+      (this.movement as any).resetWatchdog?.(this.position);
     } else if (this.isChargingLaser) {
       this.velocity = vec2(0, 0);
+      (this.movement as any).resetWatchdog?.(this.position);
     } else {
       const activeNeighbors = neighbors
         ? neighbors.filter((n) => n !== this && n.isAlive)
@@ -428,6 +431,9 @@ export class Enemy implements CombatUnit {
         aimAngle: this.aimAngle,
         hasLineOfSight: this.hasLineOfSight,
         neighbors: activeNeighbors,
+        isChargingLaser: this.isChargingLaser,
+        isOverloading: this.isOverloading,
+        stutterTimerTicks: this.stutterTimerTicks,
       };
       this.velocity = this.movement.update(
         movementCtx,

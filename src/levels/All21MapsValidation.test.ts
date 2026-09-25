@@ -16,6 +16,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { GridPathfinder } from "../engine/GridPathfinder";
 import { Arena } from "../entities/Arena";
+import { BLUEPRINTS } from "../entities/EnemyFactory";
 import { testCircleAABB } from "../math/collision";
 import { vec2, vecDistance, vecLength } from "../math/vector";
 import { createStandardRoomSequence, RoomConfig } from "./Room";
@@ -40,7 +41,7 @@ describe("All 21 Maps Comprehensive Validation Suite", () => {
   describe("1. Exit Reachability Validation (All 21 Maps)", () => {
     for (const room of all21Rooms) {
       it(`Room ${room.roomNumber} (${room.title}): has valid path from player spawn to exit portal`, () => {
-        const pathfinder = new GridPathfinder(960, 640, 40);
+        const pathfinder = new GridPathfinder(960, 640);
         pathfinder.updateObstacles(room.obstacles, 14);
 
         // Snap to nearest walkable if adjacent to boundary
@@ -55,6 +56,34 @@ describe("All 21 Maps Comprehensive Validation Suite", () => {
           `Room ${room.roomNumber} exit portal at (${room.exitPortal.x}, ${room.exitPortal.y}) must be reachable from player spawn (${room.playerSpawn.x}, ${room.playerSpawn.y})`
         ).toBeGreaterThan(0);
       });
+    }
+  });
+
+  describe("1b. Static Hostile-to-Player Graph Reachability Validation (All 21 Maps at True Radii)", () => {
+    for (const room of all21Rooms) {
+      if (room.enemies.length > 0) {
+        it(`Room ${room.roomNumber} (${room.title}): all ${room.enemies.length} hostile spawns have walkable A* path to player spawn at true radii`, () => {
+          for (const enemyCfg of room.enemies) {
+            const enemyRadius =
+              enemyCfg.radius ?? BLUEPRINTS[enemyCfg.type]?.radius ?? 15;
+            const pathfinder = new GridPathfinder(960, 640);
+            pathfinder.updateObstacles(room.obstacles, enemyRadius);
+
+            const startPos =
+              pathfinder.findNearestWalkable(vec2(enemyCfg.x, enemyCfg.y)) ??
+              vec2(enemyCfg.x, enemyCfg.y);
+            const goalPos =
+              pathfinder.findNearestWalkable(room.playerSpawn) ??
+              room.playerSpawn;
+
+            const path = pathfinder.findPath(startPos, goalPos);
+            expect(
+              path.length,
+              `Room ${room.roomNumber} (${room.title}) hostile '${enemyCfg.id}' (${enemyCfg.type}, R=${enemyRadius}) must have a walkable path to player spawn`
+            ).toBeGreaterThan(0);
+          }
+        });
+      }
     }
   });
 
@@ -300,6 +329,131 @@ describe("All 21 Maps Comprehensive Validation Suite", () => {
         expect(Number.isFinite(enemy.velocity.x)).toBe(true);
         expect(Number.isFinite(enemy.velocity.y)).toBe(true);
       }
+    });
+
+    it("Room 16: Warden (R=18) navigates actively with 0 freeze deadlocks when player takes cover behind central barrier", () => {
+      const room16 = standardRooms[15]; // Room 16
+      const arena = new Arena();
+      arena.loadRoom(room16);
+
+      arena.player.takeDamage = vi.fn().mockReturnValue({ absorbed: true, eliminated: false });
+
+      // Player takes cover behind top barrier (x=250, y=150) so sightline to warden (x=720, y=320) is blocked by barrier-top (x: 420..450, y: 0..250)
+      const coverPos = vec2(250, 150);
+
+      const warden = arena.enemies.find((e) => e.type === "warden")!;
+      expect(warden).toBeDefined();
+      const initialPos = { ...warden.position };
+
+      let maxConsecutiveZeroTicks = 0;
+      let consecutiveZeroTicks = 0;
+
+      for (let tick = 0; tick < 300; tick++) {
+        arena.player.position.x = coverPos.x;
+        arena.player.position.y = coverPos.y;
+        arena.player.velocity.x = 0;
+        arena.player.velocity.y = 0;
+
+        arena.step(1 / 60, {
+          moveDir: vec2(1, 0),
+          mousePos: vec2(coverPos.x, coverPos.y),
+          shoot: false,
+          reload: false,
+          restart: false,
+        });
+
+        if (!warden.isAlive) break;
+
+        const speed = vecLength(warden.velocity);
+        const isFiringStutter = warden.stutterTimerTicks > 0;
+        const distToPlayer = vecDistance(warden.position, arena.player.position);
+        const isArrived = distToPlayer <= warden.radius + arena.player.radius + 4;
+
+        if (speed < 1e-3 && !isFiringStutter && !isArrived) {
+          consecutiveZeroTicks++;
+          if (consecutiveZeroTicks > maxConsecutiveZeroTicks) {
+            maxConsecutiveZeroTicks = consecutiveZeroTicks;
+          }
+        } else {
+          consecutiveZeroTicks = 0;
+        }
+      }
+
+      // Assert warden never froze for >= 15 consecutive ticks
+      expect(
+        maxConsecutiveZeroTicks,
+        `Room 16 Warden froze for ${maxConsecutiveZeroTicks} consecutive ticks when player took cover`
+      ).toBeLessThan(15);
+
+      // Assert warden moved substantially from spawn
+      const distMoved = vecDistance(warden.position, initialPos);
+      expect(
+        distMoved,
+        `Room 16 Warden failed to navigate toward cover (moved only ${distMoved.toFixed(1)}px)`
+      ).toBeGreaterThan(50);
+    });
+
+    it("Room 20: Chrono-Zenith boss navigates actively with 0 freeze deadlocks when player takes cover behind obstacles", () => {
+      const room20 = standardRooms[19]; // Room 20
+      const arena = new Arena();
+      arena.loadRoom(room20);
+
+      arena.player.takeDamage = vi.fn().mockReturnValue({ absorbed: true, eliminated: false });
+
+      // Player takes cover in south-west quadrant behind pillars/bastion
+      const coverPos = vec2(160, 480);
+
+      const boss = arena.enemies.find((e) => e.isBoss)!;
+      expect(boss).toBeDefined();
+      const initialPos = { ...boss.position };
+
+      let maxConsecutiveZeroTicks = 0;
+      let consecutiveZeroTicks = 0;
+
+      for (let tick = 0; tick < 300; tick++) {
+        arena.player.position.x = coverPos.x;
+        arena.player.position.y = coverPos.y;
+        arena.player.velocity.x = 0;
+        arena.player.velocity.y = 0;
+
+        arena.step(1 / 60, {
+          moveDir: vec2(1, 0),
+          mousePos: vec2(coverPos.x, coverPos.y),
+          shoot: false,
+          reload: false,
+          restart: false,
+        });
+
+        if (!boss.isAlive) break;
+
+        const speed = vecLength(boss.velocity);
+        const isFiringStutter = boss.stutterTimerTicks > 0;
+        const isChargingLaser = boss.isChargingLaser;
+        const isOverloading = boss.isOverloading;
+        const distToPlayer = vecDistance(boss.position, arena.player.position);
+        const isArrived = distToPlayer <= boss.radius + arena.player.radius + 4;
+        const isLegitHold = isFiringStutter || isChargingLaser || isOverloading || isArrived;
+
+        if (speed < 1e-3 && !isLegitHold) {
+          consecutiveZeroTicks++;
+          if (consecutiveZeroTicks > maxConsecutiveZeroTicks) {
+            maxConsecutiveZeroTicks = consecutiveZeroTicks;
+          }
+        } else {
+          consecutiveZeroTicks = 0;
+        }
+      }
+
+      expect(
+        maxConsecutiveZeroTicks,
+        `Room 20 Boss froze for ${maxConsecutiveZeroTicks} consecutive ticks when player took cover`
+      ).toBeLessThan(15);
+
+      const distMoved = vecDistance(boss.position, initialPos);
+      expect(
+        distMoved,
+        `Room 20 Boss failed to navigate toward cover (moved only ${distMoved.toFixed(1)}px)`
+      ).toBeGreaterThan(40);
     });
   });
 });
