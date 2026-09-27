@@ -2660,7 +2660,134 @@ describe("Combat Arena & Room Loop", () => {
       expect(auraSpy).toHaveBeenCalledWith(ctx, boss, { x: 250, y: 250 });
     });
   });
+
+  describe("Cataclysm Blast Flash Integration in Arena", () => {
+    const defaultInput = {
+      moveDir: vec2(0, 0),
+      mousePos: vec2(400, 300),
+      shoot: false,
+      reload: false,
+      restart: false,
+    };
+
+    it("advances cataclysmFlash in real wall-clock time during arena.step", () => {
+      const arena = new Arena();
+      const updateSpy = vi.spyOn(arena.cataclysmFlash, "update");
+
+      arena.step(0.025, defaultInput);
+
+      expect(updateSpy).toHaveBeenCalledWith(0.025);
+    });
+
+    it("advances boss overload countdown in unscaled wall-clock time during arena.step", () => {
+      const arena = new Arena();
+      const boss = new Enemy({
+        id: "boss-overload-step",
+        type: "boss",
+        x: 400,
+        y: 300,
+        blueprint: CHRONO_ZENITH_BLUEPRINT,
+      });
+      arena.enemies = [boss];
+
+      // Transition to phase 1 (overload channel = 75 ticks)
+      for (let i = 0; i < 5; i++) {
+        boss.takeDamage(1);
+      }
+      expect(boss.isOverloading).toBe(true);
+
+      const overloadSpy = vi.spyOn(boss.phaseController!, "updateOverload");
+
+      // Advance 0.1s wall clock
+      arena.step(0.1, defaultInput);
+
+      expect(overloadSpy).toHaveBeenCalledWith(0.1, boss.position);
+    });
+
+    it("renders cataclysmFlash when active and skips when idle", () => {
+      const arena = new Arena();
+      const ctx = createMockCanvasContext();
+      const flashRenderSpy = vi.spyOn(arena.cataclysmFlash, "render");
+
+      // Idle: should not render
+      arena.render(ctx);
+      expect(flashRenderSpy).not.toHaveBeenCalled();
+
+      // Trigger flash ramp-up
+      arena.cataclysmFlash.triggerRampUp(vec2(400, 300), "#00f0ff", 0.25);
+      expect(arena.cataclysmFlash.isActive()).toBe(true);
+
+      arena.render(ctx);
+      expect(flashRenderSpy).toHaveBeenCalledWith(
+        ctx,
+        arena.obstacles,
+        arena.width,
+        arena.height
+      );
+    });
+
+    it("triggers cataclysm flash ramp-up and apex detonation during Chrono-Zenith overload lifecycle", () => {
+      const arena = new Arena();
+      const boss = new Enemy({
+        id: "boss-flash-lifecycle",
+        type: "boss",
+        x: 480,
+        y: 320,
+        blueprint: CHRONO_ZENITH_BLUEPRINT,
+      });
+      if (boss.phaseController) {
+        boss.phaseController.transitionContextExtras = {
+          arena,
+          particles: arena.particles,
+          soundSynth: arena.soundSynth,
+          flashController: arena.cataclysmFlash,
+        };
+      }
+      arena.enemies = [boss];
+
+      // Deplete Phase 0 shields (5 shields) to trigger Phase 1 Overload channel (75 ticks)
+      for (let i = 0; i < 5; i++) {
+        boss.takeDamage(1);
+      }
+      expect(boss.isOverloading).toBe(true);
+      expect(arena.cataclysmFlash.isActive()).toBe(false);
+
+      // Advance 60 ticks (1.0s) in wall-clock time -> 15 ticks remaining (ramp-up threshold)
+      arena.step(1.0, defaultInput);
+
+      // Ramp-up must now be triggered
+      expect(arena.cataclysmFlash.isActive()).toBe(true);
+      expect(arena.cataclysmFlash.getColor()).toBe("#00f0ff");
+
+      // Advance 14 of the remaining 15 ticks
+      arena.step(14 / 60, defaultInput);
+      expect(boss.isOverloading).toBe(true);
+      expect(arena.cataclysmFlash.isActive()).toBe(true);
+
+      // Advance the final tick to reach Apex detonation and enter ramp down
+      arena.step(1 / 60, defaultInput);
+
+      expect(boss.isOverloading).toBe(false);
+      // Flash entered ramp down
+      expect(arena.cataclysmFlash.status).toBe("ramping_down");
+
+      // Advance past ramp-down duration (0.07s) -> returns to idle
+      arena.step(0.08, defaultInput);
+      expect(arena.cataclysmFlash.status).toBe("idle");
+    });
+
+    it("resets cataclysmFlash when restarting arena", () => {
+      const arena = new Arena();
+      arena.cataclysmFlash.triggerRampUp(vec2(400, 300), "#00f0ff");
+      expect(arena.cataclysmFlash.isActive()).toBe(true);
+
+      arena.restart();
+
+      expect(arena.cataclysmFlash.isActive()).toBe(false);
+    });
+  });
 });
+
 
 
 

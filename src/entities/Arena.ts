@@ -43,6 +43,7 @@ import { ParticleSystem } from "./ParticleSystem";
 import { Player } from "./Player";
 import { CombatUnit, Projectile } from "./Projectile";
 import { resolveSafeSpawnPosition } from "./boss/BossTransitionAction";
+import { CataclysmFlashController } from "./boss/CataclysmFlashController";
 import { UpgradeDefinition } from "../upgrades/UpgradeDefinition";
 import { DEFAULT_UPGRADE_REGISTRY } from "../upgrades/UpgradeRegistry";
 import { extendedCylinder } from "../upgrades/definitions/extendedCylinder";
@@ -106,6 +107,7 @@ export class Arena {
   public checkpointLoadouts: Map<number, string[]> = new Map();
   public bossDefeatTransition?: BossDefeatTransitionState;
   public portalTransition: PortalTransitionController = new PortalTransitionController();
+  public cataclysmFlash: CataclysmFlashController = new CataclysmFlashController();
 
   constructor(
     width = 960,
@@ -201,6 +203,7 @@ export class Arena {
           arena: this,
           particles: this.particles,
           soundSynth: this.soundSynth,
+          flashController: this.cataclysmFlash,
         };
       }
       return enemy;
@@ -208,6 +211,7 @@ export class Arena {
     this.player.reset(room.playerSpawn);
     this.projectiles = [];
     this.particles.clear();
+    this.cataclysmFlash.reset();
     this.timeGovernor.reset();
     this.simulator.reset();
     this.bossDefeatTransition = undefined;
@@ -270,6 +274,7 @@ export class Arena {
         arena: this,
         particles: this.particles,
         soundSynth: this.soundSynth,
+        flashController: this.cataclysmFlash,
       };
     }
     this.enemies.push(enemy);
@@ -588,6 +593,16 @@ export class Arena {
     }
 
     if (this.status === "playing") {
+      // Advance active boss overload in unscaled real wall-clock time
+      for (const enemy of this.enemies) {
+        if (enemy.isAlive && enemy.phaseController?.isOverloading) {
+          enemy.phaseController.updateOverload(wallDeltaTime, enemy.position);
+        }
+      }
+
+      // Advance cataclysm occluded screen flash in real wall-clock time
+      this.cataclysmFlash.update(wallDeltaTime);
+
       // Weapon discharge command
       if (input.shoot) {
         const firedBullets = this.player.fire(this.timeGovernor);
@@ -984,6 +999,7 @@ export class Arena {
       }
       this.projectiles = [];
       this.particles.clear();
+      this.cataclysmFlash.reset();
       this.timeGovernor.reset();
       this.simulator.reset();
     }
@@ -1017,6 +1033,11 @@ export class Arena {
     // 2. Exit Portal (floor energy beacon)
     if (this.roomManager) {
       this.roomManager.renderPortal(ctx, wallDeltaTime);
+    }
+
+    // Cataclysm Occluded Screen Flash (arena-wide blast flash masked by obstacles)
+    if (this.cataclysmFlash.isActive()) {
+      this.cataclysmFlash.render(ctx, this.obstacles, this.width, this.height);
     }
 
     // 3. Obstacles (walls & pillars)

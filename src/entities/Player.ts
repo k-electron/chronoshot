@@ -555,17 +555,18 @@ export class Player implements CombatUnit {
 
   /**
    * Processes incoming damage, absorbing impact with reactive shields or phase dash deflection,
+   * Applies damage to shields if available, bypassing shields when ignoreShields is true,
    * otherwise enforcing 1-hit lethality.
    */
-  public takeDamage(damage = 1): DamageResult {
-    if (this.dashActiveTicks > 0) {
+  public takeDamage(damage = 1, ignoreShields = false): DamageResult {
+    if (!ignoreShields && this.dashActiveTicks > 0) {
       return {
         absorbed: true,
         eliminated: false,
         remainingShields: this.shields,
       };
     }
-    if (this.shields > 0) {
+    if (!ignoreShields && this.shields > 0) {
       this.shields = Math.max(0, this.shields - damage);
       return {
         absorbed: true,
@@ -573,6 +574,7 @@ export class Player implements CombatUnit {
         remainingShields: this.shields,
       };
     }
+    this.shields = 0;
     this.kill();
     return {
       absorbed: false,

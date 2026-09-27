@@ -393,6 +393,13 @@ export interface CataclysmPulseResult {
   occludingObstacle?: Obstacle;
 }
 
+export interface LineOfSightOcclusionResult {
+  occluded: boolean;
+  obstacle?: Obstacle;
+  hitPoint?: Vector2D;
+  normal?: Vector2D;
+}
+
 /**
  * Tests raycast line-of-sight between origin and target against solid obstacles.
  * Returns true if line-of-sight is clear (unobstructed), false if blocked by any obstacle.
@@ -401,7 +408,7 @@ export function testLineOfSightOcclusion(
   origin: Vector2D,
   target: Vector2D,
   obstacles: readonly Obstacle[] = []
-): { occluded: boolean; obstacle?: Obstacle } {
+): LineOfSightOcclusionResult {
   const diff = vecSub(target, origin);
   const dist = vecDistance(origin, target);
 
@@ -410,6 +417,13 @@ export function testLineOfSightOcclusion(
   }
 
   const dir = vecScale(diff, 1 / dist);
+
+  let closestHit: {
+    obstacle: Obstacle;
+    distance: number;
+    point: Vector2D;
+    normal: Vector2D;
+  } | null = null;
 
   for (const obstacle of obstacles) {
     const hit = rayIntersectsAABB(
@@ -421,8 +435,24 @@ export function testLineOfSightOcclusion(
     );
 
     if (hit && hit.distance < dist) {
-      return { occluded: true, obstacle };
+      if (!closestHit || hit.distance < closestHit.distance) {
+        closestHit = {
+          obstacle,
+          distance: hit.distance,
+          point: hit.point,
+          normal: hit.normal,
+        };
+      }
     }
+  }
+
+  if (closestHit) {
+    return {
+      occluded: true,
+      obstacle: closestHit.obstacle,
+      hitPoint: closestHit.point,
+      normal: closestHit.normal,
+    };
   }
 
   return { occluded: false };
@@ -433,6 +463,7 @@ export interface CataclysmPulseConfig {
   speed?: number;
   color?: string;
   damage?: number;
+  fatal?: boolean;
 }
 
 export interface CataclysmPulseAction {
@@ -453,6 +484,7 @@ export function createCataclysmPulse(
   const speed = config.speed ?? 360;
   const color = config.color ?? "#ff1744";
   const damage = config.damage ?? 1;
+  const fatal = config.fatal ?? true;
 
   const action = ((ctx: BossTransitionContext): CataclysmPulseResult => {
     // 1. Emit radial shockwave particles and audio
@@ -470,16 +502,18 @@ export function createCataclysmPulse(
       return { occluded: false, damageDealt: 0 };
     }
 
-    const { occluded, obstacle } = testLineOfSightOcclusion(
+    const { occluded, obstacle, hitPoint, normal } = testLineOfSightOcclusion(
       ctx.bossPosition,
       player.position,
       obstacles
     );
 
     if (occluded) {
-      // Occluded behind obstacle: 0 damage, emit deflection feedback
+      // Occluded behind obstacle: 0 damage, emit deflection feedback on obstacle front face
+      const sparkOrigin = hitPoint ?? player.position;
+      const sparkNormal = normal ?? { x: 0, y: 1 };
       if (ctx.particles && typeof ctx.particles.emitImpactSparks === "function" && obstacle) {
-        ctx.particles.emitImpactSparks(player.position, { x: 0, y: 1 }, 8);
+        ctx.particles.emitImpactSparks(sparkOrigin, sparkNormal, 12, color);
       }
       if (ctx.soundSynth && typeof ctx.soundSynth.playShieldDeflect === "function") {
         ctx.soundSynth.playShieldDeflect(1.0);
@@ -487,7 +521,40 @@ export function createCataclysmPulse(
       return { occluded: true, damageDealt: 0, occludingObstacle: obstacle };
     }
 
-    // Exposed in open line of sight: inflict damage on player
+    // Exposed in open line of sight: absolute fatal wipe if fatal (default), bypassing shields
+    if (fatal) {
+      if (typeof player.takeDamage === "function") {
+        player.takeDamage(damage, true);
+      }
+      try {
+        if ("shields" in player) {
+          (player as any).shields = 0;
+        }
+      } catch {
+        // ignore if read-only
+      }
+      if ("kill" in player && typeof (player as any).kill === "function") {
+        (player as any).kill();
+      }
+      try {
+        (player as any).isAlive = false;
+      } catch {
+        // ignore if read-only getter
+      }
+
+      if (ctx.particles && typeof ctx.particles.emitShatter === "function") {
+        ctx.particles.emitShatter(player.position, 22, "#00f0ff", 240);
+      }
+      if (ctx.soundSynth && typeof ctx.soundSynth.playShatter === "function") {
+        ctx.soundSynth.playShatter(1.0);
+      }
+      if (ctx.arena) {
+        ctx.arena.status = "defeat";
+      }
+      return { occluded: false, damageDealt: damage };
+    }
+
+    // Fallback non-fatal branch
     const damageResult = player.takeDamage(damage);
 
     if (damageResult?.absorbed) {
@@ -530,7 +597,7 @@ export function createCataclysmPulse(
 
   const fn = action as any;
   fn.type = "cataclysm_pulse";
-  fn.config = { particleCount, speed, color, damage };
+  fn.config = { particleCount, speed, color, damage, fatal };
   fn.execute = (ctx: BossTransitionContext) => action(ctx);
 
   return action;

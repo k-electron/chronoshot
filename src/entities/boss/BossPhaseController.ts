@@ -45,6 +45,8 @@ export interface BossPhaseConfig {
   onPhaseEnter?: (ctx: BossTransitionContext) => void;
   onPhaseExit?: (ctx: BossTransitionContext) => void;
   overloadChannelTicks?: number;
+  overloadRampUpTicks?: number;
+  onOverloadRampUp?: (ctx: BossTransitionContext) => void;
   onOverloadDetonate?: (ctx: BossTransitionContext) => void;
 }
 
@@ -172,21 +174,81 @@ export class BossPhaseController {
     return this.currentPhaseIndex >= this.phases.length - 1;
   }
 
+  private steppedOverloadViaWallClock: boolean = false;
+
+  /**
+   * Advances the Cataclysm Overload channel timer in unscaled real wall-clock seconds.
+   * Unaffected by player stillness or micro-creep time dilation.
+   *
+   * @param wallDeltaTime Elapsed wall-clock time in seconds.
+   * @param bossPos Optional current boss position.
+   */
+  public updateOverload(wallDeltaTime: number, bossPos?: Vector2D): void {
+    if (bossPos) {
+      this.lastBossPosition.x = bossPos.x;
+      this.lastBossPosition.y = bossPos.y;
+    }
+
+    if (this.overloadTicksRemaining <= 0) {
+      return;
+    }
+
+    this.steppedOverloadViaWallClock = true;
+    const prevOverload = this.overloadTicksRemaining;
+    const ticksToAdvance = wallDeltaTime * 60;
+    this.overloadTicksRemaining = Math.max(0, this.overloadTicksRemaining - ticksToAdvance);
+
+    const rampUpThreshold = this.currentPhase.overloadRampUpTicks ?? 15;
+    if (prevOverload > rampUpThreshold && this.overloadTicksRemaining <= rampUpThreshold) {
+      const rampUpCtx: BossTransitionContext = {
+        bossPosition: { ...this.lastBossPosition },
+        currentPhase: this.currentPhaseIndex,
+        nextPhase: this.currentPhaseIndex,
+        ...this.transitionContextExtras,
+      };
+      this.currentPhase.onOverloadRampUp?.(rampUpCtx);
+    }
+
+    if (prevOverload > 0 && this.overloadTicksRemaining === 0) {
+      const detonateCtx: BossTransitionContext = {
+        bossPosition: { ...this.lastBossPosition },
+        currentPhase: this.currentPhaseIndex,
+        nextPhase: this.currentPhaseIndex,
+        ...this.transitionContextExtras,
+      };
+      this.currentPhase.onOverloadDetonate?.(detonateCtx);
+    }
+  }
+
   /**
    * Advances phase elapsed ticks and checks transition triggers.
    *
    * @param deltaTicks Number of simulation ticks elapsed.
    * @param bossPos Current position of the boss unit.
+   * @param wallDeltaTime Optional wall-clock delta time in seconds.
    * @returns true if a phase transition occurred during this update.
    */
-  public update(deltaTicks: number, bossPos: Vector2D): boolean {
+  public update(deltaTicks: number, bossPos: Vector2D, wallDeltaTime?: number): boolean {
     this.lastBossPosition.x = bossPos.x;
     this.lastBossPosition.y = bossPos.y;
     this.phaseElapsedTicks += deltaTicks;
 
-    if (this.overloadTicksRemaining > 0) {
+    if (wallDeltaTime !== undefined) {
+      this.updateOverload(wallDeltaTime, bossPos);
+    } else if (!this.steppedOverloadViaWallClock && this.overloadTicksRemaining > 0) {
       const prevOverload = this.overloadTicksRemaining;
       this.overloadTicksRemaining = Math.max(0, this.overloadTicksRemaining - deltaTicks);
+
+      const rampUpThreshold = this.currentPhase.overloadRampUpTicks ?? 15;
+      if (prevOverload > rampUpThreshold && this.overloadTicksRemaining <= rampUpThreshold) {
+        const rampUpCtx: BossTransitionContext = {
+          bossPosition: { ...this.lastBossPosition },
+          currentPhase: this.currentPhaseIndex,
+          nextPhase: this.currentPhaseIndex,
+          ...this.transitionContextExtras,
+        };
+        this.currentPhase.onOverloadRampUp?.(rampUpCtx);
+      }
 
       if (prevOverload > 0 && this.overloadTicksRemaining === 0) {
         const detonateCtx: BossTransitionContext = {
@@ -198,6 +260,7 @@ export class BossPhaseController {
         this.currentPhase.onOverloadDetonate?.(detonateCtx);
       }
     }
+    this.steppedOverloadViaWallClock = false;
 
     if (!this.hasNextPhase) {
       return false;

@@ -552,7 +552,7 @@ describe("BossTransitionAction", () => {
       expect(emitSparksSpy).toHaveBeenCalled();
     });
 
-    it("inflicts damage when player is in clear line-of-sight during detonation", () => {
+    it("inflicts fatal damage when player is in clear line-of-sight during detonation", () => {
       const pulse = createCataclysmPulse({ particleCount: 20, damage: 1 });
       const takeDamageSpy = vi.fn();
 
@@ -569,7 +569,7 @@ describe("BossTransitionAction", () => {
       const result = pulse(ctx);
       expect(result.occluded).toBe(false);
       expect(result.damageDealt).toBe(1);
-      expect(takeDamageSpy).toHaveBeenCalledWith(1);
+      expect(takeDamageSpy).toHaveBeenCalledWith(1, true);
     });
 
     it("triggers arena defeat state and shatter feedback when Cataclysm Pulse deals lethal damage", () => {
@@ -582,6 +582,9 @@ describe("BossTransitionAction", () => {
         position: vec2(150, 320),
         get isAlive() {
           return playerAlive;
+        },
+        set isAlive(val: boolean) {
+          playerAlive = val;
         },
         takeDamage: vi.fn().mockImplementation(() => {
           playerAlive = false;
@@ -608,8 +611,76 @@ describe("BossTransitionAction", () => {
       expect(playShatterSpy).toHaveBeenCalledWith(1.0);
     });
 
-    it("triggers shield deflection/break feedback when player absorbs Cataclysm Pulse", () => {
-      const pulse = createCataclysmPulse({ particleCount: 20, damage: 1 });
+    it("enforces absolute lethal wipe regardless of player shields when in open line of sight", () => {
+      const pulse = createCataclysmPulse({ particleCount: 20, damage: 1, fatal: true });
+      const emitShatterSpy = vi.fn();
+      const playShatterSpy = vi.fn();
+      const mockArena: any = { status: "playing" };
+      const shieldedPlayer: any = {
+        position: vec2(150, 320),
+        isAlive: true,
+        shields: 3,
+        takeDamage: vi.fn().mockImplementation((_dmg, ignoreShields) => {
+          if (ignoreShields) {
+            shieldedPlayer.shields = 0;
+            shieldedPlayer.isAlive = false;
+            return { absorbed: false, eliminated: true, remainingShields: 0 };
+          }
+          shieldedPlayer.shields -= 1;
+          return { absorbed: true, eliminated: false, remainingShields: shieldedPlayer.shields };
+        }),
+      };
+
+      const ctx: BossTransitionContext = {
+        bossPosition: vec2(700, 320),
+        currentPhase: 0,
+        nextPhase: 1,
+        player: shieldedPlayer,
+        arena: mockArena,
+        obstacles: [],
+        particles: { emitShatter: emitShatterSpy } as any,
+        soundSynth: { playShatter: playShatterSpy } as any,
+      };
+
+      const result = pulse(ctx);
+      expect(result.occluded).toBe(false);
+      expect(shieldedPlayer.isAlive).toBe(false);
+      expect(shieldedPlayer.shields).toBe(0);
+      expect(mockArena.status).toBe("defeat");
+      expect(emitShatterSpy).toHaveBeenCalledWith(shieldedPlayer.position, 22, "#00f0ff", 240);
+      expect(playShatterSpy).toHaveBeenCalledWith(1.0);
+    });
+
+    it("spawns deflection sparks across the obstacle face facing the boss when player is occluded", () => {
+      const pulse = createCataclysmPulse({ particleCount: 20, damage: 1, color: "#a855f7" });
+      const emitSparksSpy = vi.fn();
+      const playDeflectSpy = vi.fn();
+      // Pillar at x: 400, y: 250, w: 80, h: 140 (bounds: 400..480, 250..390)
+      const pillar = createObstacle("cover-pillar", 400, 250, 80, 140);
+      // Boss at 700, 320; Player at 150, 320 -> Ray from boss to player strikes east face of pillar at x=480, normal (1, 0)
+      const ctx: BossTransitionContext = {
+        bossPosition: vec2(700, 320),
+        currentPhase: 0,
+        nextPhase: 1,
+        player: { position: vec2(150, 320), isAlive: true, takeDamage: vi.fn() } as any,
+        obstacles: [pillar],
+        particles: { emitImpactSparks: emitSparksSpy, emitShatter: vi.fn() } as any,
+        soundSynth: { playShieldDeflect: playDeflectSpy, playShieldBreak: vi.fn() } as any,
+      };
+
+      const result = pulse(ctx);
+      expect(result.occluded).toBe(true);
+      expect(result.damageDealt).toBe(0);
+      expect(emitSparksSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ x: expect.closeTo(480, 1), y: expect.closeTo(320, 1) }),
+        expect.objectContaining({ x: -1, y: 0 }),
+        12,
+        "#a855f7"
+      );
+    });
+
+    it("triggers shield deflection/break feedback when player absorbs Cataclysm Pulse with fatal: false", () => {
+      const pulse = createCataclysmPulse({ particleCount: 20, damage: 1, fatal: false });
       const emitShieldBreakSpy = vi.fn();
       const playShieldBreakSpy = vi.fn();
       const mockPlayer: any = {

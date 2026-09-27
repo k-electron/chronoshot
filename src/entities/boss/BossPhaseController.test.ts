@@ -512,6 +512,59 @@ describe("BossPhaseController", () => {
       controller.update(10, vec2(410, 310));
       expect(onDetonateSpy).toHaveBeenCalledTimes(1);
     });
+
+    it("advances overload channel using unscaled wall-clock delta time and triggers onOverloadRampUp", () => {
+      const onRampUpSpy = vi.fn();
+      const onDetonateSpy = vi.fn();
+
+      const p0 = createTestPhase(0, {
+        maxShields: 1,
+        overloadChannelTicks: 30, // 0.5s at 60Hz
+        overloadRampUpTicks: 15,  // 0.25s at 60Hz
+        onOverloadRampUp: onRampUpSpy,
+        onOverloadDetonate: onDetonateSpy,
+      });
+
+      const controller = new BossPhaseController([p0], vec2(200, 200));
+
+      expect(controller.overloadTicksRemaining).toBe(30);
+      expect(controller.isInvulnerable).toBe(true);
+
+      // Advance 0.2s in wall-clock time (12 ticks -> 18 ticks remaining)
+      controller.updateOverload(0.2, vec2(200, 200));
+      expect(controller.overloadTicksRemaining).toBe(18);
+      expect(controller.isInvulnerable).toBe(true);
+      expect(onRampUpSpy).not.toHaveBeenCalled();
+
+      // Damage during pre-rampup is deflected
+      const preHit = controller.takeDamage(1);
+      expect(preHit.deflected).toBe(true);
+      expect(controller.shields).toBe(1);
+
+      // Advance another 0.1s in wall-clock time (6 ticks -> 12 ticks remaining, crosses 15-tick ramp-up threshold)
+      controller.updateOverload(0.1, vec2(205, 205));
+      expect(controller.overloadTicksRemaining).toBe(12);
+      expect(onRampUpSpy).toHaveBeenCalledTimes(1);
+      expect(onDetonateSpy).not.toHaveBeenCalled();
+
+      // Damage during rampup is STILL deflected (100% invulnerable throughout rampup)
+      expect(controller.isInvulnerable).toBe(true);
+      const rampHit = controller.takeDamage(1);
+      expect(rampHit.deflected).toBe(true);
+      expect(controller.shields).toBe(1);
+
+      // Advance 0.2s in wall-clock time (12 ticks -> 0 ticks remaining, reaches Apex)
+      controller.updateOverload(0.2, vec2(210, 210));
+      expect(controller.overloadTicksRemaining).toBe(0);
+      expect(onDetonateSpy).toHaveBeenCalledTimes(1);
+      expect(controller.isInvulnerable).toBe(false);
+
+      // Damage immediately after Apex succeeds and damages shields
+      const postHit = controller.takeDamage(1);
+      expect(postHit.deflected).toBeUndefined();
+      expect(postHit.absorbed).toBe(true);
+      expect(controller.shields).toBe(0);
+    });
   });
 });
 

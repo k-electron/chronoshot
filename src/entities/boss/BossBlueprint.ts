@@ -305,7 +305,11 @@ export const CHRONO_ZENITH_BLUEPRINT: BossBlueprint = {
       maxShields: 3,
       speed: 95,
       overloadChannelTicks: 75,
+      onOverloadRampUp: (ctx) => {
+        ctx.flashController?.triggerRampUp(ctx.bossPosition, "#00f0ff", 0.25);
+      },
       onOverloadDetonate: (ctx) => {
+        ctx.flashController?.triggerApex();
         const action = combineTransitionActions(
           createCataclysmPulse({ particleCount: 36, speed: 340, color: "#00f0ff", damage: 1 }),
           createMinionEscortSpawn([
@@ -328,6 +332,7 @@ export const CHRONO_ZENITH_BLUEPRINT: BossBlueprint = {
           createAudioCue("shieldBreak")
         );
         action(ctx);
+        ctx.flashController?.triggerRampDown(0.07);
       },
       movement: () => new KiterBehavior({ minDist: 260, maxDist: 440 }),
       attack: () =>
@@ -345,7 +350,11 @@ export const CHRONO_ZENITH_BLUEPRINT: BossBlueprint = {
       maxShields: 2,
       speed: 105,
       overloadChannelTicks: 65,
+      onOverloadRampUp: (ctx) => {
+        ctx.flashController?.triggerRampUp(ctx.bossPosition, "#a855f7", 0.25);
+      },
       onOverloadDetonate: (ctx) => {
+        ctx.flashController?.triggerApex();
         const action = combineTransitionActions(
           createCataclysmPulse({ particleCount: 42, speed: 380, color: "#a855f7", damage: 1 }),
           createMinionEscortSpawn([
@@ -361,6 +370,7 @@ export const CHRONO_ZENITH_BLUEPRINT: BossBlueprint = {
           createAudioCue("shieldBreak")
         );
         action(ctx);
+        ctx.flashController?.triggerRampDown(0.07);
       },
       movement: () => new KiterBehavior({ minDist: 200, maxDist: 380 }),
       attack: () =>
@@ -380,12 +390,17 @@ export const CHRONO_ZENITH_BLUEPRINT: BossBlueprint = {
       maxShields: 0,
       speed: 125,
       overloadChannelTicks: 60,
+      onOverloadRampUp: (ctx) => {
+        ctx.flashController?.triggerRampUp(ctx.bossPosition, "#ff1744", 0.25);
+      },
       onOverloadDetonate: (ctx) => {
+        ctx.flashController?.triggerApex();
         const action = combineTransitionActions(
           createCataclysmPulse({ particleCount: 48, speed: 420, color: "#ff1744", damage: 1 }),
           createAudioCue("shieldBreak")
         );
         action(ctx);
+        ctx.flashController?.triggerRampDown(0.07);
       },
       movement: () => new DirectAdvanceBehavior(),
       attack: () =>
