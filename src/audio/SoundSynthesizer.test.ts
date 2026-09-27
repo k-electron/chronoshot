@@ -513,4 +513,29 @@ describe("SoundSynthesizer Procedural Web Audio Generation", () => {
     expect(mock.createdOscillators.length).toBe(0);
     expect(mock.createdBufferSources.length).toBe(0);
   });
+
+  it("smoothly glides pitch along the TimeGovernor decay curve without discontinuities", () => {
+    const mock = createMockAudioContext();
+    const synth = new SoundSynthesizer(mock.context);
+
+    // Sample across a decay ramp from 1.00 down to 0.05
+    const steps = 19;
+    const samples: number[] = [];
+    for (let i = 0; i <= steps; i++) {
+      const scale = 1.0 - (i / steps) * 0.95;
+      samples.push(synth.calculatePitch(scale));
+    }
+
+    // Verify monotonic decreasing without sudden steps
+    for (let i = 1; i < samples.length; i++) {
+      expect(samples[i]).toBeLessThan(samples[i - 1]);
+      // Step delta between consecutive scale decrements should be smooth (< 0.06)
+      const stepDelta = samples[i - 1] - samples[i];
+      expect(stepDelta).toBeGreaterThan(0);
+      expect(stepDelta).toBeLessThan(0.06);
+    }
+
+    expect(samples[0]).toBeCloseTo(1.0, 4);
+    expect(samples[samples.length - 1]).toBeCloseTo(0.43, 2);
+  });
 });

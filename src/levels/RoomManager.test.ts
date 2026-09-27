@@ -13,6 +13,7 @@ import {
   createStandardRoomSequence,
 } from "./Room";
 import { RoomManager } from "./RoomManager";
+import { PortalTransitionController } from "./PortalTransition";
 
 function createMockContext(): CanvasRenderingContext2D {
   return {
@@ -195,7 +196,7 @@ describe("Room Configuration & Sequence Schema", () => {
     expect(room9.roomNumber).toBe(9);
     expect(room9.title).toBe("ROOM 09: THE IRON GATE");
     expect(room9.subtitle).toBe("Zone 2 Final Defense");
-    expect(room9.tacticalTip).toContain("6 enemy shield hits to break");
+    expect(room9.tacticalTip).toContain("4 enemy shield hits to break");
     expect(room9.enemies).toHaveLength(4);
 
     const wardens = room9.enemies.filter((e) => e.type === "warden");
@@ -590,6 +591,49 @@ describe("RoomManager Tactical Puzzle Progression", () => {
       expect(manager.getCurrentRoomIndex()).toBe(19);
       expect(manager.getCurrentRoom().roomNumber).toBe(20);
       expect(manager.endlessDirector).toBeUndefined();
+    });
+  });
+
+  describe("Cyberpunk Iris Portal Transition Integration", () => {
+    it("coordinates with PortalTransitionController to delay room advancement until midpoint", () => {
+      const manager = new RoomManager();
+      manager.setExitUnlocked(true);
+      const portal = manager.getCurrentRoom().exitPortal;
+      const playerPos = vec2(portal.x, portal.y);
+
+      expect(manager.isPlayerInExitPortal(playerPos)).toBe(true);
+
+      const transition = new PortalTransitionController({
+        ingressDuration: 0.14,
+        egressDuration: 0.14,
+      });
+
+      // Operative enters portal -> initiates ingress
+      transition.startIngress(portal);
+      expect(transition.isActive()).toBe(true);
+      expect(transition.getPhase()).toBe("ingress");
+      expect(manager.getCurrentRoomIndex()).toBe(0); // Still in room 1
+
+      // Advance halfway through ingress
+      transition.update(0.07, playerPos, () => {
+        manager.advanceRoom();
+        return manager.getCurrentRoom().playerSpawn;
+      });
+      expect(transition.getPhase()).toBe("ingress");
+      expect(manager.getCurrentRoomIndex()).toBe(0); // Still in room 1
+
+      // Advance remaining ingress to reach midpoint
+      transition.update(0.07, playerPos, () => {
+        manager.advanceRoom();
+        return manager.getCurrentRoom().playerSpawn;
+      });
+      expect(transition.getPhase()).toBe("egress");
+      expect(manager.getCurrentRoomIndex()).toBe(1); // Atomically advanced to room 2!
+
+      // Complete egress
+      transition.update(0.14, playerPos, () => {});
+      expect(transition.isActive()).toBe(false);
+      expect(transition.getPhase()).toBe("none");
     });
   });
 });

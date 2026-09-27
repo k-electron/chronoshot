@@ -454,23 +454,26 @@ export function renderSightline(
 export function renderEnemy(
   ctx: CanvasRenderingContext2D,
   enemy: RenderableEnemy,
-  targetPosition?: Vector2D
+  targetPosition?: Vector2D,
+  renderPosition?: Vector2D
 ): void {
   if (!enemy.isAlive) {
     return;
   }
 
+  const pos = renderPosition ?? enemy.position;
+
   // 1. Sightline / Charging Laser beam in world coordinates
   if (enemy.isChargingLaser || enemy.hasLineOfSight) {
     let target = targetPosition;
     if (!target) {
-      scratchTargetVec.x = enemy.position.x + Math.cos(enemy.aimAngle) * 400;
-      scratchTargetVec.y = enemy.position.y + Math.sin(enemy.aimAngle) * 400;
+      scratchTargetVec.x = pos.x + Math.cos(enemy.aimAngle) * 400;
+      scratchTargetVec.y = pos.y + Math.sin(enemy.aimAngle) * 400;
       target = scratchTargetVec;
     }
     renderSightline(
       ctx,
-      enemy.position,
+      pos,
       target,
       enemy.isChargingLaser ?? false,
       enemy.hasLineOfSight ?? false
@@ -479,7 +482,7 @@ export function renderEnemy(
 
   // 2. Radiant concentric shield rings and shield pips in world coordinates
   if (enemy.shields > 0) {
-    renderShieldAura(ctx, enemy.position, enemy.radius, enemy.shields, enemy.maxShields);
+    renderShieldAura(ctx, pos, enemy.radius, enemy.shields, enemy.maxShields);
   }
 
   // 3. Chassis body & weapon muzzles in local rotated coordinates
@@ -487,7 +490,7 @@ export function renderEnemy(
   const isEnraged = enemy.isEnraged ?? false;
 
   ctx.save();
-  ctx.translate(enemy.position.x, enemy.position.y);
+  ctx.translate(pos.x, pos.y);
   ctx.rotate(enemy.aimAngle);
 
   renderChassis(ctx, chassis, enemy.radius, isEnraged);
@@ -503,9 +506,10 @@ export class EnemyRenderer {
   public static render(
     ctx: CanvasRenderingContext2D,
     enemy: RenderableEnemy,
-    targetPosition?: Vector2D
+    targetPosition?: Vector2D,
+    renderPosition?: Vector2D
   ): void {
-    renderEnemy(ctx, enemy, targetPosition);
+    renderEnemy(ctx, enemy, targetPosition, renderPosition);
   }
 
   public static renderChassis = renderChassis;

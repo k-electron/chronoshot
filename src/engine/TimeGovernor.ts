@@ -33,8 +33,19 @@ export interface TimeGovernorConfig {
   /**
    * Smooth ramp rate (units per second) towards target scale.
    * If Infinity (default), time scale immediately reflects velocity.
+   * If specified, sets both rampUpRate and rampDownRate.
    */
   rampRate?: number;
+
+  /**
+   * Smooth ramp rate when accelerating/increasing time scale. Default: Infinity.
+   */
+  rampUpRate?: number;
+
+  /**
+   * Smooth ramp rate when decelerating/settling into slow-time. Default: Infinity (or 4.5 in combat arena).
+   */
+  rampDownRate?: number;
 }
 
 export class TimeGovernor {
@@ -42,7 +53,8 @@ export class TimeGovernor {
   private maxTimeScale: number;
   private fixedDeltaTime: number;
   private maxDeltaTime: number;
-  private rampRate: number;
+  private rampUpRate: number;
+  private rampDownRate: number;
   private timeScaleOverride: number | null = null;
 
   private currentTimeScale: number;
@@ -54,9 +66,38 @@ export class TimeGovernor {
     this.maxTimeScale = config?.maxTimeScale ?? 1.0;
     this.fixedDeltaTime = config?.fixedDeltaTime ?? 1 / 60;
     this.maxDeltaTime = config?.maxDeltaTime ?? 0.25;
-    this.rampRate = config?.rampRate ?? Infinity;
+
+    if (config?.rampRate !== undefined) {
+      this.rampUpRate = config.rampRate;
+      this.rampDownRate = config.rampRate;
+    } else {
+      this.rampUpRate = config?.rampUpRate ?? Infinity;
+      this.rampDownRate = config?.rampDownRate ?? Infinity;
+    }
 
     this.currentTimeScale = this.baselineTimeScale;
+  }
+
+  /**
+   * Returns active upward ramp rate towards higher velocity time scale.
+   */
+  public getRampUpRate(): number {
+    return this.rampUpRate;
+  }
+
+  /**
+   * Returns active downward settling ramp rate towards baseline slow-time.
+   */
+  public getRampDownRate(): number {
+    return this.rampDownRate;
+  }
+
+  /**
+   * Configures asymmetric ramp rates dynamically.
+   */
+  public setRampRates(upRate: number, downRate: number): void {
+    this.rampUpRate = upRate;
+    this.rampDownRate = downRate;
   }
 
   /**
@@ -81,11 +122,13 @@ export class TimeGovernor {
     }
 
     const target = this.calculateTargetTimeScale(currentSpeed, maxSpeed);
+    const isAccelerating = target >= this.currentTimeScale;
+    const rate = isAccelerating ? this.rampUpRate : this.rampDownRate;
 
-    if (this.rampRate === Infinity || wallDeltaTime <= 0) {
+    if (rate === Infinity || wallDeltaTime <= 0) {
       this.currentTimeScale = target;
     } else {
-      const step = this.rampRate * wallDeltaTime;
+      const step = rate * wallDeltaTime;
       const diff = target - this.currentTimeScale;
       if (Math.abs(diff) <= step) {
         this.currentTimeScale = target;

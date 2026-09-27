@@ -75,6 +75,38 @@ describe("TimeGovernor - Micro-Creep & Velocity Scaling", () => {
     governor.advance(0.1, 0, 100);
     expect(governor.getTimeScale()).toBeCloseTo(0.25, 4);
   });
+
+  it("supports asymmetric ramping: instant attack up, smooth settling decay down", () => {
+    // Immediate attack (Infinity), smooth decay of 4.5 units per second
+    const governor = new TimeGovernor({ rampUpRate: Infinity, rampDownRate: 4.5 });
+
+    // Full speed input immediately reaches 1.0 on first frame
+    governor.advance(0.016, 100, 100);
+    expect(governor.getTimeScale()).toBeCloseTo(1.0, 5);
+
+    // Player releases keys: speed drops to 0 (target 0.05)
+    // After 0.05s: drop = 4.5 * 0.05 = 0.225 -> timeScale = 1.0 - 0.225 = 0.775
+    governor.advance(0.05, 0, 100);
+    expect(governor.getTimeScale()).toBeCloseTo(0.775, 4);
+
+    // After another 0.1s: drop = 4.5 * 0.10 = 0.45 -> timeScale = 0.775 - 0.45 = 0.325
+    governor.advance(0.1, 0, 100);
+    expect(governor.getTimeScale()).toBeCloseTo(0.325, 4);
+
+    // Key re-pressed: immediately snaps back to 1.0
+    governor.advance(0.016, 100, 100);
+    expect(governor.getTimeScale()).toBeCloseTo(1.0, 5);
+  });
+
+  it("supports dynamically updating ramp rates via setRampRates", () => {
+    const governor = new TimeGovernor();
+    expect(governor.getRampUpRate()).toBe(Infinity);
+    expect(governor.getRampDownRate()).toBe(Infinity);
+
+    governor.setRampRates(10, 5);
+    expect(governor.getRampUpRate()).toBe(10);
+    expect(governor.getRampDownRate()).toBe(5);
+  });
 });
 
 describe("TimeGovernor - Action Tick Queuing", () => {

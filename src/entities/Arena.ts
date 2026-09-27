@@ -51,8 +51,16 @@ import { speedLoader } from "../upgrades/definitions/speedLoader";
 import { UpgradeDraftHUD } from "../ui/UpgradeDraftHUD";
 import { DefeatHUD } from "../ui/DefeatHUD";
 import { VictoryHUD } from "../ui/VictoryHUD";
+import { PortalTransitionController } from "../levels/PortalTransition";
 
 export type ArenaStatus = "playing" | "victory" | "defeat";
+
+export interface BossDefeatTransitionState {
+  active: boolean;
+  ticksRemaining: number;
+  totalTicks: number;
+  isFinalBoss: boolean;
+}
 
 export interface ArenaInput {
   moveDir: Vector2D;
@@ -96,6 +104,8 @@ export class Arena {
   public hoveredDefeatCardIndex: number | null = null;
   public hoveredVictoryCardIndex: number | null = null;
   public checkpointLoadouts: Map<number, string[]> = new Map();
+  public bossDefeatTransition?: BossDefeatTransitionState;
+  public portalTransition: PortalTransitionController = new PortalTransitionController();
 
   constructor(
     width = 960,
@@ -106,7 +116,7 @@ export class Arena {
     this.width = width;
     this.height = height;
 
-    this.timeGovernor = new TimeGovernor();
+    this.timeGovernor = new TimeGovernor({ rampUpRate: Infinity, rampDownRate: 4.5 });
     this.simulator = new FixedStepSimulator();
     this.particles = new ParticleSystem();
     this.reticle = new Reticle();
@@ -200,6 +210,10 @@ export class Arena {
     this.particles.clear();
     this.timeGovernor.reset();
     this.simulator.reset();
+    this.bossDefeatTransition = undefined;
+    if (!this.portalTransition.isActive()) {
+      this.portalTransition.reset();
+    }
 
     if (this.roomManager && !this.roomManager.isEndlessMode()) {
       this.endlessDirector = undefined;
@@ -406,6 +420,43 @@ export class Arena {
    * enforces 1-hit lethality, and monitors win/loss conditions.
    */
   public step(wallDeltaTime: number, input: ArenaInput): void {
+    // Keep visual particle simulations living during freeze-frame UI overlays
+    if (
+      this.status === "defeat" ||
+      this.status === "victory" ||
+      this.isUpgradeDraftActive ||
+      this.isPaused
+    ) {
+      this.particles.update(wallDeltaTime);
+    }
+
+    // Handle Cyberpunk Iris Portal Transition
+    if (this.portalTransition.isActive()) {
+      if (input.fullReset || input.restart) {
+        this.restart();
+        return;
+      }
+      this.particles.update(wallDeltaTime);
+      this.portalTransition.update(
+        wallDeltaTime,
+        this.player.position,
+        () => {
+          if (this.roomManager) {
+            if (this.roomManager.hasNextRoom()) {
+              this.roomManager.advanceRoom();
+              const nextRoom = this.roomManager.getCurrentRoom();
+              this.loadRoom(nextRoom);
+              return { x: nextRoom.playerSpawn.x, y: nextRoom.playerSpawn.y };
+            } else {
+              this.roomManager.advanceRoom();
+              this.status = "victory";
+            }
+          }
+        }
+      );
+      return;
+    }
+
     // In defeat state, track hovered defeat card and process defeat actions
     if (this.status === "defeat") {
       const roomNum = this.roomManager
@@ -573,17 +624,25 @@ export class Arena {
       }
     }
 
-    // Synchronize 1.00x real-time simulation during active reload channel
-    if (this.player.isReloading()) {
+    let activeSpeed: number;
+    if (this.bossDefeatTransition && this.bossDefeatTransition.active) {
+      const progress =
+        1 -
+        this.bossDefeatTransition.ticksRemaining /
+          this.bossDefeatTransition.totalTicks;
+      const decayScale = Math.max(0.12, 1.0 - progress * (1.0 - 0.12));
+      this.timeGovernor.setTimeScaleOverride(decayScale);
+      activeSpeed = this.player.maxSpeed;
+    } else if (this.player.isReloading()) {
       this.timeGovernor.setTimeScaleOverride(1.0);
-    } else if (this.timeGovernor.getTimeScaleOverride() !== null) {
-      this.timeGovernor.setTimeScaleOverride(null);
+      activeSpeed = this.player.maxSpeed;
+    } else {
+      if (this.timeGovernor.getTimeScaleOverride() !== null) {
+        this.timeGovernor.setTimeScaleOverride(null);
+      }
+      const inputSpeed = vecLength(input.moveDir) * this.player.maxSpeed;
+      activeSpeed = Math.max(this.player.getSpeed(), inputSpeed);
     }
-
-    const inputSpeed = vecLength(input.moveDir) * this.player.maxSpeed;
-    const activeSpeed = this.player.isReloading()
-      ? this.player.maxSpeed
-      : Math.max(this.player.getSpeed(), inputSpeed);
 
     // Fixed-step simulation coordinated through TimeGovernor
     this.simulator.stepWithGovernor(
@@ -601,6 +660,10 @@ export class Arena {
       this.soundSynth?.playShatter(this.timeGovernor.getTimeScale());
       this.particles.emitShatter(this.player.position, 22, "#00f0ff", 240);
       this.status = "defeat";
+      if (this.bossDefeatTransition) {
+        this.bossDefeatTransition.active = false;
+        this.timeGovernor.setTimeScaleOverride(null);
+      }
     }
 
     // Evaluate room clearance / exit portal status
@@ -617,13 +680,11 @@ export class Arena {
           this.player.radius
         )
       ) {
-        this.soundSynth?.playVictory(this.timeGovernor.getTimeScale());
-        if (this.roomManager.hasNextRoom()) {
-          this.roomManager.advanceRoom();
-          this.loadRoom(this.roomManager.getCurrentRoom());
-        } else {
-          this.roomManager.advanceRoom(); // Flags game completed
-          this.status = "victory";
+        if (!this.portalTransition.isActive()) {
+          this.soundSynth?.playVictory(this.timeGovernor.getTimeScale());
+          const portal = this.roomManager.getCurrentRoom().exitPortal;
+          this.player.velocity = vec2(0, 0);
+          this.portalTransition.startIngress({ x: portal.x, y: portal.y });
         }
       }
     }
@@ -729,6 +790,10 @@ export class Arena {
               this.soundSynth?.playShatter(this.timeGovernor.getTimeScale());
               this.particles.emitShatter(this.player.position, 22, "#00f0ff", 240);
               this.status = "defeat";
+              if (this.bossDefeatTransition) {
+                this.bossDefeatTransition.active = false;
+                this.timeGovernor.setTimeScaleOverride(null);
+              }
             } else {
               const enemy = hit.unit as Enemy;
               if (this.endlessDirector) {
@@ -741,13 +806,12 @@ export class Arena {
                   this.roomManager &&
                   (this.roomManager.getCurrentRoom().roomNumber === 20 ||
                     !this.roomManager.hasNextRoom());
-                if (isFinalBoss) {
-                  this.soundSynth?.playVictory(this.timeGovernor.getTimeScale());
-                  this.status = "victory";
-                  this.roomManager?.advanceRoom();
-                } else {
-                  this.openUpgradeDraft();
-                }
+                this.bossDefeatTransition = {
+                  active: true,
+                  ticksRemaining: 30,
+                  totalTicks: 30,
+                  isFinalBoss: !!isFinalBoss,
+                };
               } else {
                 this.soundSynth?.playShatter(this.timeGovernor.getTimeScale());
                 this.particles.emitShatter(hit.point, 18, "#ff2a44", 220);
@@ -773,6 +837,27 @@ export class Arena {
       this.soundSynth?.playShatter(this.timeGovernor.getTimeScale());
       this.particles.emitShatter(this.player.position, 22, "#00f0ff", 240);
       this.status = "defeat";
+      if (this.bossDefeatTransition) {
+        this.bossDefeatTransition.active = false;
+        this.timeGovernor.setTimeScaleOverride(null);
+      }
+    }
+
+    if (this.bossDefeatTransition && this.bossDefeatTransition.active) {
+      this.bossDefeatTransition.ticksRemaining--;
+      if (this.bossDefeatTransition.ticksRemaining <= 0) {
+        this.bossDefeatTransition.active = false;
+        this.timeGovernor.setTimeScaleOverride(null);
+        if (this.status === "playing" && this.player.isAlive) {
+          if (this.bossDefeatTransition.isFinalBoss) {
+            this.soundSynth?.playVictory(this.timeGovernor.getTimeScale());
+            this.status = "victory";
+            this.roomManager?.advanceRoom();
+          } else {
+            this.openUpgradeDraft();
+          }
+        }
+      }
     }
 
     // 6. Check exit portal stepping if room manager is active
@@ -799,14 +884,37 @@ export class Arena {
       }
     }
 
-    // 7. Prune eliminated enemies in Endless Mode to prevent unbounded array accumulation
+    // 7. Prune eliminated enemies in Endless Mode in place to avoid per-tick heap allocations
     if (this.endlessDirector) {
-      this.enemies = this.enemies.filter((e) => e.isAlive);
+      let writeIdx = 0;
+      let hasDead = false;
+      const count = this.enemies.length;
+      for (let i = 0; i < count; i++) {
+        const enemy = this.enemies[i];
+        if (enemy.isAlive) {
+          if (hasDead) {
+            this.enemies[writeIdx] = enemy;
+          }
+          writeIdx++;
+        } else {
+          hasDead = true;
+        }
+      }
+      if (hasDead) {
+        for (let i = writeIdx; i < count; i++) {
+          (this.enemies as any)[i] = undefined;
+        }
+        this.enemies.length = writeIdx;
+      }
     }
   }
 
   private checkVictoryCondition(): void {
-    if (this.isUpgradeDraftActive || this.endlessDirector) {
+    if (
+      this.bossDefeatTransition?.active ||
+      this.isUpgradeDraftActive ||
+      this.endlessDirector
+    ) {
       return;
     }
     const aliveEnemies = this.enemies.some((e) => e.isAlive);
@@ -827,6 +935,7 @@ export class Arena {
    * the exact augmentation set possessed upon initially entering that boss room.
    */
   public rollbackToCheckpoint(): void {
+    this.portalTransition.reset();
     this.hoveredDefeatCardIndex = null;
     if (!this.roomManager) {
       this.restart();
@@ -853,6 +962,8 @@ export class Arena {
    * Instantly restarts the combat room back to pristine initial setup (Full Run Reset).
    */
   public restart(): void {
+    this.portalTransition.reset();
+    this.bossDefeatTransition = undefined;
     this.checkpointLoadouts.clear();
     this.hoveredDefeatCardIndex = null;
     this.endlessDirector = undefined;
@@ -917,6 +1028,9 @@ export class Arena {
       ctx.strokeRect(obs.x, obs.y, obs.width, obs.height);
     }
 
+    // Query interpolation alpha
+    const alpha = Math.max(0, Math.min(1, this.timeGovernor.getAlpha()));
+
     // 3. Projectiles (with high-velocity luminous tracer trails)
     for (const bullet of this.projectiles) {
       const isPlayerBullet = bullet.owner === "player";
@@ -924,20 +1038,30 @@ export class Arena {
       ctx.fillStyle = "#ffffff";
       ctx.lineWidth = 2;
 
+      const headX =
+        bullet.previousPosition.x + (bullet.position.x - bullet.previousPosition.x) * alpha;
+      const headY =
+        bullet.previousPosition.y + (bullet.position.y - bullet.previousPosition.y) * alpha;
+
       ctx.beginPath();
       ctx.moveTo(bullet.previousPosition.x, bullet.previousPosition.y);
-      ctx.lineTo(bullet.position.x, bullet.position.y);
+      ctx.lineTo(headX, headY);
       ctx.stroke();
 
       ctx.beginPath();
-      ctx.arc(bullet.position.x, bullet.position.y, bullet.radius, 0, Math.PI * 2);
+      ctx.arc(headX, headY, bullet.radius, 0, Math.PI * 2);
       ctx.fill();
     }
 
     // 4. Cataclysm Hazard Warning Auras (for overloading bosses)
     for (const enemy of this.enemies) {
       if (enemy.isAlive && enemy.isOverloading) {
-        this.renderCataclysmAura(ctx, enemy);
+        const enemyRenderX =
+          enemy.previousPosition.x + (enemy.position.x - enemy.previousPosition.x) * alpha;
+        const enemyRenderY =
+          enemy.previousPosition.y + (enemy.position.y - enemy.previousPosition.y) * alpha;
+        const enemyRenderPos = { x: enemyRenderX, y: enemyRenderY };
+        this.renderCataclysmAura(ctx, enemy, enemyRenderPos);
       }
     }
 
@@ -951,14 +1075,27 @@ export class Arena {
     // Enemies (Crimson geometric polygons rendered via decoupled EnemyRenderer)
     for (const enemy of this.enemies) {
       if (enemy.isAlive) {
-        EnemyRenderer.render(ctx, enemy, this.player.position);
+        const enemyRenderX =
+          enemy.previousPosition.x + (enemy.position.x - enemy.previousPosition.x) * alpha;
+        const enemyRenderY =
+          enemy.previousPosition.y + (enemy.position.y - enemy.previousPosition.y) * alpha;
+        const enemyRenderPos = { x: enemyRenderX, y: enemyRenderY };
+        EnemyRenderer.render(ctx, enemy, this.player.position, enemyRenderPos);
       }
     }
 
     // 5. Player (Cyan directional circle, crosshair sightline, and ground chrono-anchor)
     if (this.player.isAlive) {
+      const playerRenderX =
+        this.player.previousPosition.x +
+        (this.player.position.x - this.player.previousPosition.x) * alpha;
+      const playerRenderY =
+        this.player.previousPosition.y +
+        (this.player.position.y - this.player.previousPosition.y) * alpha;
+      const playerRenderPos = { x: playerRenderX, y: playerRenderY };
+
       ChronoAnchorRenderer.render(ctx, {
-        position: this.player.position,
+        position: playerRenderPos,
         radius: this.player.radius,
         progress: this.player.getReloadProgress(),
         isReloading: this.player.isReloading(),
@@ -967,7 +1104,7 @@ export class Arena {
       if (this.player.shields > 0) {
         ctx.save();
         ctx.beginPath();
-        ctx.arc(this.player.position.x, this.player.position.y, this.player.radius + 6, 0, Math.PI * 2);
+        ctx.arc(playerRenderX, playerRenderY, this.player.radius + 6, 0, Math.PI * 2);
         ctx.strokeStyle = "rgba(0, 240, 255, 0.85)";
         ctx.lineWidth = 2;
         ctx.stroke();
@@ -975,7 +1112,7 @@ export class Arena {
       }
 
       ctx.save();
-      ctx.translate(this.player.position.x, this.player.position.y);
+      ctx.translate(playerRenderX, playerRenderY);
       ctx.rotate(this.player.aimAngle);
 
       // Body circle
@@ -1047,7 +1184,7 @@ export class Arena {
         ctx.restore();
       }
 
-      if (!this.isUpgradeDraftActive && !this.isPaused) {
+      if (!this.isUpgradeDraftActive && !this.isPaused && !this.portalTransition.isActive()) {
         this.reticle.update(wallDeltaTime);
         this.reticle.render(
           ctx,
@@ -1058,6 +1195,9 @@ export class Arena {
         );
       }
     }
+
+    // Cyberpunk Iris Portal Transition aperture
+    this.portalTransition.render(ctx, this.width, this.height);
 
     // Upgrade Draft Overlay
     if (this.isUpgradeDraftActive) {
@@ -1371,9 +1511,13 @@ export class Arena {
   /**
    * Renders pulsating hazard aura around boss during Cataclysm Overload channel.
    */
-  public renderCataclysmAura(ctx: CanvasRenderingContext2D, enemy: Enemy): void {
+  public renderCataclysmAura(
+    ctx: CanvasRenderingContext2D,
+    enemy: Enemy,
+    renderPosition?: Vector2D
+  ): void {
     ctx.save();
-    const pos = enemy.position;
+    const pos = renderPosition ?? enemy.position;
     const pulse = Math.sin(enemy.overloadTicksRemaining * 0.3) * 6;
     const auraRadius = Math.max(1, enemy.radius * 3.5 + pulse);
 

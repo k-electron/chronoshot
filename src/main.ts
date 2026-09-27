@@ -22,12 +22,20 @@ window.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
+  // High-DPI canvas backing store buffer scaling
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  canvas.width = Math.round(960 * dpr);
+  canvas.height = Math.round(640 * dpr);
+  canvas.style.width = "960px";
+  canvas.style.height = "640px";
+  ctx.scale(dpr, dpr);
+
   const urlParams = new URLSearchParams(window.location.search);
   const shouldSkipCampaign = urlParams.has("skip");
 
   const roomManager = new RoomManager();
   const soundSynth = new SoundSynthesizer();
-  const arena = new Arena(canvas.width, canvas.height, roomManager, soundSynth);
+  const arena = new Arena(960, 640, roomManager, soundSynth);
 
   if (shouldSkipCampaign) {
     arena.bypassToCampaignVictory();
@@ -42,7 +50,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // Input state
   const keysDown = new Set<string>();
-  let mousePos = vec2(canvas.width / 2, canvas.height / 2);
+  let mousePos = vec2(480, 320);
   let shootRequested = false;
   let reloadRequested = false;
   let dashRequested = false;
@@ -56,8 +64,8 @@ window.addEventListener("DOMContentLoaded", () => {
   // Window coordinate mapping for canvas scaling
   function getCanvasCoords(event: MouseEvent): { x: number; y: number } {
     const rect = canvas!.getBoundingClientRect();
-    const scaleX = canvas!.width / rect.width;
-    const scaleY = canvas!.height / rect.height;
+    const scaleX = 960 / rect.width;
+    const scaleY = 640 / rect.height;
     return {
       x: (event.clientX - rect.left) * scaleX,
       y: (event.clientY - rect.top) * scaleY,

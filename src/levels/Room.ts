@@ -466,7 +466,7 @@ export function createRoom8(width = 960, height = 640): RoomConfig {
 
 /**
  * Room 9: The Iron Gate (Zone 2 Final Defense: Dual Wardens + Marksman + Stalker).
- * Requires careful ammunition budgeting to deplete 6 total enemy shields and neutralize hostiles.
+ * Requires careful ammunition budgeting to deplete 4 total enemy shields and neutralize hostiles.
  */
 export function createRoom9(width = 960, height = 640): RoomConfig {
   return {
@@ -475,7 +475,7 @@ export function createRoom9(width = 960, height = 640): RoomConfig {
     title: "ROOM 09: THE IRON GATE",
     subtitle: "Zone 2 Final Defense",
     tacticalTip:
-      "6 enemy shield hits to break. Budget your ammunition and maintain distance from the warden pair.",
+      "4 enemy shield hits to break. Budget your ammunition and maintain distance from the warden pair.",
     playerSpawn: vec2(140, height / 2),
     obstacles: [
       ...createPerimeterWalls(width, height),

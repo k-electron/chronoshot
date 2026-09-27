@@ -26,21 +26,32 @@ ChronoShot is deliberately engineered without heavy third-party game engines (no
 - **`FixedStepSimulator`**: Executes discrete 60 Hz physics quanta (`fixedDeltaTime = 1 / 60`).
 - **`TimeGovernor`**: Governs global time dilation:
   - **Micro-Creep**: 5% simulation velocity (`0.05x`) when player is stationary.
-  - **Movement Scaling**: Smoothly accelerates time scale up to 100% (`1.00x`) proportional to player movement velocity.
+  - **Asymmetric Movement Scaling & Doppler Glide**: Instant attack (`rampUpRate = Infinity`) when accelerating via WASD to guarantee zero twitch dodging latency, coupled with an asymmetric smooth settling decay curve (`rampDownRate = 4.5/s`, ~200ms duration) down to the 5% baseline upon key release.
   - **Action Tick Bursts & Anchored Real-Time Reload**:
     - Fire weapon: `+6` simulation ticks (instantaneous recoil burst).
     - Reload weapon: Smooth multi-frame real-time channel (`1.00x` speed) spanning 30 simulation ticks (15 with Speed Loader) while player locomotion is anchored (`velocity = 0`) with 360-degree aiming freedom, sequential chamber loading, and emergency Dash breakout with partial ammo retention.
+- **Sub-Tick Render Interpolation (`lerp(previousPosition, position, alpha)`)**:
+  - `Arena.render()` queries the sub-tick fractional accumulator `alpha = timeGovernor.getAlpha()` ($[0, 1)$) and interpolates visual render coordinates for Player, Enemies, and Projectile tracer heads/tails:
+    $$\vec{p}_{\text{render}} = \vec{p}_{\text{prev}} \cdot (1 - \alpha) + \vec{p}_{\text{curr}} \cdot \alpha$$
+  - Provides judder-free visual motion across 60Hz, 120Hz, 144Hz, 240Hz, and VRR displays while preserving deterministic 60 Hz fixed-step physics.
+- **High-DPI Retina/4K Backing Store Scaling**: Canvas backing pixel buffer scales dynamically with $\min(\text{devicePixelRatio}, 3)$ via `ctx.scale(dpr, dpr)` in `src/main.ts`, delivering razor-sharp hairline HUD vectors while preserving exact $960 \times 640$ virtual coordinate mouse targeting.
+- **Persistent Wall-Clock Particle Simulation**: Visual debris, crystalline shatter shards, and deflection sparks continue updating in wall-clock time (`particles.update(wallDeltaTime)`) during UI overlays (Upgrade Draft, Pause, Defeat, Victory) so particles drift and dissipate naturally rather than freezing mid-air.
 - **`Arena`**: Coordinates entities (`Player`, `Enemy`, `Obstacle`, `Projectile`, `ParticleSystem`), dynamic entity instantiation (`spawnEnemy`), collision passes, and room progression with unified player elimination lifecycle checks.
 
 ### 2. Continuous Collision Detection (CCD) Ballistics & Shield Durability
 - High-velocity projectiles must never tunnel through obstacles or hitboxes during discrete tick jumps.
 - Projectiles cast raycast line segments between `previousPosition` and `position` against obstacle bounds and unit circles on every tick.
 - **Hit-Count Shields**: Units with energy shields absorb discrete bullet impacts via `takeDamage()`, producing procedural deflection sparks and pings before suffering lethal elimination.
+- **Boss Defeat Slow-Motion Decay & Ballistics Peril ("No Free Pass" Rule)**:
+  - When a milestone boss hull is destroyed, `Arena` initiates a 30-tick (~500–600ms) slow-motion collapse (`bossDefeatTransition`) decaying time dilation smoothly from $1.00\text{x}$ down to $0.12\text{x}$.
+  - In-flight hostile projectiles and hazards remain fully simulated, live, and lethal during the collapse.
+  - Upgrade Draft HUD (Rooms 5, 10, 15) and Campaign Victory HUD (Room 20) are deferred until the collapse finishes.
+  - If a lingering bullet strikes an unshielded player during the collapse, player elimination (`status = "defeat"`) aborts reward presentation immediately.
 
 ### 3. Procedural Audio (Zero External Asset Files)
 - All sound effects (gunfire, reload clicks, bullet wall impacts, shield deflections, shield breaks, sniper laser charging, enemy shatters, victory fanfare) are synthesized programmatically using the browser Web Audio API via `SoundSynthesizer`.
 - **Never add external audio binaries (`.mp3`, `.wav`, `.ogg`)**.
-- Audio pitch and duration scale dynamically with `TimeGovernor.getTimeScale()` (e.g. deep sub-bass pitch drop during micro-creep).
+- Audio pitch and duration smoothly glide along `TimeGovernor.getTimeScale()` continuously without pitch stepping (e.g. deep sub-bass pitch drop during micro-creep).
 
 ### 4. 20px Grid A* Pathfinding & Modular Boss Phase Engine
 - **`GridPathfinder`**: Discrete $48 \times 32$ tile-grid A* with entity radius obstacle inflation and cell-center containment at unit's true radius navigates around walls and pillars when line-of-sight is blocked, featuring dual-sided endpoint snapping (`findNearestWalkable`) to prevent deadlocks when starting adjacent to obstacles.
@@ -76,6 +87,11 @@ ChronoShot is deliberately engineered without heavy third-party game engines (no
   - Final boss Chrono-Zenith (Room 20) bypasses intermediate drafts upon elimination and immediately triggers the Campaign Victory HUD (`status = "victory"` and `roomManager.advanceRoom()`, marking `isGameCompleted = true`).
   - Selecting **Endless Protocol** on the Victory HUD deploys into Endless Survival Mode in the Apex Colosseum with full loadout injection (all 7 upgrades equipped, 3 shields, 8 rounds).
 - **`EndlessDirector` & `ApexColosseumTemplate`**: Survival mode wave coordinator dynamically tracking active threat load against a climbing simulation threat budget ($50 + \lfloor \text{ticks}/120 \rfloor \times 5$), safely filtering spatial candidates ($\ge 350\text{px}$ from player, $\ge 48\text{px}$ unit clearance, zero obstacle overlap), and queuing 30-tick visual telegraph rings before unit materialization. Self-contains archetype threat costs (`THREAT_COSTS`) and cadence timings (`ARCHETYPE_CONFIGS`).
+- **Cyberpunk Iris Portal Transition (`PortalTransitionController`)**:
+  - Unlocked exit gate passage triggers a continuous geometric aperture transition (~280ms wall time) rather than an instantaneous scene cut.
+  - **Ingress Phase (~140ms)**: Smoothly pulls operative toward portal center via cubic ease-in-out magnetic convergence while an octagonal aperture contracts inward to zero radius.
+  - **Atomic Midpoint Swap**: When the aperture closes, `RoomManager.advanceRoom()` and `Arena.loadRoom()` atomically initialize the subsequent room layout, preserving full game state.
+  - **Egress Phase (~140ms)**: The octagonal aperture expands outward from the new room's `playerSpawn` coordinates, framed with radiant cyan `#00f0ff` outlines and 8 hairline corner blade accents, restoring full player locomotion upon completion.
 - **Playtest Campaign Bypass (`?skip`)**: Fast developer/playtest hook (`Arena.bypassToCampaignVictory()`) activated via the `?skip` URL query parameter. Directly initializes the operative into the post-Zenith campaign victory screen with completed Room 20 status, pre-Zenith loadout (Extended Cylinder, Speed Loader, Reactive Shield), historical checkpoint snapshots (Rooms 5, 10, 15, 20), and fully functional interactive cards for Endless Protocol and Expedition Reset.
 
 ---
@@ -113,7 +129,7 @@ npm run dev
    - Use mock Canvas 2D contexts (`createMockContext()`) with `vi.fn()` for rendering tests.
    - Use mock audio contexts to verify audio trigger calls without requiring real audio devices.
 3. **Keep Tests Fast & Deterministic**:
-   - The entire suite (712+ tests) runs in under 900ms. Avoid arbitrary `setTimeout` or wall-clock waits in tests.
+   - The entire suite (740+ tests) runs in ~1.0s. Avoid arbitrary `setTimeout` or wall-clock waits in tests.
 
 ---
 

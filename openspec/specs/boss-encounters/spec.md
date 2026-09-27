@@ -147,6 +147,21 @@ The boss combat system SHALL support the Chrono-Zenith Zero Sovereign milestone 
 
 #### Scenario: Destruction of Chrono-Zenith core
 - **WHEN** a player projectile strikes Chrono-Zenith's exposed core in phase four
-- **THEN** the boss is eliminated with a radiant geometric particle supernova, triggers victory audio fanfare, suppresses intermediate upgrade drafts, and immediately activates the campaign victory sequence
+- **THEN** the boss begins an active slow-motion supernova collapse with living projectile ballistics, triggers victory audio fanfare, suppresses intermediate upgrade drafts, and smoothly transitions to the campaign victory sequence upon completion of the collapse
+
+### Requirement: Boss Defeat Continuous Slow-Motion Decay and Ballistic Peril
+When a milestone boss entity's final health/shield layer is depleted, the combat arena SHALL enter an active slow-motion disintegration sequence (~400–600ms wall time) rather than instantly freezing the simulation or immediately opening reward menus. During this slow-motion collapse, all in-flight boss projectiles and active hazards SHALL remain live, simulating, and lethal to the player, enforcing continuous ballistic evasion. If the player survives the slow-motion aftermath until the boss shatter fully clears, the combat arena SHALL then smoothly transition to the Upgrade Draft HUD (Rooms 5, 10, 15) or Campaign Victory HUD (Room 20). If a lingering projectile strikes the player during the collapse, standard damage, shield deflection, and player elimination rules SHALL apply.
+
+#### Scenario: Active ballistic simulation during boss disintegration
+- **WHEN** a milestone boss suffers lethal elimination while hostile projectiles remain in flight
+- **THEN** the combat arena initiates a continuous slow-motion collapse, procedural shatter debris expands from the boss hull, and all in-flight projectiles continue moving and resolving collision checks against the player
+
+#### Scenario: Player eliminated by lingering boss fire during defeat decay
+- **WHEN** an in-flight boss projectile strikes the player during the boss defeat slow-motion sequence with 0 shields remaining
+- **THEN** the player is eliminated, the arena aborts reward presentation, and transitions to the defeat state
+
+#### Scenario: Smooth transition to reward presentation after ballistic clearing
+- **WHEN** the slow-motion collapse completes and the player has survived all active projectile hazards
+- **THEN** the combat arena smoothly brings up the Upgrade Draft HUD (for intermediate bosses) or Campaign Victory HUD (for final boss) over living, drifting background debris
 
 

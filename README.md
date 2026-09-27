@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg)](https://vitejs.dev/)
-[![Tests](https://img.shields.io/badge/Tests-712%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-740%20passing-brightgreen.svg)]()
 
 ---
 
@@ -119,9 +119,9 @@ Powered by a decoupled data-driven architecture (`UpgradePipeline`, `UpgradeRegi
   - **Room 06 (`BREACH PROTOCOL`)**: Zone 2 baseline launch with dual Stalker pincer sprint + Shotgun Guard suppression.
   - **Room 07 (`CROSSFIRE CORRIDOR`)**: Dual Marksman Snipers holding crisscrossing sightlines while an Aegis Warden advances.
   - **Room 08 (`KILLBOX ENCLOSURE`)**: High-density 5-enemy squad in a tight pillbox arena forcing tactical reloading.
-  - **Room 09 (`THE IRON GATE`)**: Climax with dual Aegis Wardens, Marksman sniper, and Stalker rusher requiring 6 total shield breaks.
+  - **Room 09 (`THE IRON GATE`)**: Climax with dual Aegis Wardens, Marksman sniper, and Stalker rusher requiring 4 total shield breaks.
   - **Room 10 (`CHRONO-WEAVER`)**: Milestone Boss 2 (Temporal Anchor) pairing precision standoff laser beams in Phase 1 with 360-degree radial novae and Stalker summons in Phase 2, triggering Upgrade Draft 2.
-  - **Room 11 (`VANGUARD BREACH`)**: Sector 3 entry calibration testing 2-upgrade builds against Warden, Shotgun, and Stalker vanguard squads.
+  - **Room 11 (`VANGUARD BREACH`)**: Sector 3 entry calibration testing 2-upgrade builds against combined vanguard forces (Warden, dual Shotgun Guards, Stalker, and Grunts with 4 total shields).
   - **Room 12 (`TWIN BUNKER CROSSFIRE`)**: Multi-shield siege featuring dual advancing Wardens pinned by perimeter snipers.
   - **Room 13 (`SPLIT FLANK MATRIX`)**: Corridor containment preventing dual high-speed Stalker pincer rushes.
   - **Room 14 (`THE CRUCIBLE`)**: Peak pre-boss gauntlet testing full mastery across Wardens, Snipers, Shotguns, and Stalkers.
@@ -237,7 +237,7 @@ npm run preview
 
 ### Continuous Integration & Cloudflare Pages Hosting
 
-- **GitHub Actions**: Automated CI (`.github/workflows/ci.yml`) runs on all pull requests and pushes to `main`. It validates dependencies, TypeScript compilation, Vite production build, and all 712 Vitest unit & integration tests under Node 26.
+- **GitHub Actions**: Automated CI (`.github/workflows/ci.yml`) runs on all pull requests and pushes to `main`. It validates dependencies, TypeScript compilation, Vite production build, and all 740 Vitest unit & integration tests under Node 26.
 - **Cloudflare Pages Hosting**:
   1. In the [Cloudflare Dashboard](https://dash.cloudflare.com/), go to **Workers & Pages** > **Create application** > **Pages** > **Connect to Git**.
   2. Select the `k-electron/chronoshot` repository.

@@ -426,5 +426,51 @@ describe("EnemyRenderer", () => {
       // Octagon + inner core + enrage ring
       expect(ctx.translate).toHaveBeenCalledWith(400, 300);
     });
+
+    it("uses renderPosition for translation, sightline origin, and shield aura when provided", () => {
+      const enemy: RenderableEnemy = {
+        isAlive: true,
+        position: vec2(100, 100),
+        aimAngle: 0,
+        radius: 16,
+        shields: 2,
+        maxShields: 2,
+        chassis: "diamond",
+        isChargingLaser: true,
+      };
+
+      const renderPos = vec2(120, 140);
+      const target = vec2(300, 140);
+
+      EnemyRenderer.render(ctx, enemy, target, renderPos);
+
+      // Verify translation used renderPos instead of enemy.position
+      expect(ctx.translate).toHaveBeenCalledWith(120, 140);
+      expect(ctx.translate).not.toHaveBeenCalledWith(100, 100);
+
+      // Verify sightline origin used renderPos
+      expect(ctx.moveTo).toHaveBeenCalledWith(120, 140);
+      expect(ctx.lineTo).toHaveBeenCalledWith(300, 140);
+
+      // Verify shield aura origin used renderPos
+      expect(ctx.arc).toHaveBeenCalledWith(120, 140, 16 + 5, 0, Math.PI * 2);
+    });
+
+    it("falls back to enemy.position when renderPosition is omitted", () => {
+      const enemy: RenderableEnemy = {
+        isAlive: true,
+        position: vec2(100, 100),
+        aimAngle: 0,
+        radius: 16,
+        shields: 1,
+        maxShields: 1,
+        chassis: "diamond",
+      };
+
+      EnemyRenderer.render(ctx, enemy);
+
+      expect(ctx.translate).toHaveBeenCalledWith(100, 100);
+      expect(ctx.arc).toHaveBeenCalledWith(100, 100, 16 + 5, 0, Math.PI * 2);
+    });
   });
 });

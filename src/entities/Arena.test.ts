@@ -7,6 +7,37 @@ import { createObstacle } from "./Obstacle";
 import { createProjectile } from "./Projectile";
 import { RoomManager } from "../levels/RoomManager";
 import { CHRONO_ZENITH_BLUEPRINT } from "./boss/BossBlueprint";
+import { ChronoAnchorRenderer } from "../ui/ChronoAnchorRenderer";
+import { EnemyRenderer } from "../ui/EnemyRenderer";
+
+function createMockCanvasContext(): CanvasRenderingContext2D {
+  return {
+    save: vi.fn(),
+    restore: vi.fn(),
+    beginPath: vi.fn(),
+    closePath: vi.fn(),
+    arc: vi.fn(),
+    fill: vi.fn(),
+    stroke: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    fillRect: vi.fn(),
+    strokeRect: vi.fn(),
+    fillText: vi.fn(),
+    translate: vi.fn(),
+    rotate: vi.fn(),
+    setLineDash: vi.fn(),
+    createLinearGradient: vi.fn().mockReturnValue({ addColorStop: vi.fn() }),
+    createRadialGradient: vi.fn().mockReturnValue({ addColorStop: vi.fn() }),
+    measureText: vi.fn().mockReturnValue({ width: 50 }),
+    fillStyle: "#000000",
+    strokeStyle: "#000000",
+    lineWidth: 1,
+    textAlign: "left",
+    textBaseline: "top",
+    font: "10px monospace",
+  } as unknown as CanvasRenderingContext2D;
+}
 
 describe("Combat Arena & Room Loop", () => {
   it("initializes arena with player, tactical obstacles, enemies, and HUDs", () => {
@@ -204,7 +235,7 @@ describe("Combat Arena & Room Loop", () => {
     const portal = arena.roomManager!.getCurrentRoom().exitPortal;
     arena.player.position = vec2(portal.x, portal.y);
 
-    // Step simulation: triggers portal enter and loads Room 2
+    // Step simulation: triggers portal enter and initiates cyberpunk iris transition
     arena.step(0.016, {
       moveDir: vec2(0, 0),
       mousePos: vec2(500, 320),
@@ -213,10 +244,118 @@ describe("Combat Arena & Room Loop", () => {
       restart: false,
     });
 
-    // Successfully transitioned to Room 2!
+    // Portal transition is active in ingress phase, room has not swapped yet
+    expect(arena.portalTransition.isActive()).toBe(true);
+    expect(arena.portalTransition.getPhase()).toBe("ingress");
+    expect(arena.roomManager?.getCurrentRoomIndex()).toBe(0);
+
+    // Advance through ingress duration (0.14s) to trigger atomic room swap at midpoint
+    arena.step(0.14, {
+      moveDir: vec2(0, 0),
+      mousePos: vec2(500, 320),
+      shoot: false,
+      reload: false,
+      restart: false,
+    });
+
+    // Midpoint triggered: successfully transitioned to Room 2 and entered egress!
     expect(arena.roomManager?.getCurrentRoomIndex()).toBe(1);
     expect(arena.enemies).toHaveLength(2); // Room 2 has 2 grunts
     expect(arena.roomManager?.isExitUnlocked()).toBe(false); // Locked for Room 2
+    expect(arena.portalTransition.getPhase()).toBe("egress");
+
+    // Advance through egress duration (0.14s) to complete transition
+    arena.step(0.14, {
+      moveDir: vec2(0, 0),
+      mousePos: vec2(500, 320),
+      shoot: false,
+      reload: false,
+      restart: false,
+    });
+    expect(arena.portalTransition.isActive()).toBe(false);
+    expect(arena.portalTransition.getPhase()).toBe("none");
+  });
+
+  it("suppresses weapon fire and locks controls while portal transition is active", () => {
+    const roomManager = new RoomManager();
+    const arena = new Arena(960, 640, roomManager);
+    arena.enemies[0].kill();
+    arena.step(0.016, {
+      moveDir: vec2(0, 0),
+      mousePos: vec2(500, 320),
+      shoot: false,
+      reload: false,
+      restart: false,
+    });
+
+    const portal = arena.roomManager!.getCurrentRoom().exitPortal;
+    arena.player.position = vec2(portal.x, portal.y);
+
+    // Step into portal -> initiates transition
+    arena.step(0.016, {
+      moveDir: vec2(0, 0),
+      mousePos: vec2(500, 320),
+      shoot: false,
+      reload: false,
+      restart: false,
+    });
+    expect(arena.portalTransition.isActive()).toBe(true);
+
+    const initialAmmo = arena.player.weapon.getAmmo();
+    // Attempt to shoot while in portal transition
+    arena.step(0.016, {
+      moveDir: vec2(1, 0),
+      mousePos: vec2(600, 320),
+      shoot: true,
+      reload: false,
+      restart: false,
+    });
+
+    // Weapon fire suppressed, no projectiles created
+    expect(arena.player.weapon.getAmmo()).toBe(initialAmmo);
+    expect(arena.projectiles).toHaveLength(0);
+  });
+
+  it("renders cyberpunk iris transition and suppresses hardware reticle during transit", () => {
+    const mockCtx = {
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      arc: vi.fn(),
+      rect: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+      fillRect: vi.fn(),
+      strokeRect: vi.fn(),
+      fillText: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      closePath: vi.fn(),
+      translate: vi.fn(),
+      rotate: vi.fn(),
+      setLineDash: vi.fn(),
+      createLinearGradient: vi.fn().mockReturnValue({ addColorStop: vi.fn() }),
+      createRadialGradient: vi.fn().mockReturnValue({ addColorStop: vi.fn() }),
+    } as unknown as CanvasRenderingContext2D;
+
+    const arena = new Arena();
+    arena.portalTransition.startIngress(vec2(480, 320));
+    expect(arena.portalTransition.isActive()).toBe(true);
+
+    arena.render(mockCtx, 0.016);
+    // Iris shroud rendered
+    expect(mockCtx.rect).toHaveBeenCalledWith(0, 0, 960, 640);
+    expect(mockCtx.fill).toHaveBeenCalledWith("evenodd");
+  });
+
+  it("resets portal transition when arena is restarted", () => {
+    const arena = new Arena();
+    arena.portalTransition.startIngress(vec2(480, 320));
+    expect(arena.portalTransition.isActive()).toBe(true);
+
+    arena.restart();
+    expect(arena.portalTransition.isActive()).toBe(false);
+    expect(arena.portalTransition.getPhase()).toBe("none");
   });
 
   it("triggers procedural audio synthesis on shooting, dry-fire, and reload", async () => {
@@ -584,6 +723,16 @@ describe("Combat Arena & Room Loop", () => {
       restart: false,
     });
 
+    while (arena.bossDefeatTransition?.active) {
+      arena.step(0.016, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(500, 320),
+        shoot: false,
+        reload: false,
+        restart: false,
+      });
+    }
+
     expect(boss!.isAlive).toBe(false);
     expect(arena.isUpgradeDraftActive).toBe(true);
 
@@ -802,6 +951,16 @@ describe("Combat Arena & Room Loop", () => {
         restart: false,
       });
 
+      while (arena.bossDefeatTransition?.active) {
+        arena.step(0.016, {
+          moveDir: vec2(0, 0),
+          mousePos: vec2(500, 320),
+          shoot: false,
+          reload: false,
+          restart: false,
+        });
+      }
+
       // Zenith is eliminated and triggers immediate campaign victory without intermediate draft
       expect(zenith!.isAlive).toBe(false);
       expect(arena.isUpgradeDraftActive).toBe(false);
@@ -880,6 +1039,16 @@ describe("Combat Arena & Room Loop", () => {
         reload: false,
         restart: false,
       });
+
+      while (arena.bossDefeatTransition?.active) {
+        arena.step(0.016, {
+          moveDir: vec2(0, 0),
+          mousePos: vec2(500, 320),
+          shoot: false,
+          reload: false,
+          restart: false,
+        });
+      }
 
       expect(arena.status).toBe("victory");
 
@@ -1090,6 +1259,74 @@ describe("Combat Arena & Room Loop", () => {
       expect(arena.enemies).not.toContain(deadEnemy);
       expect(arena.enemies).toContain(livingEnemy);
       expect(arena.enemies.every((e) => e.isAlive)).toBe(true);
+    });
+
+    it("prunes dead enemies in place without reallocating enemies array during Endless Mode fixedUpdate", () => {
+      const arena = new Arena();
+      arena.startEndlessMode();
+
+      // Clear any dynamic spawns for clean test baseline
+      arena.enemies = [];
+
+      const livingEnemy1 = new Enemy({
+        id: "living-1",
+        type: "grunt",
+        x: 600,
+        y: 300,
+        radius: 15,
+        fireCadenceTicks: 100,
+      });
+
+      const deadEnemy = new Enemy({
+        id: "dead-1",
+        type: "grunt",
+        x: 650,
+        y: 300,
+        radius: 15,
+        fireCadenceTicks: 100,
+      });
+      deadEnemy.isAlive = false;
+
+      const livingEnemy2 = new Enemy({
+        id: "living-2",
+        type: "grunt",
+        x: 700,
+        y: 300,
+        radius: 15,
+        fireCadenceTicks: 100,
+      });
+
+      arena.enemies.push(livingEnemy1, deadEnemy, livingEnemy2);
+      const originalArrayRef = arena.enemies;
+
+      // Step simulation
+      for (let i = 0; i < 3; i++) {
+        arena.step(0.016, {
+          moveDir: vec2(1, 0),
+          mousePos: vec2(500, 320),
+          shoot: false,
+          reload: false,
+          restart: false,
+        });
+      }
+
+      // In-place compaction must preserve array reference identity
+      expect(arena.enemies).toBe(originalArrayRef);
+      expect(arena.enemies).toHaveLength(2);
+      expect(arena.enemies[0]).toBe(livingEnemy1);
+      expect(arena.enemies[1]).toBe(livingEnemy2);
+      expect(arena.enemies).not.toContain(deadEnemy);
+
+      // Subsequent steps with all-living enemies also preserve reference identity
+      arena.step(0.016, {
+        moveDir: vec2(1, 0),
+        mousePos: vec2(500, 320),
+        shoot: false,
+        reload: false,
+        restart: false,
+      });
+      expect(arena.enemies).toBe(originalArrayRef);
+      expect(arena.enemies).toHaveLength(2);
     });
 
     it("renders Cataclysm hazard aura and materialization telegraph without throwing", () => {
@@ -1909,6 +2146,518 @@ describe("Combat Arena & Room Loop", () => {
       expect(enemy.position.x).toBeLessThanOrEqual(arena.width - enemy.radius);
       expect(enemy.position.y).toBeGreaterThanOrEqual(enemy.radius);
       expect(enemy.position.y).toBeLessThanOrEqual(arena.height - enemy.radius);
+    });
+
+    it("continues updating visual particle simulation in wall-clock time during upgrade draft", () => {
+      const arena = new Arena(960, 640);
+      arena.particles.emitShatter(vec2(300, 300), 10, "#ff2a44", 200);
+      expect(arena.particles.getCount()).toBe(10);
+      const initialLifetime = arena.particles.getParticles()[0].lifetime;
+      const initialX = arena.particles.getParticles()[0].position.x;
+      const initialY = arena.particles.getParticles()[0].position.y;
+
+      // Open upgrade draft
+      arena.openUpgradeDraft();
+      expect(arena.isUpgradeDraftActive).toBe(true);
+
+      // Step arena with wallDeltaTime 0.1s
+      arena.step(0.1, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(480, 320),
+        shoot: false,
+        reload: false,
+        restart: false,
+      });
+
+      const p0 = arena.particles.getParticles()[0];
+      expect(p0.lifetime).toBeCloseTo(initialLifetime - 0.1, 4);
+      // Particle position must have advanced
+      const moved = p0.position.x !== initialX || p0.position.y !== initialY;
+      expect(moved).toBe(true);
+    });
+
+    it("continues updating visual particle simulation in wall-clock time during victory state", () => {
+      const arena = new Arena(960, 640);
+      arena.status = "victory";
+      arena.particles.emitShatter(vec2(400, 400), 8, "#00f0ff", 220);
+      const initialLifetime = arena.particles.getParticles()[0].lifetime;
+
+      arena.step(0.05, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(480, 320),
+        shoot: false,
+        reload: false,
+        restart: false,
+      });
+
+      const p0 = arena.particles.getParticles()[0];
+      expect(p0.lifetime).toBeCloseTo(initialLifetime - 0.05, 4);
+    });
+  });
+
+  describe("Boss Defeat Slow-Motion Decay & Ballistics Peril", () => {
+    it("initiates bossDefeatTransition upon lethal boss hit, slows time smoothly, and defers upgrade draft until 30-tick collapse completes", () => {
+      const arena = new Arena(960, 640);
+      arena.obstacles = [];
+      arena.enemies = [];
+      const boss = new Enemy({
+        id: "boss-goliath",
+        type: "boss",
+        isBoss: true,
+        x: 600,
+        y: 320,
+        radius: 24,
+      });
+      if (boss.phaseController) {
+        boss.phaseController.currentPhaseIndex = 1;
+      }
+      boss.shields = 0;
+      arena.enemies = [boss];
+
+      const lethalShot = createProjectile(
+        "lethal-shot",
+        vec2(550, 320),
+        0,
+        1000,
+        "player"
+      );
+      arena.projectiles.push(lethalShot);
+
+      // Deliver lethal shot
+      arena.step(0.05, {
+        moveDir: vec2(1, 0),
+        mousePos: vec2(600, 320),
+        shoot: false,
+        reload: false,
+        restart: false,
+      });
+
+      expect(boss.isAlive).toBe(false);
+      expect(arena.bossDefeatTransition).toBeDefined();
+      expect(arena.bossDefeatTransition!.active).toBe(true);
+      expect(arena.bossDefeatTransition!.totalTicks).toBe(30);
+      expect(arena.bossDefeatTransition!.ticksRemaining).toBeLessThan(30);
+      expect(arena.bossDefeatTransition!.ticksRemaining).toBeGreaterThan(0);
+      // Upgrade draft must be deferred during the collapse!
+      expect(arena.isUpgradeDraftActive).toBe(false);
+      expect(arena.status).toBe("playing");
+
+      // Verify time scale override decay is active on subsequent step
+      arena.step(0.016, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(600, 320),
+        shoot: false,
+        reload: false,
+        restart: false,
+      });
+      const decayScale = arena.timeGovernor.getTimeScaleOverride();
+      expect(decayScale).not.toBeNull();
+      expect(decayScale!).toBeLessThanOrEqual(1.0);
+      expect(decayScale!).toBeGreaterThanOrEqual(0.12);
+
+      // Step until transition completes
+      while (arena.bossDefeatTransition?.active) {
+        arena.step(0.016, {
+          moveDir: vec2(0, 0),
+          mousePos: vec2(600, 320),
+          shoot: false,
+          reload: false,
+          restart: false,
+        });
+      }
+
+      expect(arena.bossDefeatTransition?.active).toBe(false);
+      expect(arena.timeGovernor.getTimeScaleOverride()).toBeNull();
+      expect(arena.isUpgradeDraftActive).toBe(true);
+    });
+
+    it("in-flight boss projectiles remain live and simulate continuous collision detection during collapse", () => {
+      const arena = new Arena(960, 640);
+      arena.obstacles = [];
+      arena.enemies = [];
+      const boss = new Enemy({
+        id: "boss-goliath",
+        type: "boss",
+        isBoss: true,
+        x: 600,
+        y: 320,
+        radius: 24,
+      });
+      if (boss.phaseController) {
+        boss.phaseController.currentPhaseIndex = 1;
+      }
+      boss.shields = 0;
+      arena.enemies = [boss];
+      arena.player.position = vec2(100, 320);
+
+      const lethalShot = createProjectile(
+        "lethal-player-shot",
+        vec2(550, 320),
+        0,
+        1000,
+        "player"
+      );
+      const hostileShot = createProjectile(
+        "hostile-bullet",
+        vec2(400, 320),
+        Math.PI,
+        200,
+        "enemy"
+      );
+      arena.projectiles = [lethalShot, hostileShot];
+
+      const initialBulletX = hostileShot.position.x;
+
+      arena.step(0.05, {
+        moveDir: vec2(1, 0),
+        mousePos: vec2(600, 320),
+        shoot: false,
+        reload: false,
+        restart: false,
+      });
+
+      expect(boss.isAlive).toBe(false);
+      expect(arena.bossDefeatTransition?.active).toBe(true);
+
+      // Hostile projectile remains live and moved westward towards player
+      expect(hostileShot.isAlive).toBe(true);
+      expect(hostileShot.position.x).toBeLessThan(initialBulletX);
+
+      // Continue stepping: bullet keeps advancing under continuous collision detection
+      const prevX = hostileShot.position.x;
+      arena.step(0.05, {
+        moveDir: vec2(0, 0),
+        mousePos: vec2(600, 320),
+        shoot: false,
+        reload: false,
+        restart: false,
+      });
+      expect(hostileShot.position.x).toBeLessThan(prevX);
+      expect(hostileShot.isAlive).toBe(true);
+    });
+
+    it("if in-flight projectile strikes player during collapse with 0 shields, player is eliminated and reward presentation is aborted", () => {
+      const arena = new Arena(960, 640);
+      arena.obstacles = [];
+      arena.enemies = [];
+      const boss = new Enemy({
+        id: "boss-goliath",
+        type: "boss",
+        isBoss: true,
+        x: 600,
+        y: 320,
+        radius: 24,
+      });
+      if (boss.phaseController) {
+        boss.phaseController.currentPhaseIndex = 1;
+      }
+      boss.shields = 0;
+      arena.enemies = [boss];
+      arena.player.position = vec2(100, 320);
+      arena.player.shields = 0;
+
+      // Lethal player bullet positioned to hit boss quickly
+      const lethalShot = createProjectile(
+        "lethal-player-shot",
+        vec2(550, 320),
+        0,
+        1000,
+        "player"
+      );
+      // Hostile bullet positioned to reach player (x=100) after boss death
+      const hostileShot = createProjectile(
+        "incoming-bullet",
+        vec2(250, 320),
+        Math.PI,
+        500,
+        "enemy"
+      );
+      arena.projectiles = [lethalShot, hostileShot];
+
+      // Deliver lethal shot to boss
+      arena.step(0.05, {
+        moveDir: vec2(1, 0),
+        mousePos: vec2(600, 320),
+        shoot: false,
+        reload: false,
+        restart: false,
+      });
+
+      expect(boss.isAlive).toBe(false);
+      expect(arena.bossDefeatTransition?.active).toBe(true);
+
+      // Step until either player is eliminated or transition ends
+      while (arena.status === "playing" && arena.player.isAlive && arena.projectiles.length > 0) {
+        arena.step(0.02, {
+          moveDir: vec2(0, 0),
+          mousePos: vec2(600, 320),
+          shoot: false,
+          reload: false,
+          restart: false,
+        });
+      }
+
+      // Boss was killed
+      expect(boss.isAlive).toBe(false);
+      // Player was struck by lingering hostile bullet and eliminated
+      expect(arena.player.isAlive).toBe(false);
+      expect(arena.status).toBe("defeat");
+      // Defeat must abort reward presentation
+      expect(arena.isUpgradeDraftActive).toBe(false);
+      expect(arena.bossDefeatTransition?.active).toBe(false);
+    });
+
+    it("if player has reactive shield, shield absorbs bullet with deflection sparks and player survives collapse", () => {
+      const arena = new Arena(960, 640);
+      arena.obstacles = [];
+      arena.enemies = [];
+      const boss = new Enemy({
+        id: "boss-goliath",
+        type: "boss",
+        isBoss: true,
+        x: 600,
+        y: 320,
+        radius: 24,
+      });
+      if (boss.phaseController) {
+        boss.phaseController.currentPhaseIndex = 1;
+      }
+      boss.shields = 0;
+      arena.enemies = [boss];
+      arena.player.position = vec2(100, 320);
+
+      // Equip reactive shield (gives shields)
+      arena.player.setAugmentation("reactiveShield", true);
+      // Give 2 shields to verify deflection sparks on non-breaking impact
+      arena.player.shields = 2;
+      expect(arena.player.shields).toBe(2);
+
+      const lethalShot = createProjectile(
+        "lethal-player-shot",
+        vec2(550, 320),
+        0,
+        1000,
+        "player"
+      );
+      const hostileShot = createProjectile(
+        "incoming-bullet",
+        vec2(250, 320),
+        Math.PI,
+        500,
+        "enemy"
+      );
+      arena.projectiles = [lethalShot, hostileShot];
+
+      const sparkSpy = vi.spyOn(arena.particles, "emitShieldSparks");
+      const deflectSpy = vi.spyOn(arena.soundSynth!, "playShieldDeflect");
+
+      // Deliver lethal shot to boss
+      arena.step(0.05, {
+        moveDir: vec2(1, 0),
+        mousePos: vec2(600, 320),
+        shoot: false,
+        reload: false,
+        restart: false,
+      });
+
+      expect(boss.isAlive).toBe(false);
+      expect(arena.bossDefeatTransition?.active).toBe(true);
+
+      // Step through until collapse completes
+      while (arena.bossDefeatTransition?.active || arena.projectiles.some((p) => p.isAlive)) {
+        arena.step(0.02, {
+          moveDir: vec2(0, 0),
+          mousePos: vec2(600, 320),
+          shoot: false,
+          reload: false,
+          restart: false,
+        });
+      }
+
+      // Boss is eliminated
+      expect(boss.isAlive).toBe(false);
+      // Shield deflected the bullet
+      expect(sparkSpy).toHaveBeenCalled();
+      expect(deflectSpy).toHaveBeenCalled();
+      expect(arena.player.shields).toBe(1);
+      expect(arena.player.isAlive).toBe(true);
+      expect(arena.status).toBe("playing");
+      // Player survived collapse: upgrade draft is presented!
+      expect(arena.isUpgradeDraftActive).toBe(true);
+    });
+  });
+
+  describe("Sub-Tick Render Interpolation", () => {
+    it("interpolates player, enemy, and projectile coordinates at alpha = 0.5 (midpoint)", () => {
+      const arena = new Arena();
+      const ctx = createMockCanvasContext();
+
+      arena.player.previousPosition = vec2(100, 200);
+      arena.player.position = vec2(200, 300);
+
+      const enemy = arena.enemies[0];
+      enemy.previousPosition = vec2(300, 400);
+      enemy.position = vec2(400, 500);
+      arena.enemies = [enemy];
+
+      const bullet = createProjectile(
+        "test-bullet",
+        vec2(50, 60),
+        0,
+        1000,
+        "player"
+      );
+      bullet.previousPosition = vec2(50, 60);
+      bullet.position = vec2(150, 160);
+      arena.projectiles = [bullet];
+
+      vi.spyOn(arena.timeGovernor, "getAlpha").mockReturnValue(0.5);
+      const enemyRenderSpy = vi.spyOn(EnemyRenderer, "render");
+      const anchorSpy = vi.spyOn(ChronoAnchorRenderer, "render");
+
+      arena.render(ctx);
+
+      // Alpha = 0.5: Midpoints
+      // Player midpoint: (150, 250)
+      expect(anchorSpy).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({
+          position: { x: 150, y: 250 },
+        })
+      );
+      expect(ctx.translate).toHaveBeenCalledWith(150, 250);
+
+      // Enemy midpoint: (350, 450)
+      expect(enemyRenderSpy).toHaveBeenCalledWith(
+        ctx,
+        enemy,
+        arena.player.position,
+        { x: 350, y: 450 }
+      );
+
+      // Bullet midpoint: (100, 110)
+      // tracer line: previousPosition (50, 60) -> head (100, 110)
+      expect(ctx.moveTo).toHaveBeenCalledWith(50, 60);
+      expect(ctx.lineTo).toHaveBeenCalledWith(100, 110);
+      // bullet head arc at (100, 110)
+      expect(ctx.arc).toHaveBeenCalledWith(100, 110, bullet.radius, 0, Math.PI * 2);
+    });
+
+    it("renders at previousPosition when alpha = 0", () => {
+      const arena = new Arena();
+      const ctx = createMockCanvasContext();
+
+      arena.player.previousPosition = vec2(100, 200);
+      arena.player.position = vec2(200, 300);
+
+      const enemy = arena.enemies[0];
+      enemy.previousPosition = vec2(300, 400);
+      enemy.position = vec2(400, 500);
+      arena.enemies = [enemy];
+
+      const bullet = createProjectile(
+        "test-bullet",
+        vec2(50, 60),
+        0,
+        1000,
+        "player"
+      );
+      bullet.previousPosition = vec2(50, 60);
+      bullet.position = vec2(150, 160);
+      arena.projectiles = [bullet];
+
+      vi.spyOn(arena.timeGovernor, "getAlpha").mockReturnValue(0);
+      const enemyRenderSpy = vi.spyOn(EnemyRenderer, "render");
+      const anchorSpy = vi.spyOn(ChronoAnchorRenderer, "render");
+
+      arena.render(ctx);
+
+      // Alpha = 0: previousPosition
+      expect(anchorSpy).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({
+          position: { x: 100, y: 200 },
+        })
+      );
+      expect(ctx.translate).toHaveBeenCalledWith(100, 200);
+
+      expect(enemyRenderSpy).toHaveBeenCalledWith(
+        ctx,
+        enemy,
+        arena.player.position,
+        { x: 300, y: 400 }
+      );
+
+      expect(ctx.lineTo).toHaveBeenCalledWith(50, 60);
+      expect(ctx.arc).toHaveBeenCalledWith(50, 60, bullet.radius, 0, Math.PI * 2);
+    });
+
+    it("renders at current position when alpha = 1", () => {
+      const arena = new Arena();
+      const ctx = createMockCanvasContext();
+
+      arena.player.previousPosition = vec2(100, 200);
+      arena.player.position = vec2(200, 300);
+
+      const enemy = arena.enemies[0];
+      enemy.previousPosition = vec2(300, 400);
+      enemy.position = vec2(400, 500);
+      arena.enemies = [enemy];
+
+      const bullet = createProjectile(
+        "test-bullet",
+        vec2(50, 60),
+        0,
+        1000,
+        "player"
+      );
+      bullet.previousPosition = vec2(50, 60);
+      bullet.position = vec2(150, 160);
+      arena.projectiles = [bullet];
+
+      vi.spyOn(arena.timeGovernor, "getAlpha").mockReturnValue(1);
+      const enemyRenderSpy = vi.spyOn(EnemyRenderer, "render");
+      const anchorSpy = vi.spyOn(ChronoAnchorRenderer, "render");
+
+      arena.render(ctx);
+
+      // Alpha = 1: current position
+      expect(anchorSpy).toHaveBeenCalledWith(
+        ctx,
+        expect.objectContaining({
+          position: { x: 200, y: 300 },
+        })
+      );
+      expect(ctx.translate).toHaveBeenCalledWith(200, 300);
+
+      expect(enemyRenderSpy).toHaveBeenCalledWith(
+        ctx,
+        enemy,
+        arena.player.position,
+        { x: 400, y: 500 }
+      );
+
+      expect(ctx.lineTo).toHaveBeenCalledWith(150, 160);
+      expect(ctx.arc).toHaveBeenCalledWith(150, 160, bullet.radius, 0, Math.PI * 2);
+    });
+
+    it("interpolates Cataclysm Overload aura origin when boss is overloading", () => {
+      const arena = new Arena();
+      const ctx = createMockCanvasContext();
+
+      const boss = arena.enemies[0];
+      boss.previousPosition = vec2(200, 200);
+      boss.position = vec2(300, 300);
+      vi.spyOn(boss, "isOverloading", "get").mockReturnValue(true);
+      vi.spyOn(boss, "overloadTicksRemaining", "get").mockReturnValue(30);
+      arena.enemies = [boss];
+
+      vi.spyOn(arena.timeGovernor, "getAlpha").mockReturnValue(0.5);
+      const auraSpy = vi.spyOn(arena, "renderCataclysmAura");
+
+      arena.render(ctx);
+
+      expect(auraSpy).toHaveBeenCalledWith(ctx, boss, { x: 250, y: 250 });
     });
   });
 });
