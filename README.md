@@ -3,37 +3,27 @@
 > A top-down tactical arcade puzzle-shooter where **time moves only when you move**.
 
 [![CI](https://github.com/k-electron/chronoshot/actions/workflows/ci.yml/badge.svg)](https://github.com/k-electron/chronoshot/actions/workflows/ci.yml)
-[![Cloudflare Pages](https://img.shields.io/badge/Deployed%20with-Cloudflare%20Pages-F38020.svg?logo=cloudflare)](https://pages.cloudflare.com/)
+[![Cloudflare Pages](https://img.shields.io/badge/Hosted%20on-Cloudflare%20Pages-F38020.svg?logo=cloudflare)](https://chronoshot.pages.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg)](https://vitejs.dev/)
-[![Tests](https://img.shields.io/badge/Tests-740%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-768%20passing-brightgreen.svg)]()
 
 ---
 
-```
-+-----------------------------------------------------------------------+
-| 05 // SECTOR 1 BOSS          CHRONO // 0.05x [||        ] [ESC] PAUSE|
-| [BOSS // GOLIATH-01: AEGIS COLOSSUS]               SHIELDS: [▮▮▮▮]    |
-|                                                                       |
-|        # # # # # # # # # # # # # # # # # # # # # # # # # #            |
-|        #                                                 #            |
-|        #    [▲ Escort: Grunt]                            #            |
-|        #       *   .   .   . (bullet creeping at 5%)     #            |
-|        #        \                                        #            |
-|        #       +-------+               /-----\           #            |
-|        #       | BUNKER|              | (x)   | <-- BOSS #            |
-|        #       +-------+               \-----/           #            |
-|        #                                                 #            |
-|        #                [● You: Cyan] ----> [· Reticle]  #            |
-|        #                                                 #            |
-|        #                               [▲ Escort: Grunt] #            |
-|        # # # # # # # # # # # # # [EXIT GATE] # # # # # # #            |
-|                                                                       |
-| (O) 6 / 6 CYLINDER                                                    |
-|     READY                                                             |
-+-----------------------------------------------------------------------+
-```
+<p align="center">
+  <a href="https://chronoshot.pages.dev/">
+    <img src="docs/assets/gameplay-preview.gif" alt="ChronoShot Tactical Gameplay Preview" width="800" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://chronoshot.pages.dev/">
+    <img src="https://img.shields.io/badge/▶%20PLAY%20NOW-chronoshot.pages.dev-00f0ff?style=for-the-badge&logo=googlechrome&logoColor=black&labelColor=0a0e14" alt="Play ChronoShot Online" height="48" />
+  </a>
+  <br />
+  <sub>⚡ Zero install required &bull; 60 Hz deterministic simulation &bull; Playable in any desktop browser</sub>
+</p>
 
 ---
 

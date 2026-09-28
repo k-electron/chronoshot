@@ -592,6 +592,21 @@ describe("RoomManager Tactical Puzzle Progression", () => {
       expect(manager.getCurrentRoom().roomNumber).toBe(20);
       expect(manager.endlessDirector).toBeUndefined();
     });
+
+    it("jumps to a specific room number via jumpToRoom", () => {
+      const manager = new RoomManager();
+      expect(manager.getCurrentRoom().roomNumber).toBe(1);
+
+      const success = manager.jumpToRoom(4);
+      expect(success).toBe(true);
+      expect(manager.getCurrentRoom().roomNumber).toBe(4);
+      expect(manager.getCurrentRoomIndex()).toBe(3);
+      expect(manager.isExitUnlocked()).toBe(false);
+
+      const invalid = manager.jumpToRoom(999);
+      expect(invalid).toBe(false);
+      expect(manager.getCurrentRoom().roomNumber).toBe(4);
+    });
   });
 
   describe("Cyberpunk Iris Portal Transition Integration", () => {

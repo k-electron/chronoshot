@@ -32,14 +32,23 @@ window.addEventListener("DOMContentLoaded", () => {
 
   const urlParams = new URLSearchParams(window.location.search);
   const shouldSkipCampaign = urlParams.has("skip");
+  const roomParam = urlParams.get("room");
 
   const roomManager = new RoomManager();
   const soundSynth = new SoundSynthesizer();
   const arena = new Arena(960, 640, roomManager, soundSynth);
 
-  if (shouldSkipCampaign) {
+  if (roomParam) {
+    const roomNum = parseInt(roomParam, 10);
+    if (!isNaN(roomNum) && roomManager.jumpToRoom(roomNum)) {
+      arena.loadRoom(roomManager.getCurrentRoom());
+    }
+  } else if (shouldSkipCampaign) {
     arena.bypassToCampaignVictory();
   }
+
+  // Expose arena on window for developer tooling & capture scripts
+  (window as unknown as { __arena?: Arena }).__arena = arena;
 
   // Resume Web Audio on first user interaction to comply with browser autoplay policies
   const resumeAudio = () => {

@@ -265,6 +265,26 @@ export class RoomManager {
   }
 
   /**
+   * Directly jumps the manager to a specific room number (for playtest / dev navigation).
+   */
+  public jumpToRoom(roomNumber: number): boolean {
+    if (this.endlessDirector) {
+      this.endlessDirector = undefined;
+      if (this.rooms.length > 20) {
+        this.rooms = this.rooms.slice(0, 20);
+      }
+    }
+    const idx = this.rooms.findIndex((r) => r.roomNumber === roomNumber);
+    if (idx !== -1) {
+      this.currentRoomIndex = idx;
+      this.exitUnlocked = false;
+      this.gameCompleted = false;
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Renders the Exit Portal on the canvas with animated state feedback.
    * Suppressed in boss rooms and Endless Survival Mode.
    */
