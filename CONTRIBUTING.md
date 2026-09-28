@@ -96,6 +96,23 @@ ChronoShot utilizes [OpenSpec](https://github.com/openspec/openspec) to maintain
 
 ---
 
+## 🌐 Deployment (Cloudflare Pages)
+
+ChronoShot is hosted as a static Single-Page Application on [Cloudflare Pages](https://pages.cloudflare.com/).
+
+### Build Configuration
+When setting up or updating Cloudflare Pages deployments:
+1. In the [Cloudflare Dashboard](https://dash.cloudflare.com/), navigate to **Workers & Pages** > **Create application** > **Pages** > **Connect to Git**.
+2. Select the repository (`k-electron/chronoshot`).
+3. Configure the build settings:
+   - **Framework preset**: `Vite` (or None)
+   - **Build command**: `npm run build`
+   - **Build output directory**: `dist`
+   - **Environment variables**: Set `NODE_VERSION` to `26` (matches `.nvmrc`).
+4. Static assets and security headers (`public/_headers`) and SPA routing rules (`public/_redirects`) are automatically served from the `dist/` root.
+
+---
+
 ## 📄 License
 
 By contributing to ChronoShot, you agree that your contributions will be licensed under the project's [MIT License](LICENSE).
