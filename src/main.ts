@@ -8,27 +8,24 @@ import { SoundSynthesizer } from "./audio/SoundSynthesizer";
 import { Arena, ArenaInput } from "./entities/Arena";
 import { RoomManager } from "./levels/RoomManager";
 import { vec2 } from "./math/vector";
+import { PixiArenaRenderer } from "./rendering/PixiArenaRenderer";
 
-window.addEventListener("DOMContentLoaded", () => {
+window.addEventListener("DOMContentLoaded", async () => {
   const canvas = document.getElementById("game-canvas") as HTMLCanvasElement | null;
   if (!canvas) {
     console.error("Game canvas element not found");
     return;
   }
 
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    console.error("Failed to acquire 2D canvas context");
-    return;
-  }
-
-  // High-DPI canvas backing store buffer scaling
-  const dpr = Math.min(window.devicePixelRatio || 1, 3);
-  canvas.width = Math.round(960 * dpr);
-  canvas.height = Math.round(640 * dpr);
   canvas.style.width = "960px";
   canvas.style.height = "640px";
-  ctx.scale(dpr, dpr);
+
+  const pixiRenderer = new PixiArenaRenderer();
+  await pixiRenderer.init(canvas, {
+    width: 960,
+    height: 640,
+    preserveDrawingBuffer: true,
+  });
 
   const urlParams = new URLSearchParams(window.location.search);
   const shouldSkipCampaign = urlParams.has("skip");
@@ -220,7 +217,7 @@ window.addEventListener("DOMContentLoaded", () => {
     canvas!.style.cursor = arena.getDesiredCursor(mousePos);
 
     // Render frame
-    arena.render(ctx!, wallDeltaTime);
+    pixiRenderer.render(arena, wallDeltaTime);
 
     requestAnimationFrame(loop);
   }

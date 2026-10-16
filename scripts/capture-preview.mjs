@@ -42,7 +42,6 @@ async function main() {
     if (!arena) throw new Error("Arena not found on window");
 
     const canvas = document.getElementById("game-canvas");
-    const ctx = canvas.getContext("2d");
 
     const { GIFEncoder, quantize, applyPalette } = window.exports;
     const gif = GIFEncoder();

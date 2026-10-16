@@ -128,4 +128,65 @@ export class Reticle {
 
     ctx.restore();
   }
+
+  /**
+   * Renders the hardware reticle into a Pixi Graphics display object.
+   */
+  public renderPixi(
+    g: any,
+    target: Vector2D,
+    timeScale: number = 0.05,
+    reloadProgress: number = 0,
+    isReloading: boolean = false
+  ): void {
+    const x = target ? target.x : 0;
+    const y = target ? target.y : 0;
+    const isDryFiring = this.dryFireFlashTimer > 0;
+
+    g.clear();
+
+    const speedFactor = Math.max(0, Math.min(1, (timeScale - 0.05) / 0.95));
+    const innerGap = 5 + speedFactor * 3.5;
+    const tickLength = 5;
+
+    let strokeHex = 0x00f0ff;
+    let dotHex = 0xffffff;
+
+    if (isDryFiring) {
+      strokeHex = 0xff3344;
+      dotHex = 0xff3344;
+    } else if (isReloading) {
+      strokeHex = 0xffb300;
+      dotHex = 0xffb300;
+    }
+
+    // 1. Center precision micro-dot
+    g.circle(x, y, 1.5).fill({ color: dotHex });
+
+    // 2. Directional hairline tick marks
+    g.moveTo(x, y - innerGap - tickLength).lineTo(x, y - innerGap);
+    g.moveTo(x, y + innerGap).lineTo(x, y + innerGap + tickLength);
+    g.moveTo(x - innerGap - tickLength, y).lineTo(x - innerGap, y);
+    g.moveTo(x + innerGap, y).lineTo(x + innerGap + tickLength, y);
+    g.stroke({ width: 1.25, color: strokeHex });
+
+    // 3. Circular Reload Progress Arc
+    if (isReloading) {
+      const reloadRadius = innerGap + 2;
+      const clampedProg = Math.max(0, Math.min(1, reloadProgress));
+
+      g.circle(x, y, reloadRadius).stroke({ width: 1, color: 0xffb300, alpha: 0.25 });
+
+      if (clampedProg > 0) {
+        const startAngle = -Math.PI / 2;
+        const endAngle = startAngle + clampedProg * Math.PI * 2;
+        g.arc(x, y, reloadRadius, startAngle, endAngle).stroke({ width: 1.5, color: 0xffb300 });
+      }
+    }
+
+    // 4. Dry-fire warning ring
+    if (isDryFiring) {
+      g.circle(x, y, 12).stroke({ width: 1, color: 0xff3344 });
+    }
+  }
 }

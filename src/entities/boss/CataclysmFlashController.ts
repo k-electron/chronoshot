@@ -505,4 +505,40 @@ export class CataclysmFlashController {
     ctx.fill();
     ctx.restore();
   }
+
+  /**
+   * Renders the occluded screen flash to a Pixi Graphics display object.
+   */
+  public renderPixi(
+    g: any,
+    obstacles: readonly Obstacle[],
+    width: number = 960,
+    height: number = 640
+  ): void {
+    if (!this.isActive()) {
+      g.clear();
+      return;
+    }
+
+    const alpha = this.getAlpha();
+    if (alpha <= 0.001) {
+      g.clear();
+      return;
+    }
+
+    const polygon = computeVisibilityPolygon(this.origin, obstacles, width, height);
+    if (polygon.length < 3) {
+      g.clear();
+      return;
+    }
+
+    g.clear();
+    const flatPoints: number[] = [];
+    for (const pt of polygon) {
+      flatPoints.push(pt.x, pt.y);
+    }
+
+    const hex = this.color.startsWith("#") ? parseInt(this.color.slice(1), 16) : 0xff1744;
+    g.poly(flatPoints).fill({ color: hex, alpha });
+  }
 }

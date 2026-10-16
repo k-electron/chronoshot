@@ -89,4 +89,54 @@ export class ChronoAnchorRenderer {
 
     ctx.restore();
   }
+
+  /**
+   * Renders ChronoAnchor clamps and progress arc to a Pixi Graphics display object.
+   */
+  public static renderPixi(
+    g: any,
+    options: ChronoAnchorRenderOptions
+  ): void {
+    if (!options.isReloading) {
+      return;
+    }
+
+    const { radius, progress } = options;
+    const clampedProgress = Math.max(0, Math.min(1, progress));
+    const anchorRadius = radius + 10;
+
+    // 1. Ground Anchor Base Track Ring
+    g.circle(0, 0, anchorRadius).stroke({ width: 1.5, color: 0x384556 });
+
+    // 2. Three Ground Anchor Clamps arranged at 120-degree intervals
+    const clampAngles = [-Math.PI / 2, Math.PI / 6, (5 * Math.PI) / 6];
+    for (const angle of clampAngles) {
+      const clampDist = anchorRadius + 3;
+      const cx = Math.cos(angle) * clampDist;
+      const cy = Math.sin(angle) * clampDist;
+
+      // Anchor pin
+      g.circle(cx, cy, 2.5)
+        .fill({ color: 0xffb300 })
+        .stroke({ width: 1, color: 0xffffff });
+
+      // Hairline bracket to base ring
+      g.moveTo(Math.cos(angle) * (anchorRadius - 2), Math.sin(angle) * (anchorRadius - 2));
+      g.lineTo(cx, cy);
+      g.stroke({ width: 1, color: 0xffb300 });
+    }
+
+    // 3. Radial Progress Sweep Arc
+    if (clampedProgress > 0) {
+      const startAngle = -Math.PI / 2;
+      const endAngle = startAngle + clampedProgress * Math.PI * 2;
+
+      g.arc(0, 0, anchorRadius, startAngle, endAngle)
+        .stroke({ width: 2.5, color: 0xffb300 });
+
+      const leadX = Math.cos(endAngle) * anchorRadius;
+      const leadY = Math.sin(endAngle) * anchorRadius;
+      g.circle(leadX, leadY, 3).fill({ color: 0xffffff });
+    }
+  }
 }

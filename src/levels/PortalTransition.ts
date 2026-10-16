@@ -190,6 +190,55 @@ export class PortalTransitionController {
   }
 
   /**
+   * Renders the octagonal aperture cutout and blades to a Pixi Graphics display object.
+   */
+  public renderPixi(
+    g: any,
+    width: number,
+    height: number
+  ): void {
+    if (this.phase === "none") {
+      g.clear();
+      return;
+    }
+
+    const center = this.phase === "ingress" ? this.portalCenter : this.egressCenter;
+    const radius = this.getRadius();
+
+    g.clear();
+
+    // 1. Dark shroud
+    g.rect(0, 0, width, height).fill({ color: 0x0b0d11, alpha: 0.95 });
+
+    // 2. Octagonal hole cutout
+    if (radius > 0.5 && typeof g.cut === "function") {
+      const vertices: number[] = [];
+      for (let i = 0; i < 8; i++) {
+        const angle = (i * Math.PI) / 4;
+        vertices.push(center.x + radius * Math.cos(angle), center.y + radius * Math.sin(angle));
+      }
+      g.poly(vertices);
+      g.cut();
+
+      // Octagonal cyan rim
+      g.poly(vertices).stroke({ width: 2.5, color: 0x00f0ff });
+
+      // 8 hairline aperture blades radiating outward
+      const bladeLength = Math.min(40, radius * 0.4 + 15);
+      for (let i = 0; i < 8; i++) {
+        const angle = (i * Math.PI) / 4;
+        const vx = center.x + radius * Math.cos(angle);
+        const vy = center.y + radius * Math.sin(angle);
+        g.moveTo(vx, vy).lineTo(
+          vx + bladeLength * Math.cos(angle),
+          vy + bladeLength * Math.sin(angle)
+        );
+      }
+      g.stroke({ width: 1, color: 0x00f0ff, alpha: 0.6 });
+    }
+  }
+
+  /**
    * Returns the current lifecycle phase ("none" | "ingress" | "egress").
    */
   public getPhase(): PortalTransitionPhase {

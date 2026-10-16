@@ -12,17 +12,20 @@ Welcome, AI agent! This document provides essential project context, architectur
 - **Tech Stack**:
   - **Language**: TypeScript 5.4+ (strict mode enabled)
   - **Bundler**: Vite 5.4
-  - **Runtime**: Browser HTML5 Canvas 2D & Web Audio API
-  - **Testing**: Vitest 1.6+
+  - **Runtime**: Browser WebGL/WebGPU (Pixi.js v8), Canvas & Web Audio API
+  - **Testing**: Vitest 1.6+ (headless pure-Node testing with PixiContext2DAdapter)
   - **Specifications**: OpenSpec (spec-driven development)
 
 ---
 
 ## 🏛️ Architecture & Core Principles
 
-ChronoShot is deliberately engineered without heavy third-party game engines (no Phaser, Three.js, or Pixi.js). Keep the engine lean, transparent, and deterministic.
+ChronoShot strictly decouples **deterministic simulation** from **hardware-accelerated presentation**:
+- **Simulation Layer**: Lean, deterministic, zero-dependency TypeScript running discrete 60 Hz physics quanta (`FixedStepSimulator`), time dilation (`TimeGovernor`), Continuous Collision Detection raycasting, and procedural Web Audio (`SoundSynthesizer`).
+- **Presentation Layer**: Hardware-accelerated WebGL/WebGPU rendering driven by **Pixi.js v8** (`PixiArenaRenderer`, `StageCoordinator`, and `WorldFilterPipeline`).
+- **Headless Test Compatibility**: All unit tests run in Vitest's pure Node environment (`environment: "node"`, <1.5s total execution) using pure TypeScript display mocks and `PixiContext2DAdapter`, ensuring zero dependence on native C++/GL drivers.
 
-### 1. Decoupled Simulation & Rendering
+### 1. Decoupled Simulation & 12-Layer Scene Graph
 - **`FixedStepSimulator`**: Executes discrete 60 Hz physics quanta (`fixedDeltaTime = 1 / 60`).
 - **`TimeGovernor`**: Governs global time dilation:
   - **Micro-Creep**: 5% simulation velocity (`0.05x`) when player is stationary.
@@ -31,10 +34,26 @@ ChronoShot is deliberately engineered without heavy third-party game engines (no
     - Fire weapon: `+6` simulation ticks (instantaneous recoil burst).
     - Reload weapon: Smooth multi-frame real-time channel (`1.00x` speed) spanning 30 simulation ticks (15 with Speed Loader) while player locomotion is anchored (`velocity = 0`) with 360-degree aiming freedom, sequential chamber loading, and emergency Dash breakout with partial ammo retention.
 - **Sub-Tick Render Interpolation (`lerp(previousPosition, position, alpha)`)**:
-  - `Arena.render()` queries the sub-tick fractional accumulator `alpha = timeGovernor.getAlpha()` ($[0, 1)$) and interpolates visual render coordinates for Player, Enemies, and Projectile tracer heads/tails:
+  - `PixiArenaRenderer` and `Arena.render()` query the sub-tick fractional accumulator `alpha = timeGovernor.getAlpha()` ($[0, 1)$) and interpolate visual render coordinates for Player, Enemies, and Projectile tracer heads/tails:
     $$\vec{p}_{\text{render}} = \vec{p}_{\text{prev}} \cdot (1 - \alpha) + \vec{p}_{\text{curr}} \cdot \alpha$$
   - Provides judder-free visual motion across 60Hz, 120Hz, 144Hz, 240Hz, and VRR displays while preserving deterministic 60 Hz fixed-step physics.
-- **High-DPI Retina/4K Backing Store Scaling**: Canvas backing pixel buffer scales dynamically with $\min(\text{devicePixelRatio}, 3)$ via `ctx.scale(dpr, dpr)` in `src/main.ts`, delivering razor-sharp hairline HUD vectors while preserving exact $960 \times 640$ virtual coordinate mouse targeting.
+- **Strict 12-Layer Z-Order Hierarchy**:
+  - **`worldContainer` (GPU Post-Processing Filters Applied)**:
+    1. `FloorGridLayer`: `#0e1117` base and `#161b22` 40px grid.
+    2. `PortalLayer`: Floor exit portal beacon.
+    3. `CataclysmFlashLayer`: 2D raycast visibility-polygon flash rendered *beneath* obstacles and units to preserve cover silhouettes.
+    4. `ObstacleLayer`: `#1e242f` walls/pillars with `#384556` strokes.
+    5. `ProjectileLayer`: Pooled luminous tracer lines and bullet cores (`DisplayObjectPool`).
+    6. `TelegraphLayer`: Warning rings, dashed passive sightlines (`drawDashedLine`), and Marksman charging beams.
+    7. `EntityLayer`: Operative chassis (`PlayerPixiDisplay`), reactive shield rings, and procedural enemy hulls (`EnemyPixiDisplay`).
+    8. `ParticleLayer`: Pooled wall-clock shard debris, deflection sparks, and shockwaves.
+  - **`hudContainer` (Unfiltered for Razor-Sharp Hairline Vectors & Typography)**:
+    9. `TelemetryLayer`: `TimeHUD`, `CylinderHUD`, `BossTelemetryHUD`, `EndlessTelemetryHUD`, room header.
+    10. `ReticleLayer`: In-canvas precision crosshair (`Reticle.renderPixi`).
+    11. `PortalTransitionLayer`: Octagonal iris cutout (`.cut()`) and cyan blades.
+    12. `ModalOverlayLayer`: Pause matrix card, `UpgradeDraftHUD`, `DefeatHUD`, `VictoryHUD`.
+- **GPU Post-Processing Pipeline (`WorldFilterPipeline`)**: Luminance-thresholded bloom (>0.65 luminance) ensuring dark surfaces remain un-bloomed, chromatic aberration pulses on damage/dash, and radial shockwave ripples on Cataclysm detonations.
+- **High-DPI Retina/4K Backing Store Scaling**: Canvas backing pixel buffer scales dynamically with $\min(\text{devicePixelRatio}, 3)$ via `resolution: dpr` and `autoDensity: true`, delivering razor-sharp hairline HUD vectors while preserving exact $960 \times 640$ virtual coordinate mouse targeting.
 - **Persistent Wall-Clock Particle Simulation**: Visual debris, crystalline shatter shards, and deflection sparks continue updating in wall-clock time (`particles.update(wallDeltaTime)`) during UI overlays (Upgrade Draft, Pause, Defeat, Victory) so particles drift and dissipate naturally rather than freezing mid-air.
 - **`Arena`**: Coordinates entities (`Player`, `Enemy`, `Obstacle`, `Projectile`, `ParticleSystem`), dynamic entity instantiation (`spawnEnemy`), collision passes, and room progression with unified player elimination lifecycle checks.
 
