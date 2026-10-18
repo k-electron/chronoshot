@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg)](https://vitejs.dev/)
-[![Tests](https://img.shields.io/badge/Tests-768%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-803%20passing-brightgreen.svg)]()
 
 ---
 
@@ -56,13 +56,15 @@ Conquer 20 handcrafted combat rooms across four distinct sectors, defeat 4 multi
 
 ## 🏗️ Architecture & Engine Philosophy
 
-ChronoShot is deliberately built from scratch without third-party game engines (no Phaser, Pixi.js, or Three.js).
+ChronoShot is built with a strictly decoupled architecture separating **deterministic simulation** from **hardware-accelerated presentation**:
 
-- **Simulation**: Deterministic 60 Hz fixed-step physics (`FixedStepSimulator`) decoupled from display refresh rates.
-- **Render Interpolation**: Sub-tick coordinate smoothing (`lerp(prev, curr, alpha)`) delivers judder-free visual motion across 60Hz–240Hz+ displays.
+- **Simulation**: Lean, deterministic, zero-dependency TypeScript running discrete 60 Hz physics quanta (`FixedStepSimulator`), time dilation (`TimeGovernor`), Continuous Collision Detection raycasting, and procedural Web Audio (`SoundSynthesizer`).
+- **Presentation**: Hardware-accelerated WebGL/WebGPU rendering powered by **Pixi.js v8** (`PixiArenaRenderer`, `StageCoordinator`, and `WorldFilterPipeline`) with a 12-layer scene graph and GPU post-processing filters (luminance-thresholded bloom, chromatic aberration pulses, radial shockwaves).
+- **Render Interpolation**: Sub-tick coordinate smoothing (`lerp(prev, curr, alpha)`) delivers judder-free visual motion across 60Hz–240Hz+ displays while preserving deterministic 60 Hz physics.
 - **Ballistics**: Continuous Collision Detection (CCD) line-segment raycasts eliminate projectile tunneling.
 - **Procedural Audio**: 100% synthesized in real time via Web Audio API—zero external audio binaries (`.mp3`/`.wav`) with continuous dynamic pitch dilation.
-- **AI Navigation**: $48 \times 32$ tile-grid A* pathfinding paired with continuous swept-circle physical clearance and anti-freeze tangent deflectors.
+- **AI Navigation**: $48 \times 32$ tile-grid A* pathfinding paired with continuous swept-circle physical clearance, Minkowski raycasts, and anti-freeze tangent deflectors.
+- **Headless Testing**: All 800+ automated unit & integration tests run deterministically in Vitest's pure Node environment (<1.5s total execution) via `PixiContext2DAdapter` with zero native C++/GPU driver dependencies.
 
 ```
 +-------------------------------------------------------------------------+
@@ -89,10 +91,11 @@ ChronoShot is deliberately built from scratch without third-party game engines (
                                     |
                                     v  (interpolated frame state)
 +-------------------------------------------------------------------------+
-|                       CANVAS 2D RENDERER                                |
-|  - High-contrast geometric minimalism (Cyan Player, Crimson Enemies)    |
-|  - Glowing bullet tracers, fading trails, and crystalline shatter shards |
-|  - Interactive Revolver Cylinder HUD & Time Dilation Meter              |
+|                  PIXI.JS V8 & GPU FILTER PIPELINE                       |
+|  - 12-layer scene graph (worldContainer filtered + hudContainer crisp)  |
+|  - Luminance-thresholded radiant bloom, chromatic aberration, shockwave |
+|  - Pooled projectile tracer lines and wall-clock crystalline debris     |
+|  - Hairline Revolver Cylinder HUD, Reticle, and Time Dilation Telemetry |
 +-------------------------------------------------------------------------+
 ```
 
@@ -121,7 +124,7 @@ Visit `http://localhost:5173` in your browser.
 ChronoShot features an outcome-based automated test suite verifying physics, time dilation, weapons, AI steering, and progression:
 
 ```bash
-# Run unit & integration test suite (760+ tests in ~1.0s)
+# Run unit & integration test suite (800+ tests in ~1.2s)
 npm test
 
 # Run tests in continuous watch mode
